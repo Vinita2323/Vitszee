@@ -76,7 +76,7 @@ const CustomerAuth = () => {
     const { login } = useAuth();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
-    const logoUrl = "/Logo.png";
+    const logoUrl = "/Vitszeefinallog-removebg-preview.png";
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -272,16 +272,16 @@ const CustomerAuth = () => {
                         </div>
                     </motion.div>
 
-                    {/* Circular Carousel Control */}
+                    {/* Square Logo Box */}
                     <div className="relative -mt-14 flex justify-center z-20">
-                        <div className="w-28 h-28 rounded-full bg-white border-4 border-white shadow-[0_15px_40px_rgba(97,218,251,0.2)] flex items-center justify-center overflow-hidden transition-shadow duration-1000" style={{ boxShadow: `0 15px 40px ${activeCategory.shadow}` }}>
+                        <div className="w-36 h-28 rounded-2xl bg-white border-4 border-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] flex items-center justify-center p-2.5 transition-shadow duration-1000" style={{ boxShadow: `0 15px 40px ${activeCategory.shadow}` }}>
                             <AnimatePresence mode="wait">
                                     <motion.div
                                         key={carouselIndex}
-                                        initial={{ opacity: 0, scale: 0.5, rotate: -20 }}
-                                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                                        exit={{ opacity: 0, scale: 1.5, rotate: 20 }}
-                                        className="w-full h-full"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 1.2 }}
+                                        className="w-full h-full flex items-center justify-center"
                                         style={{ color: activeCategory.text }}
                                     >
                                         {logoUrl ? (
@@ -289,7 +289,7 @@ const CustomerAuth = () => {
                                                 src={logoUrl}
                                                 alt={`${appName} logo`}
                                                 loading="lazy"
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-full object-contain"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: activeCategory.color }}>

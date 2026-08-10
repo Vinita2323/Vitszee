@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Order from './app/models/order.js';
 
-await mongoose.connect('mongodb+srv://dmgroceriesvegetables_db_user:Dm%40123@cluster0.lbxmrpo.mongodb.net/quickcom');
+await mongoose.connect(process.env.MONGO_URI);
 const o = await Order.findOne({orderId: 'ORD-01KY9DMQWQXA2ZEGJGM0ESEV01'}).lean();
 if (o) {
   console.log(JSON.stringify({

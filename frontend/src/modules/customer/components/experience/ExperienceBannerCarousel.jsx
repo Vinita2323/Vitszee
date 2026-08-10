@@ -5,6 +5,8 @@ import {
   applyCloudinaryTransform,
   buildCloudinarySrcSet,
   isCloudinaryUrl,
+  handleImageError,
+  DEFAULT_BANNER_IMAGE,
 } from "@/core/utils/imageUtils";
 
 import { isMobileOrWebView } from "@/core/utils/deviceUtils";
@@ -104,6 +106,7 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
                 }
                 sizes="100vw"
                 alt={banner.title || section?.title || "Banner"}
+                onError={(e) => handleImageError(e, DEFAULT_BANNER_IMAGE)}
                 className="w-full h-full object-contain object-center pointer-events-none"
                 loading={idx === 0 ? "eager" : "lazy"}
                 fetchPriority={idx === 0 ? "high" : "low"}
@@ -124,6 +127,7 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
                   }
                   sizes="(max-width: 768px) 100vw, 560px"
                   alt={banner.title || section?.title || "Banner"}
+                  onError={(e) => handleImageError(e, DEFAULT_BANNER_IMAGE)}
                   className="w-full h-full object-cover object-center pointer-events-none"
                   loading={idx === 0 ? "eager" : "lazy"}
                   fetchPriority={idx === 0 ? "high" : "low"}

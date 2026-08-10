@@ -81,7 +81,12 @@ export const CartProvider = ({ children }) => {
         const response = await customerApi.getCart();
         setCart(normalizeBackendCart(response.data.result.items));
       } catch (error) {
-        console.error("Failed to fetch cart from backend", error);
+        if (error.response?.status === 401) {
+          console.warn("Cart fetch unauthorized (session expired or invalid token). Falling back to guest cart.");
+          setCart(loadGuestCart());
+        } else {
+          console.error("Failed to fetch cart from backend", error);
+        }
       } finally {
         setLoading(false);
       }

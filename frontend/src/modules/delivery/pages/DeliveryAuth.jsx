@@ -36,7 +36,7 @@ const DeliveryAuth = () => {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const appName = settings?.appName || "App";
-  const logoUrl = "/Logo.png";
+  const logoUrl = "/Vitszeefinallog-removebg-preview.png";
   const { login, user, isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -248,9 +248,9 @@ const DeliveryAuth = () => {
             </svg>
           </div>
 
-          {/* Logo Container (No Circle) */}
-          <div className="relative -mt-28 self-center z-10 flex justify-center">
-            <img src="/Logo.png" alt="Logo" className="w-44 h-44 object-contain" />
+          {/* Logo Container (Square Box) */}
+          <div className="relative -mt-24 self-center z-10 flex items-center justify-center bg-white p-3 rounded-2xl shadow-lg border border-slate-100 w-36 h-28">
+            <img src="/Vitszeefinallog-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
 
           <AnimatePresence mode="wait">

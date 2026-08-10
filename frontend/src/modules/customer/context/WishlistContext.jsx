@@ -44,7 +44,12 @@ export const WishlistProvider = ({ children }) => {
         setWishlist(backendWishlist);
         setIsFullDataFetched(false);
       } catch (error) {
-        console.error("Failed to fetch wishlist from backend", error);
+        if (error.response?.status === 401) {
+          console.warn("Wishlist fetch unauthorized (session expired or invalid token). Falling back to guest wishlist.");
+          setWishlist(loadGuestWishlist());
+        } else {
+          console.error("Failed to fetch wishlist from backend", error);
+        }
       } finally {
         setLoading(false);
       }

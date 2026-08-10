@@ -122,7 +122,7 @@ const CodCash = () => {
         key: key,
         amount: amount * 100, // Amount in paise
         currency: "INR",
-        name: "DM Groceries",
+        name: "Vitzee Market",
         description: "COD Cash Deposit",
         order_id: orderId,
         handler: async function (response) {

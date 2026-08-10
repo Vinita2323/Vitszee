@@ -20,13 +20,13 @@ const LOCATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const LocationProvider = ({ children }) => {
   // Default location (used until we can resolve a better one)
   const [currentLocation, setCurrentLocation] = useState({
-    name: "214, Rajshri Palace Colony, Pipliyahana, Indore, Madhya Pradesh 452018, India",
+    name: "169, 507, Corporate House, RNT Marg, Near Central Mall, Flim Colony, South Tukoganj, Indore, Madhya Pradesh 452001, India",
     time: "12-15 mins",
     city: "Indore",
     state: "Madhya Pradesh",
-    pincode: "452018",
-    latitude: 22.711140989838025,
-    longitude: 75.9001552518043,
+    pincode: "452001",
+    latitude: 22.71760605465747,
+    longitude: 75.87197264240304,
   });
 
   // Address list for drawer UI – will be hydrated from profile API.
@@ -288,33 +288,21 @@ export const LocationProvider = ({ children }) => {
     refreshAddresses();
   }, [refreshAddresses]);
 
-  // On mount: only restore from cache. Do NOT auto-fetch – browsers block the
-  // location prompt unless it's triggered by a user gesture (e.g. tap).
+  // On mount: force static location to match seller location
   useEffect(() => {
-    const parsed = getJSON(STORAGE_KEY, null);
-    const addressName = parsed?.address || parsed?.name;
-    if (parsed && addressName) {
-      updateLocation(
-        {
-          name: addressName,
-          time: parsed.time || "12-15 mins",
-          city: parsed.city,
-          state: parsed.state,
-          pincode: parsed.pincode,
-          latitude: parsed.latitude,
-          longitude: parsed.longitude,
-        },
-        { persist: false, updateSavedHome: false },
-      );
-    } else {
-      // If no location is stored (or TTL expired), persist the default
-      // immediately so subsequent reads have something to anchor on.
-      updateLocation(currentLocation, {
-        persist: true,
-        updateSavedHome: false,
-      });
-    }
-    // Live fetch happens only when user taps location pill or "Use current location"
+    const staticSellerLocation = {
+      name: "169, 507, Corporate House, RNT Marg, Near Central Mall, Flim Colony, South Tukoganj, Indore, Madhya Pradesh 452001, India",
+      time: "12-15 mins",
+      city: "Indore",
+      state: "Madhya Pradesh",
+      pincode: "452001",
+      latitude: 22.71760605465747,
+      longitude: 75.87197264240304,
+    };
+    updateLocation(staticSellerLocation, {
+      persist: true,
+      updateSavedHome: false,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

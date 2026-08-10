@@ -27,7 +27,7 @@ const Topbar = ({ onMenuClick }) => {
     const location = useLocation();
 
     const appName = settings?.appName || 'App';
-    const logoUrl = "/Logo.png";
+    const logoUrl = "/Vitszeefinallog-removebg-preview.png";
 
     const [searchQuery, setSearchQuery] = React.useState('');
     const [notifications, setNotifications] = React.useState([]);

@@ -228,15 +228,15 @@ const SidebarContent = ({ items, title, onClose, openMenu, handleToggle, hovered
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Redesigned Brand Header Section matching DM Groceries reference */}
+      {/* Redesigned Brand Header Section matching Vitzee Market reference */}
       <div className="flex-shrink-0 flex h-20 items-center justify-between px-5 z-10 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
         <div className="flex items-center space-x-3">
-          <div className="h-10 w-10 rounded-full overflow-hidden shadow-md ring-1 ring-white/10 flex items-center justify-center bg-white p-0.5">
-            <img src="/Logo.png" alt="DM Groceries" className="h-full w-full object-contain" />
+          <div className="h-11 w-11 rounded-full shadow-md ring-1 ring-white/10 flex items-center justify-center bg-white p-1 flex-shrink-0">
+            <img src="/Vitszeefinallog-removebg-preview.png" alt="Vitzee Market" className="h-full w-full object-contain" />
           </div>
           <div>
             <h1 className="text-sm font-black tracking-tight text-white leading-none uppercase">
-              DM Groceries
+              Vitzee Market
             </h1>
             <span className="text-[9px] font-black text-emerald-200/80 uppercase tracking-wider mt-1.5 block">
               → And Vegetables ←

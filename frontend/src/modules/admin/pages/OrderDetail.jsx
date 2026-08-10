@@ -551,7 +551,7 @@ const OrderDetail = () => {
                         {/* Header: Centered Brand */}
                         <div style={{ textAlign: "center", marginBottom: "50px" }}>
                             {true ? (
-                                <img src="/Logo.png" alt="Logo" width="130" style={{ display: "inline-block", marginBottom: "16px" }} crossOrigin="anonymous" />
+                                <img src="/Vitszeefinallog-removebg-preview.png" alt="Logo" width="130" style={{ display: "inline-block", marginBottom: "16px" }} crossOrigin="anonymous" />
                             ) : (
                                 <div style={{ fontSize: "26px", fontWeight: "900", color: "#0f172a", marginBottom: "4px" }}>{settings?.appName || 'NOYO KART'}</div>
                             )}

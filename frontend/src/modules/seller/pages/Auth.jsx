@@ -61,7 +61,7 @@ const Auth = () => {
   const { settings } = useSettings();
   const navigate = useNavigate();
   const appName = settings?.appName || "App";
-  const logoUrl = "/Logo.png";
+  const logoUrl = "/Vitszeefinallog-removebg-preview.png";
   const [verifications, setVerifications] = useState({
     email: createInitialVerificationState(),
     phone: createInitialVerificationState(),
@@ -476,17 +476,17 @@ const Auth = () => {
             transition={{ duration: 0.8 }}
             className="relative z-10 w-full flex flex-col items-center text-center">
             
-            {/* Circular Logo Outer Line */}
-            <div className="w-22 h-22 rounded-full p-2 flex items-center justify-center mb-4 bg-white shadow-sm">
+            {/* White Square Logo Wrapper */}
+            <div className="w-36 h-28 rounded-2xl p-3 flex items-center justify-center mb-4 bg-white shadow-lg border border-slate-100 flex-shrink-0">
               <img
-                src="/Logo.png"
-                alt="DM Groceries Logo"
-                className="w-16 h-16 object-contain filter brightness-100"
+                src="/Vitszeefinallog-removebg-preview.png"
+                alt="Vitzee Market Logo"
+                className="w-full h-full object-contain filter brightness-100"
               />
             </div>
 
             <h2 className="text-white text-xl font-extrabold tracking-wide uppercase">
-              DM Groceries
+              Vitzee Market
             </h2>
             <p className="text-white/60 text-[10px] font-black tracking-widest mt-1 uppercase font-mono">
               → And Vegetables ←

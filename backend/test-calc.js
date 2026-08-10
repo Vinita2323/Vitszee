@@ -3,7 +3,7 @@ import Order from './app/models/order.js';
 import Setting from './app/models/setting.js';
 import { calculateRiderPayout } from './app/services/finance/pricingService.js';
 
-await mongoose.connect('mongodb+srv://dmgroceriesvegetables_db_user:Dm%40123@cluster0.lbxmrpo.mongodb.net/quickcom');
+await mongoose.connect(process.env.MONGO_URI);
 
 try {
   // Find a return requested order or simulate one

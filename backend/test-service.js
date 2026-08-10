@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { getOrderWithAccess } from './app/services/orderQueryService.js';
 import Order from './app/models/order.js'; // Needed to register model
 
-await mongoose.connect('mongodb+srv://dmgroceriesvegetables_db_user:Dm%40123@cluster0.lbxmrpo.mongodb.net/quickcom');
+await mongoose.connect(process.env.MONGO_URI);
 
 const db = mongoose.connection.db;
 const delivery = await db.collection('deliveries').findOne();

@@ -106,7 +106,7 @@ export const sendReward = async (req, res) => {
         // Send Notification
         const notificationPayload = {
             title: "Happy Birthday!",
-            message: message || "Wishing you a very Happy Birthday from DM Groceries!",
+            message: message || "Wishing you a very Happy Birthday from Vitzee Market!",
             userId: recipientId
         };
 

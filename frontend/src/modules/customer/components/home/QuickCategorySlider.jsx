@@ -1,5 +1,5 @@
 import React from "react";
-import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { applyCloudinaryTransform, handleImageError, DEFAULT_CATEGORY_IMAGE } from "@/core/utils/imageUtils";
 
 const QuickCategorySlider = ({ categories, onCategoryClick }) => {
   if (!categories || categories.length === 0) return null;
@@ -33,6 +33,7 @@ const QuickCategorySlider = ({ categories, onCategoryClick }) => {
                 src={applyCloudinaryTransform(cat.image, "f_auto,q_auto,w_150")}
                 alt={cat.name}
                 loading="lazy"
+                onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               />
             </div>

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { returnPickupBroadcastPayloadFromOrder } from './app/services/orderWorkflowService.js';
 
 async function main() {
-  await mongoose.connect('mongodb+srv://dmgroceriesvegetables_db_user:Dm%40123@cluster0.lbxmrpo.mongodb.net/quickcom');
+  await mongoose.connect(process.env.MONGO_URI);
   const Order = mongoose.model('Order', new mongoose.Schema({}, {strict: false}), 'orders');
   const order = await Order.findOne({ orderId: 'ORD-01KYBVRJ3SW8BDF80CZNDB5E8R' }).lean();
   

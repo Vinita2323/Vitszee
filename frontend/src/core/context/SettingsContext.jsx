@@ -32,7 +32,7 @@ export const SettingsProvider = ({ children }) => {
       
       // Force theme colors and app name globally
       merged.primaryColor = "#1A4516";
-      merged.appName = "DM Groceries";
+      merged.appName = "Vitzee Market";
       
       setSettings(merged);
       applyThemeVariables(merged);

@@ -4,6 +4,7 @@ import ProductCard from "../shared/ProductCard";
 import { cn } from "@/lib/utils";
 import ExperienceBannerCarousel from "./ExperienceBannerCarousel";
 import { setJSON, STORAGE_KEYS } from "@core/utils/storage";
+import { handleImageError, DEFAULT_CATEGORY_IMAGE } from "@/core/utils/imageUtils";
 
 const rememberExperienceReturn = (headerId, sectionId) =>
   setJSON(
@@ -135,6 +136,7 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
                           <img
                             src={cat.image}
                             alt={cat.name}
+                            onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
                             className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
                           />
                         ) : (
@@ -217,6 +219,7 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
                           <img
                             src={cat.image}
                             alt={cat.name}
+                            onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
                             className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
                           />
                         ) : (

@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '@shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
-import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
+import { applyCloudinaryTransform, handleImageError, DEFAULT_CATEGORY_IMAGE } from '@/core/utils/imageUtils';
 
 import ProductCard from '../components/shared/ProductCard';
 import ProductDetailSheet from '../components/shared/ProductDetailSheet';
@@ -196,7 +196,7 @@ const CategoryProductsPage = () => {
                                         "w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 transition-all duration-300",
                                         selectedSubCategory === cat.id ? "scale-110" : "opacity-100"
                                     )}>
-                                        <img src={applyCloudinaryTransform(cat.icon)} alt={cat.name} loading="lazy" className="w-full h-full object-contain" />
+                                        <img src={applyCloudinaryTransform(cat.icon)} alt={cat.name} loading="lazy" onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)} className="w-full h-full object-contain" />
                                     </div>
                                     <span className={cn(
                                         "text-[10px] text-center font-bold font-sans leading-tight px-1",

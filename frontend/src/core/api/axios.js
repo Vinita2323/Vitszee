@@ -2,7 +2,7 @@ import axios from 'axios';
 import { resolveApiBaseUrl } from './resolveApiBaseUrl';
 import { getStoredAuthToken } from '@core/utils/authStorage';
 import { getActiveRole, ROLES } from '@core/auth/activeRoleStore';
-import { rawGet, STORAGE_KEYS } from '@core/utils/storage';
+import { rawGet, rawRemove, STORAGE_KEYS } from '@core/utils/storage';
 
 const ROLE_STORAGE_KEYS = [
     STORAGE_KEYS.AUTH_SELLER,
@@ -100,15 +100,13 @@ axiosInstance.interceptors.response.use(
         const originalRequest = error.config;
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
-            const hasStoredRoleToken = ROLE_STORAGE_KEYS.some((key) => Boolean(rawGet(key)));
-            if (hasStoredRoleToken) {
+            const activeRole = getActiveRole();
+            const storageKey = ROLE_TO_STORAGE_KEY[activeRole] || STORAGE_KEYS.AUTH_CUSTOMER;
+            if (rawGet(storageKey)) {
                 console.warn(
-                    '[axios] Received 401 response. Preserving stored auth tokens; session data is only cleared by explicit logout.',
-                    {
-                        url: originalRequest?.url,
-                        method: originalRequest?.method,
-                    }
+                    `[axios] 401 Unauthorized for ${originalRequest?.url}. Clearing invalid token for role: ${activeRole}`
                 );
+                rawRemove(storageKey);
             }
         }
         return Promise.reject(error);

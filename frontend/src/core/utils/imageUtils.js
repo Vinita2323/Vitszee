@@ -1,6 +1,17 @@
 const CLOUDINARY_REGEX = /res\.cloudinary\.com/i;
 const CLOUDINARY_UPLOAD_SEGMENT_REGEX = /\/upload\/([^/]+)\//i;
 
+export const DEFAULT_CATEGORY_IMAGE = "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop&q=80";
+export const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?w=300&auto=format&fit=crop&q=80";
+export const DEFAULT_BANNER_IMAGE = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80";
+
+export function handleImageError(e, fallbackUrl = DEFAULT_CATEGORY_IMAGE) {
+  if (e?.target && e.target.src !== fallbackUrl) {
+    e.target.onerror = null;
+    e.target.src = fallbackUrl;
+  }
+}
+
 /**
  * Appends Cloudinary optimisation transforms to a URL.
  * Safe to call on any URL — non-Cloudinary URLs are returned unchanged.

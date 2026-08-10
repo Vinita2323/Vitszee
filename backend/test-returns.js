@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 async function main() {
-  await mongoose.connect('mongodb+srv://dmgroceriesvegetables_db_user:Dm%40123@cluster0.lbxmrpo.mongodb.net/quickcom');
+  await mongoose.connect(process.env.MONGO_URI);
   const Order = mongoose.model('Order', new mongoose.Schema({}, {strict: false}), 'orders');
   const orders = await Order.find({ 
     returnStatus: { $exists: true, $ne: 'none', $ne: null }
