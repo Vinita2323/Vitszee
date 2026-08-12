@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import MainLocationHeader from '../components/shared/MainLocationHeader';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
 import { applyCloudinaryTransform, handleImageError, DEFAULT_CATEGORY_IMAGE } from '@/core/utils/imageUtils';
 
@@ -10,6 +10,7 @@ const COLORS = [
 ];
 
 const CategoriesPage = () => {
+    const navigate = useNavigate();
     const [groups, setGroups] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [columnsPerRow, setColumnsPerRow] = useState(() => {
@@ -27,9 +28,11 @@ const CategoriesPage = () => {
             if (res.data.success) {
                 const tree = res.data.results || res.data.result || [];
                 const formattedGroups = tree
-                    .filter((header) => (header.name || '').trim().toLowerCase() !== 'all')
+                    .filter((header) => (header.name || '').trim().toLowerCase() !== 'all' && header.status === 'active')
                     .map((header, idx) => {
-                        const categories = (header.children || []).map((cat, cIdx) => ({
+                        const categories = (header.children || [])
+                            .filter(cat => cat.status === 'active')
+                            .map((cat, cIdx) => ({
                             id: cat._id,
                             name: cat.name,
                             image: cat.image || "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=270/layout-engine/2022-11/Slice-1_9.png",
@@ -138,12 +141,24 @@ const CategoriesPage = () => {
 
     return (
         <div className="min-h-screen bg-white">
-            <MainLocationHeader />
-            <div className="max-w-[1280px] mx-auto px-4 pt-[140px] md:pt-[150px] pb-20">
+            <header className="sticky top-0 z-50 bg-primary border-b border-primary-dark px-4 py-4 flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                        <ChevronLeft size={24} className="text-white" />
+                    </button>
+                    <h1 className="text-[18px] font-bold text-white tracking-tight">
+                        Categories
+                    </h1>
+                </div>
+            </header>
+            <div className="max-w-[1280px] mx-auto px-4 pt-6 pb-20">
                 {groups.map((group, groupIdx) => (
-                    <div key={groupIdx} className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${groupIdx * 100}ms` }}>
+                    <div key={groupIdx} className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${groupIdx * 100}ms` }}>
                         {/* Group Title */}
-                        <h2 className="text-xl md:text-2xl font-black text-[#1A1A1A] mb-6 px-1">
+                        <h2 className="text-xl md:text-2xl font-bold text-[#1A1A1A] mb-6 px-1">
                             {group.title}
                         </h2>
 
@@ -165,7 +180,7 @@ const CategoriesPage = () => {
                                                 }}
                                             >
                                                 <div
-                                                    className="absolute inset-0 rounded-full p-2.5 flex items-center justify-center shadow-sm"
+                                                    className="absolute inset-0 rounded-xl flex items-center justify-center shadow-sm overflow-hidden"
                                                     style={{
                                                         backgroundColor: category.color,
                                                         transform: 'rotateY(0deg)',
@@ -178,12 +193,12 @@ const CategoriesPage = () => {
                                                         alt={category.name}
                                                         loading="lazy"
                                                         onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
-                                                        className="w-full h-full rounded-full object-cover"
+                                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                                     />
                                                 </div>
 
                                                 <div
-                                                    className="absolute inset-0 rounded-full bg-gradient-to-br from-[#F6EFE4] via-[#EEE7F8] to-[#E7F1FB] text-slate-700 flex items-center justify-center p-2 text-center shadow-inner border border-white/70"
+                                                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#F6EFE4] via-[#EEE7F8] to-[#E7F1FB] text-slate-700 flex items-center justify-center p-2 text-center shadow-inner border border-white/70 overflow-hidden"
                                                     style={{
                                                         transform: 'rotateY(180deg)',
                                                         backfaceVisibility: 'hidden',

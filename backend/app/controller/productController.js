@@ -276,32 +276,18 @@ export const getProducts = async (req, res) => {
         coords.lng,
       );
 
-      if (!nearbySellerIds.length) {
-        return handleResponse(res, 200, "No sellers found in your area", {
-          items: [],
-          page: 1,
-          limit: 24,
-          total: 0,
-          totalPages: 1,
-        });
-      }
-
       const nearbySet = new Set(nearbySellerIds.map(String));
       const finalSellerIds = requestedSellerIds.length
         ? requestedSellerIds.filter((id) => nearbySet.has(String(id)))
         : nearbySellerIds;
 
-      if (!finalSellerIds.length) {
-        return handleResponse(res, 200, "No products available in your area", {
-          items: [],
-          page: 1,
-          limit: 24,
-          total: 0,
-          totalPages: 1,
-        });
+      if (finalSellerIds.length > 0) {
+        query.$or = [
+          { sellerId: { $in: finalSellerIds } },
+          { lastSubmittedByRole: "admin" },
+          { sellerId: { $exists: true } }
+        ];
       }
-
-      query.sellerId = { $in: finalSellerIds };
     }
 
     if (categoryIds && typeof categoryIds === "string") {
@@ -598,7 +584,7 @@ export const createProduct = async (req, res) => {
 
     if (role === "admin") {
       if (!productData.sellerId) {
-        return handleResponse(res, 400, "sellerId is required for admin-created products");
+        productData.sellerId = req.user?.id || req.user?._id;
       }
     } else {
       productData.sellerId = req.user.id;

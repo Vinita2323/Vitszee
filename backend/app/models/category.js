@@ -228,6 +228,20 @@ categorySchema.pre("findOneAndUpdate", function syncLegacyFinanceFieldsOnUpdate(
   }
 });
 
+categorySchema.pre("findOneAndDelete", async function (next) {
+  try {
+    const docToUpdate = await this.model.findOne(this.getQuery());
+    if (docToUpdate) {
+      // Dynamic import to avoid circular dependency
+      const { default: HeaderCategoryMapping } = await import("./headerCategoryMapping.js");
+      await HeaderCategoryMapping.deleteMany({ categoryId: docToUpdate._id });
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Indexes for common queries
 categorySchema.index({ type: 1, status: 1 });
 categorySchema.index({ parentId: 1, status: 1 });

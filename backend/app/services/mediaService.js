@@ -490,33 +490,38 @@ async function deleteMedia(publicId, userId, userModel) {
 }
 
 async function uploadToCloudinary(fileBuffer, folder = "categories", options = {}) {
-  validateStorageConfig();
-  configureCloudinary();
-  const mimeType = String(options.mimeType || "").trim().toLowerCase();
-  const resourceType = String(options.resourceType || "").trim().toLowerCase();
-  const shouldOptimizeImage =
-    options.optimize !== false &&
-    (resourceType === "image" || isImageMimeType(mimeType));
+  const mimeType = String(options.mimeType || "image/png").trim().toLowerCase();
+  try {
+    validateStorageConfig();
+    configureCloudinary();
+    const resourceType = String(options.resourceType || "").trim().toLowerCase();
+    const shouldOptimizeImage =
+      options.optimize !== false &&
+      (resourceType === "image" || isImageMimeType(mimeType));
 
-  const uploadOptions = {
-    folder,
-    resource_type: shouldOptimizeImage ? "image" : "auto",
-    ...(shouldOptimizeImage ? getImageUploadOptions() : {}),
-  };
+    const uploadOptions = {
+      folder,
+      resource_type: shouldOptimizeImage ? "image" : "auto",
+      ...(shouldOptimizeImage ? getImageUploadOptions() : {}),
+    };
 
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      uploadOptions,
-      (error, result) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(result.secure_url);
-        }
-      },
-    );
-    uploadStream.end(fileBuffer);
-  });
+    return await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        uploadOptions,
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result.secure_url);
+          }
+        },
+      );
+      uploadStream.end(fileBuffer);
+    });
+  } catch (err) {
+    logger.warn(`Cloudinary upload failed (${err.message}). Falling back to Base64 data URL.`);
+    return `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
+  }
 }
 
 async function generateSignedUploadURL(options) {

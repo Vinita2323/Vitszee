@@ -148,35 +148,67 @@ const ProductManagement = () => {
     }, [searchTerm, filterCategory, filterStatus, filterApprovalStatus, filterStockStatus, sortBy, pageSize]);
 
     const handleSave = async () => {
-        if (!editingItem) {
-            return toast.error('Only product editing is allowed for admins');
+        const firstVariant = (Array.isArray(formData.variants) && formData.variants.length > 0) ? formData.variants[0] : null;
+        
+        const effectivePrice = (formData.price !== '' && formData.price !== null && formData.price !== undefined) 
+            ? formData.price 
+            : (firstVariant?.price !== '' && firstVariant?.price !== undefined ? firstVariant.price : '');
+            
+        const effectiveSalePrice = (formData.salePrice !== '' && formData.salePrice !== null && formData.salePrice !== undefined)
+            ? formData.salePrice
+            : (firstVariant?.salePrice || 0);
+
+        const totalVariantStock = (Array.isArray(formData.variants) && formData.variants.length > 0)
+            ? formData.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0)
+            : null;
+
+        const effectiveStock = (formData.stock !== '' && formData.stock !== null && formData.stock !== undefined)
+            ? formData.stock
+            : (totalVariantStock !== null ? totalVariantStock : '');
+
+        const hasName = Boolean(formData.name && formData.name.trim());
+        const hasPrice = effectivePrice !== '' && effectivePrice !== null && !isNaN(Number(effectivePrice));
+        const hasStock = effectiveStock !== '' && effectiveStock !== null && !isNaN(Number(effectiveStock));
+        const hasCategory = Boolean(formData.header && formData.categoryId);
+
+        if (!hasName) {
+            return toast.error('Please enter the Product Title under General Info');
         }
 
-        if (!formData.name || !formData.price || !formData.stock || !formData.header || !formData.categoryId || !formData.subcategoryId) {
-            return toast.error('Please fill all required fields, including categories');
+        if (!hasPrice || !hasStock) {
+            return toast.error('Please enter Price and Stock (either under Item Variants or General Info)');
+        }
+
+        if (!hasCategory) {
+            return toast.error('Please select a Main Group and Category under the "Groups" tab');
         }
 
         setIsSaving(true);
         try {
             const data = new FormData();
+            const calculatedSlug = formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '');
+            const calculatedSku = formData.sku || (firstVariant?.sku ? firstVariant.sku : 'SKU-' + Date.now());
+
             data.append('name', formData.name);
-            data.append('slug', formData.slug);
-            data.append('sku', formData.sku);
-            data.append('description', formData.description);
-            data.append('price', Number(formData.price));
-            data.append('salePrice', Number(formData.salePrice) || 0);
-            data.append('stock', Number(formData.stock));
+            data.append('slug', calculatedSlug);
+            data.append('sku', calculatedSku);
+            data.append('description', formData.description || '');
+            data.append('price', Number(effectivePrice));
+            data.append('salePrice', Number(effectiveSalePrice) || 0);
+            data.append('stock', Number(effectiveStock));
             data.append('lowStockAlert', Number(formData.lowStockAlert) || 5);
-            data.append('unit', formData.unit);
+            data.append('unit', formData.unit || 'packet');
             data.append('headerId', formData.header);
             data.append('categoryId', formData.categoryId);
-            data.append('subcategoryId', formData.subcategoryId);
-            data.append('status', formData.status);
-            data.append('isFeatured', formData.isFeatured);
-            data.append('brand', formData.brand);
-            data.append('weight', formData.weight);
-            data.append('tags', formData.tags);
-            data.append('variants', JSON.stringify(formData.variants));
+            if (formData.subcategoryId) {
+                data.append('subcategoryId', formData.subcategoryId);
+            }
+            data.append('status', formData.status || 'active');
+            data.append('isFeatured', formData.isFeatured || false);
+            data.append('brand', formData.brand || '');
+            data.append('weight', formData.weight || '');
+            data.append('tags', formData.tags || '');
+            data.append('variants', JSON.stringify(formData.variants || []));
 
             if (formData.mainImageFile) {
                 data.append('mainImage', formData.mainImageFile);
@@ -185,8 +217,13 @@ const ProductManagement = () => {
                 formData.galleryFiles.forEach((file) => data.append('galleryImages', file));
             }
 
-            await adminApi.updateProduct(editingItem._id, data);
-            toast.success('Product updated successfully');
+            if (editingItem) {
+                await adminApi.updateProduct(editingItem._id, data);
+                toast.success('Product updated successfully');
+            } else {
+                await adminApi.createProduct(data);
+                toast.success('Product created successfully');
+            }
             setIsProductModalOpen(false);
             fetchProducts(page);
         } catch (error) {
@@ -381,7 +418,7 @@ const ProductManagement = () => {
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-2 duration-700 pb-16">
             {/* Page Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="ds-h1 flex items-center gap-2">
                         Product List
@@ -389,6 +426,14 @@ const ProductManagement = () => {
                     </h1>
                     <p className="ds-description mt-0.5">Track your items, prices, and how many are left in stock.</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => openModal()}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md hover:bg-slate-800 active:scale-95 transition-all shrink-0"
+                >
+                    <HiOutlinePlus className="w-4 h-4" />
+                    <span>Add New Product</span>
+                </button>
             </div>
 
             {/* Quick Stats */}
@@ -725,7 +770,7 @@ const ProductManagement = () => {
                                     </div>
                                     <div>
                                         <h3 className="admin-h3">
-                                            Edit Product
+                                            {editingItem ? 'Edit Product' : 'Add New Product'}
                                         </h3>
                                         <div className="flex items-center space-x-2 mt-0.5">
                                             <Badge variant="primary" className="text-[7px] font-bold uppercase tracking-widest px-1">SYSTEM</Badge>
@@ -1080,7 +1125,7 @@ const ProductManagement = () => {
                                     disabled={isSaving}
                                     className="bg-slate-900 text-white px-10 py-2.5 rounded-xl text-xs font-bold shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50"
                                 >
-                                    {isSaving ? 'SAVING...' : 'SAVE CHANGES'}
+                                    {isSaving ? 'SAVING...' : (editingItem ? 'SAVE CHANGES' : '+ ADD PRODUCT')}
                                 </button>
                             </div>
                         </motion.div>

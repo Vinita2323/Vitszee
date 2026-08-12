@@ -32,6 +32,9 @@ const CategoryManagement = React.lazy(
 const HeaderCategories = React.lazy(
   () => import("../pages/categories/HeaderCategories"),
 );
+const HeaderMenuConfig = React.lazy(
+  () => import("../pages/categories/HeaderMenuConfig"),
+);
 const Level2Categories = React.lazy(
   () => import("../pages/categories/Level2Categories"),
 );
@@ -113,6 +116,7 @@ const navItems = [
     color: "rose",
     children: [
       { label: "All Categories", path: "/admin/categories/hierarchy" },
+      { label: "Header Menu Config", path: "/admin/categories/header-menu" },
       { label: "Header Categories", path: "/admin/categories/header" },
       { label: "Main Categories", path: "/admin/categories/level2" },
       { label: "Sub-Categories", path: "/admin/categories/sub" },
@@ -254,6 +258,7 @@ const AdminRoutes = () => {
           element={<Navigate to="/admin/categories/header" replace />}
         />
         <Route path="/categories/header" element={<HeaderCategories />} />
+        <Route path="/categories/header-menu" element={<HeaderMenuConfig />} />
         <Route path="/categories/level2" element={<Level2Categories />} />
         <Route path="/categories/sub" element={<SubCategories />} />
         <Route path="/categories/hierarchy" element={<CategoryHierarchy />} />

@@ -25,6 +25,7 @@ import metricsRoute from "./metricsRoutes.js";
 import authOtpRoute from "../modules/otp/otp.routes.js";
 import milestoneCampaignRoute from "./milestoneCampaignRoutes.js";
 import customerMilestoneRoute from "./customerMilestoneRoutes.js";
+import headerCategoryMappingRoute from "./headerCategoryMappingRoutes.js";
 
 import express from "express";
 
@@ -48,6 +49,7 @@ const setupRoutes = (app) => {
     router.use("/seller", sellerRoute);
     router.use("/settings", settingsRoute);
     router.use("/categories", categoryRoute);
+    router.use("/header-categories", headerCategoryMappingRoute);
     router.use("/products", productRoute);
     router.use("/cart", cartRoute);
     router.use("/wishlist", wishlistRoute);

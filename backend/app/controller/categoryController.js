@@ -59,7 +59,7 @@ export const getCategories = async (req, res) => {
       const categories = await getOrSet(
         cacheKey,
         async () => {
-          const selectFields = "name slug image iconId type parentId headerColor headerFontColor headerIconColor";
+          const selectFields = "name slug image iconId type parentId status headerColor headerFontColor headerIconColor";
           return Category.find({ type: "header" })
             .select(selectFields)
             .populate({
@@ -246,8 +246,9 @@ export const updateCategory = async (req, res) => {
         });
         categoryData.image = url;
       } catch (err) {
-        console.error("Cloudinary upload failed for category update:", err);
-        return handleResponse(res, 400, `Image update failed: ${err.message}`);
+        console.error("Cloudinary upload failed for category update, falling back to base64:", err);
+        const mime = req.file.mimetype || "image/png";
+        categoryData.image = `data:${mime};base64,${req.file.buffer.toString("base64")}`;
       }
     } else if (typeof req.body.image === 'string' && req.body.image.startsWith('http')) {
       categoryData.image = req.body.image;

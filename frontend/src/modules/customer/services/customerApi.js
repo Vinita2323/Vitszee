@@ -11,7 +11,9 @@ export const customerApi = {
   getWalletTransactions: (params) =>
     getWithDedupe("/customer/transactions", params),
   getCategories: (params) =>
-    getWithDedupe("/categories", params, { ttl: 60 * 1000 }), // 1 min for categories
+    getWithDedupe("/categories", params, { ttl: 5000 }), // 5 seconds for categories to reflect admin changes fast
+  getHeaderCategories: () =>
+    getWithDedupe("/header-categories", {}, { ttl: 60 * 1000 }),
   getProducts: (params) => getWithDedupe("/products", params),
   getProductById: (id, params) => getWithDedupe(`/products/${id}`, params),
 
