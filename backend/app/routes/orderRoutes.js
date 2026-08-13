@@ -60,6 +60,12 @@ router.post(
   previewCheckoutFinance,
 );
 router.post(
+  "/checkoutPreview",
+  verifyToken,
+  allowRoles("customer", "user", "admin"),
+  previewCheckoutFinance,
+);
+router.post(
   "/",
   verifyToken,
   allowRoles("customer", "user", "admin"),

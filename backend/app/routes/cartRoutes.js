@@ -6,6 +6,7 @@ import {
     removeFromCart,
     clearCart
 } from "../controller/cartController.js";
+import { previewCheckoutFinance } from "../controller/orderFinanceController.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../middleware/validate.js";
 import {
@@ -30,5 +31,7 @@ router.delete(
     removeFromCart,
 );
 router.delete("/clear", clearCart);
+router.post("/checkoutPreview", previewCheckoutFinance);
+router.post("/checkout/preview", previewCheckoutFinance);
 
 export default router;
