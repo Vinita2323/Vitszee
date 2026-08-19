@@ -280,13 +280,7 @@ const Auth = () => {
   };
 
   const handlePanelWheel = (e) => {
-    const panel = e.currentTarget;
-    if (panel.scrollHeight <= panel.clientHeight) {
-      return;
-    }
-
-    e.preventDefault();
-    panel.scrollTop += e.deltaY;
+    e.stopPropagation();
   };
 
   const handleSubmit = async (e) => {

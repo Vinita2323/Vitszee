@@ -66,7 +66,7 @@ export const update = async (req, res) => {
 
     const mapping = await HeaderCategoryMapping.findByIdAndUpdate(
       id,
-      { customName, iconId, image, isActive, displayOrder },
+      { customName, iconId, image, isActive, displayOrder },   
       { new: true, runValidators: true }
     ).populate("categoryId");
 

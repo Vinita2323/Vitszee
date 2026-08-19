@@ -149,10 +149,6 @@ const ProductManagement = () => {
   };
 
   const handleModalScrollWheel = (event) => {
-    const container = event.currentTarget;
-    if (container.scrollHeight <= container.clientHeight) return;
-    container.scrollTop += event.deltaY;
-    event.preventDefault();
     event.stopPropagation();
   };
 
