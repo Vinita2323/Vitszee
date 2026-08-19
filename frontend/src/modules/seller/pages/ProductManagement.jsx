@@ -406,7 +406,7 @@ const ProductManagement = () => {
       setItemToDelete(null);
       fetchProducts();
     } catch (error) {
-      toast.error("Failed to delete product");
+      toast.error(error.response?.data?.message || "Failed to delete product");
     }
   };
 

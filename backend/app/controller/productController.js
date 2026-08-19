@@ -960,12 +960,16 @@ export const deleteProduct = async (req, res) => {
     const sellerId = req.user.id;
     const role = req.user.role;
 
-    const query = role === "admin" ? { _id: id } : { _id: id, sellerId };
-    const product = await Product.findOneAndDelete(query);
-
-    if (!product) {
-      return handleResponse(res, 404, "Product not found or unauthorized");
+    const existingProduct = await Product.findById(id);
+    if (!existingProduct) {
+      return handleResponse(res, 404, "Product not found or has already been deleted");
     }
+
+    if (role !== "admin" && String(existingProduct.sellerId) !== String(sellerId)) {
+      return handleResponse(res, 403, "Unauthorized: This product was created by admin or another seller");
+    }
+
+    const product = await Product.findByIdAndDelete(id);
     
     // Enqueue search index removal asynchronously
     await enqueueProductRemoval(id);
