@@ -329,9 +329,18 @@ const ProductManagement = () => {
 
       if (formData.mainImageFile) {
         data.append("mainImage", formData.mainImageFile);
+      } else if (formData.mainImage && typeof formData.mainImage === "string" && formData.mainImage.startsWith("http")) {
+        data.append("mainImage", formData.mainImage);
       }
+
       if (formData.galleryFiles && formData.galleryFiles.length > 0) {
         formData.galleryFiles.forEach((file) => data.append("galleryImages", file));
+      } else if (Array.isArray(formData.galleryImages) && formData.galleryImages.length > 0) {
+        formData.galleryImages.forEach((imgUrl) => {
+          if (typeof imgUrl === "string" && imgUrl.startsWith("http")) {
+            data.append("galleryImages", imgUrl);
+          }
+        });
       }
 
       if (editingItem) {

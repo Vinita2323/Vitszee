@@ -614,6 +614,7 @@ export const createProduct = async (req, res) => {
             scope: "createProduct",
             error: err,
           });
+          return handleResponse(res, 500, `Image upload to cloud storage failed: ${err.message || "Unknown error"}. Check Cloudinary credentials.`);
         }
       }
       if (galleryUrls.length > 0) {
@@ -791,6 +792,7 @@ export const updateProduct = async (req, res) => {
             scope: "updateProduct",
             error: err,
           });
+          return handleResponse(res, 500, `Image upload to cloud storage failed: ${err.message || "Unknown error"}. Check Cloudinary credentials.`);
         }
       }
       if (galleryUrls.length > 0) {
