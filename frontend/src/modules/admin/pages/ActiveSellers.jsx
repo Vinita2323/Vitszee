@@ -1031,8 +1031,9 @@ const ActiveSellers = () => {
               </div>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
+    </AnimatePresence>
 
       {/* In-App Document Preview Modal */}
       <AnimatePresence>
