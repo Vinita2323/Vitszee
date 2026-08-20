@@ -6,9 +6,6 @@ import Modal from '@shared/components/ui/Modal';
 import {
     HelpCircle,
     Plus,
-    Search,
-    Filter,
-    MoreVertical,
     Edit3,
     Trash2,
     Eye,
@@ -18,13 +15,9 @@ import {
     MessageSquare,
     Layers,
     TrendingUp,
-    Settings,
     ArrowUpRight,
-    GripVertical,
     Save,
-    X,
-    CheckCircle2,
-    AlertCircle
+    CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -195,29 +188,29 @@ const FAQManagement = () => {
     };
 
     return (
-        <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
+        <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-16 space-y-6">
             {/* Header Section */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-1">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                    <h1 className="ds-h1 flex items-center gap-3">
+                    <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
                         FAQ Management
-                        <div className="p-2 bg-pink-100 rounded-xl">
+                        <div className="p-1.5 bg-pink-100 rounded-xl">
                             <HelpCircle className="h-5 w-5 text-pink-600" />
                         </div>
                     </h1>
-                    <p className="ds-description mt-1">Manage categories and help customers with common questions.</p>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Manage categories and help customers with common questions.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setIsCategoryModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
                     >
                         <Layers className="h-4 w-4 text-brand-500" />
                         CATEGORIES
                     </button>
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-3 bg-pink-600 text-white rounded-2xl text-xs font-bold hover:bg-pink-700 transition-all shadow-lg active:scale-95 shadow-pink-200"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 text-white rounded-xl text-xs font-bold hover:bg-pink-700 transition-all shadow-sm cursor-pointer"
                     >
                         <Plus className="h-4 w-4" />
                         ADD FAQ
@@ -225,61 +218,65 @@ const FAQManagement = () => {
                 </div>
             </div>
 
-            {/* Quick Intelligence Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Quick Stats - Compacted */}
+            <div className="flex flex-wrap gap-3 items-center">
                 {[
                     { label: 'Total FAQs', value: faqs.length, icon: MessageSquare, bg: 'bg-pink-50', iconColor: 'text-pink-600' },
                     { label: 'Total Views', value: faqs.reduce((acc, f) => acc + f.views, 0).toLocaleString(), icon: TrendingUp, bg: 'bg-brand-50', iconColor: 'text-brand-600' },
                     { label: 'Published', value: faqs.filter(f => f.status === 'published').length, icon: CheckCircle2, bg: 'bg-brand-50', iconColor: 'text-brand-600' },
                     { label: 'Drafts', value: faqs.filter(f => f.status === 'draft').length, icon: Edit3, bg: 'bg-amber-50', iconColor: 'text-amber-600' },
                 ].map((stat, i) => (
-                    <Card key={i} className="p-5 border-none shadow-sm ring-1 ring-slate-100 bg-white group hover:ring-pink-200 transition-all overflow-hidden relative text-left">
-                        <div className="relative z-10 flex items-center gap-4">
-                            <div className={cn("p-3 rounded-2xl h-12 w-12 flex items-center justify-center", stat.bg)}>
-                                <stat.icon className={cn("h-6 w-6", stat.iconColor)} />
-                            </div>
+                    <Card key={i} className="border-none shadow-xs ring-1 ring-slate-200/80 px-4 py-2.5 bg-white rounded-lg w-full sm:w-56 md:w-60 shrink-0 text-left">
+                        <div className="flex items-center justify-between gap-3">
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
-                                <h3 className="text-2xl font-black text-slate-900">{stat.value}</h3>
+                                <p className="text-xs font-semibold text-slate-500 whitespace-nowrap">{stat.label}</p>
+                                <h3 className="text-2xl font-black text-slate-900 mt-0.5">{stat.value}</h3>
+                            </div>
+                            <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", stat.bg)}>
+                                <stat.icon className={cn("h-5 w-5", stat.iconColor)} />
                             </div>
                         </div>
                     </Card>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
                 {/* Left Sidebar: Categories */}
                 <div className="lg:col-span-1 space-y-4">
-                    <Card className="p-6 border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl text-left">
-                        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">FAQ Categories</h4>
-                        <div className="space-y-2">
+                    <Card className="p-4 border-none shadow-xs ring-1 ring-slate-200/80 bg-white rounded-xl text-left">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-1">FAQ Categories</h4>
+                        <div className="space-y-1.5">
                             <button
                                 onClick={() => setActiveCategory('All')}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all",
-                                    activeCategory === 'All' ? "bg-slate-900 text-white shadow-lg" : "text-slate-600 hover:bg-slate-50"
+                                    "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                                    activeCategory === 'All' ? "bg-slate-900 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50"
                                 )}
                             >
-                                <span className="flex items-center gap-3">
+                                <span className="flex items-center gap-2.5">
                                     <Layers className="h-4 w-4 opacity-70" />
                                     All Topics
                                 </span>
-                                <span className="text-[10px] opacity-60 font-black">{faqs.length}</span>
+                                <span className={cn("text-xs font-bold px-2 py-0.5 rounded-md", activeCategory === 'All' ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600")}>
+                                    {faqs.length}
+                                </span>
                             </button>
                             {categoriesWithCounts.map((cat) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => setActiveCategory(cat.name)}
                                     className={cn(
-                                        "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all",
-                                        activeCategory === cat.name ? "bg-pink-600 text-white shadow-lg shadow-pink-100" : "text-slate-600 hover:bg-slate-50"
+                                        "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                                        activeCategory === cat.name ? "bg-pink-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50"
                                     )}
                                 >
-                                    <span className="flex items-center gap-3">
-                                        <div className={cn("h-1.5 w-1.5 rounded-full", activeCategory === cat.name ? "bg-white" : `bg-${cat.color}-500`)} />
+                                    <span className="flex items-center gap-2.5">
+                                        <div className={cn("h-2 w-2 rounded-full", activeCategory === cat.name ? "bg-white" : `bg-${cat.color}-500`)} />
                                         {cat.name}
                                     </span>
-                                    <span className="text-[10px] opacity-60 font-black">{cat.count}</span>
+                                    <span className={cn("text-xs font-bold px-2 py-0.5 rounded-md", activeCategory === cat.name ? "bg-pink-700 text-white" : "bg-slate-100 text-slate-600")}>
+                                        {cat.count}
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -287,138 +284,77 @@ const FAQManagement = () => {
                 </div>
 
                 {/* Main Content: FAQ List */}
-                <div className="lg:col-span-3 space-y-6">
-                    {/* Filter & Search Bar */}
-                    <Card className="p-4 border-none shadow-xl ring-1 ring-slate-100/50 bg-white/80 backdrop-blur-xl rounded-xl flex flex-col md:flex-row gap-4 items-center">
-                        <div className="flex-1 relative group w-full text-left">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-pink-500 transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Search questions or answers..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-semibold outline-none focus:ring-2 focus:ring-pink-500/10 transition-all"
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Sort:</span>
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="bg-slate-50 border-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none text-slate-600 cursor-pointer"
-                            >
-                                <option>Most Viewed</option>
-                                <option>Newest First</option>
-                                <option>Alphabetical</option>
-                            </select>
-                        </div>
-                    </Card>
-
-                    {/* FAQ Grid/List */}
-                    <div className="space-y-4">
-                        <AnimatePresence mode='popLayout'>
-                            {filteredAndSortedFaqs.map((faq, index) => (
-                                <motion.div
-                                    key={faq.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.98 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.3 }}
+                <div className="lg:col-span-3">
+                    <Card className="border-none shadow-xs ring-1 ring-slate-200 bg-white rounded-2xl overflow-hidden text-left">
+                        {filteredAndSortedFaqs.length === 0 ? (
+                            <div className="p-12 text-center text-slate-400 font-bold text-sm">
+                                No FAQs found in this category
+                            </div>
+                        ) : (
+                            filteredAndSortedFaqs.map((faq) => (
+                                <div
+                                    key={faq.id || faq._id}
+                                    className="p-5 sm:p-6 border-b border-slate-200 last:border-b-0 hover:bg-slate-50/60 transition-colors flex flex-col sm:flex-row sm:items-start justify-between gap-4"
                                 >
-                                    <Card className={cn(
-                                        "border-none shadow-lg ring-1 transition-all overflow-hidden rounded-xl text-left",
-                                        expandedId === faq.id ? "ring-pink-200 bg-white" : "ring-slate-100 bg-white hover:ring-slate-200"
-                                    )}>
-                                        <div className="p-6">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-slate-50 rounded-2xl text-slate-300">
-                                                    <GripVertical className="h-4 w-4" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-                                                        <div className="flex items-center gap-3">
-                                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-slate-200 text-slate-400">
-                                                                {faq.id}
-                                                            </Badge>
-                                                            <Badge variant={faq.status === 'published' ? 'success' : 'secondary'} className="text-[8px] font-black uppercase tracking-widest">
-                                                                {faq.status}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex items-center gap-2 mr-4">
-                                                                <Eye className="h-3.5 w-3.5 text-slate-300" />
-                                                                <span className="text-[10px] font-bold text-slate-400">{faq.views.toLocaleString()}</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => handleToggleStatus(faq)}
-                                                                title={faq.status === 'published' ? 'Set as Draft' : 'Publish Now'}
-                                                                className="p-2 transition-all text-slate-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg"
-                                                            >
-                                                                {faq.status === 'published' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleEditClick(faq)}
-                                                                className="p-2 transition-all text-slate-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg"
-                                                            >
-                                                                <Edit3 className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteFaq(faq._id)}
-                                                                className="p-2 transition-all text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div
-                                                        onClick={() => setExpandedId(expandedId === faq.id ? null : faq.id)}
-                                                        className="cursor-pointer group"
-                                                    >
-                                                        <h3 className="text-base font-black text-slate-900 group-hover:text-pink-600 transition-colors flex items-center justify-between">
-                                                            {faq.question}
-                                                            {expandedId === faq.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                                                        </h3>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <AnimatePresence>
-                                                {expandedId === faq.id && (
-                                                    <motion.div
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: 'auto', opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        transition={{ duration: 0.3 }}
-                                                        className="overflow-hidden"
-                                                    >
-                                                        <div className="mt-6 pt-6 border-t border-slate-50 ml-14">
-                                                            <div className="bg-slate-50 p-6 rounded-xl relative">
-                                                                <p className="text-sm font-bold text-slate-600 leading-relaxed italic">
-                                                                    "{faq.answer}"
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex items-center justify-between mt-4">
-                                                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                                                                    <ArrowUpRight className="h-3 w-3" />
-                                                                    Category: <span className="text-slate-500">{faq.category}</span>
-                                                                </span>
-                                                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                                                    Updated: {faq.lastUpdated}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </motion.div>
+                                    {/* Left: Question, Answer & Category Tag */}
+                                    <div className="space-y-2.5 flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 font-bold text-xs rounded-lg ring-1 ring-blue-100">
+                                                {faq.category || "General"}
+                                            </span>
+                                            <button
+                                                onClick={() => handleToggleStatus(faq)}
+                                                className={cn(
+                                                    "px-2.5 py-0.5 text-xs font-bold rounded-lg cursor-pointer transition-all",
+                                                    faq.status === 'published'
+                                                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                                                        : "bg-slate-100 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200"
                                                 )}
-                                            </AnimatePresence>
+                                                title="Click to toggle status"
+                                            >
+                                                {faq.status === 'published' ? '● Published' : '○ Draft'}
+                                            </button>
+                                            {faq.views > 0 && (
+                                                <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                                                    <Eye className="h-3.5 w-3.5" /> {faq.views.toLocaleString()} views
+                                                </span>
+                                            )}
                                         </div>
-                                    </Card>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                    </div>
+
+                                        <h3 className="text-base font-bold text-slate-900 leading-snug">
+                                            {faq.question}
+                                        </h3>
+
+                                        <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                                            {faq.answer}
+                                        </p>
+                                    </div>
+
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                                        <button
+                                            onClick={() => handleEditClick(faq)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-brand-50 hover:text-brand-600 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                                            title="Edit FAQ"
+                                        >
+                                            <Edit3 className="h-3.5 w-3.5" />
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteFaq(faq._id)}
+                                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                                            title="Delete FAQ"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </Card>
                 </div>
             </div>
+
             <div className="mt-6 flex justify-center">
                 <Pagination
                     page={page}
@@ -445,61 +381,59 @@ const FAQManagement = () => {
                 title={editingFaqId ? `Edit Question: ${editingFaqId}` : "Create New FAQ"}
                 size="lg"
             >
-                <form onSubmit={handleSaveFaq} className="space-y-6 text-left">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Category</label>
-                                <select
-                                    value={newFaq.category}
-                                    onChange={(e) => setNewFaq({ ...newFaq, category: e.target.value })}
-                                    className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-pink-500/10 transition-all shadow-sm cursor-pointer"
-                                >
-                                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Visibility State</label>
-                                <div className="flex bg-slate-100 p-1 rounded-2xl">
-                                    <button
-                                        type="button"
-                                        onClick={() => setNewFaq({ ...newFaq, status: 'published' })}
-                                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", newFaq.status === 'published' ? "bg-white text-pink-600 shadow-sm" : "text-slate-400")}
-                                    >PUBLISHED</button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setNewFaq({ ...newFaq, status: 'draft' })}
-                                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", newFaq.status === 'draft' ? "bg-white text-pink-600 shadow-sm" : "text-slate-400")}
-                                    >DRAFT</button>
-                                </div>
+                <form onSubmit={handleSaveFaq} className="space-y-4 text-left p-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Category</label>
+                            <select
+                                value={newFaq.category}
+                                onChange={(e) => setNewFaq({ ...newFaq, category: e.target.value })}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-pink-500/20 focus:bg-white transition-all cursor-pointer"
+                            >
+                                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Visibility State</label>
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <button
+                                    type="button"
+                                    onClick={() => setNewFaq({ ...newFaq, status: 'published' })}
+                                    className={cn("flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer", newFaq.status === 'published' ? "bg-white text-pink-600 shadow-sm" : "text-slate-500")}
+                                >PUBLISHED</button>
+                                <button
+                                    type="button"
+                                    onClick={() => setNewFaq({ ...newFaq, status: 'draft' })}
+                                    className={cn("flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer", newFaq.status === 'draft' ? "bg-white text-pink-600 shadow-sm" : "text-slate-500")}
+                                >DRAFT</button>
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Question</label>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Question *</label>
                         <input
                             type="text"
                             required
                             value={newFaq.question}
                             onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
                             placeholder="Enter the question..."
-                            className="w-full px-5 py-5 bg-slate-50 border-none rounded-2xl text-base font-black outline-none focus:ring-2 focus:ring-pink-500/10 transition-all shadow-sm"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-pink-500/20 focus:bg-white transition-all"
                         />
                     </div>
-                    <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Answer</label>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Answer *</label>
                         <textarea
                             rows={4}
                             required
                             value={newFaq.answer}
                             onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
                             placeholder="Type the answer here..."
-                            className="w-full px-5 py-5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-pink-500/10 transition-all shadow-sm resize-none"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-pink-500/20 focus:bg-white transition-all resize-none"
                         />
                     </div>
-                    <div className="flex gap-4">
-                        <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all">CANCEL</button>
-                        <button type="submit" className="flex-[2] py-4 bg-pink-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-pink-700 shadow-xl shadow-pink-100 transition-all flex items-center justify-center gap-2">
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                        <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition-all cursor-pointer">CANCEL</button>
+                        <button type="submit" className="flex-[2] py-2.5 bg-pink-600 text-white rounded-xl font-bold text-xs hover:bg-pink-700 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
                             <Save className="h-4 w-4" /> SAVE FAQ
                         </button>
                     </div>
@@ -511,32 +445,32 @@ const FAQManagement = () => {
                 onClose={() => setIsCategoryModalOpen(false)}
                 title="Manage Categories"
             >
-                <div className="space-y-6 text-left">
-                    <div className="space-y-3">
+                <div className="space-y-4 text-left p-1">
+                    <div className="space-y-2">
                         {categories.map((cat) => (
-                            <div key={cat.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="flex items-center gap-4">
-                                    <div className={cn("h-4 w-4 rounded-full shadow-sm", `bg-${cat.color}-500`)} />
-                                    <span className="text-sm font-black text-slate-900">{cat.name}</span>
+                            <div key={cat.id} className="flex items-center justify-between p-3 px-4 bg-slate-50 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn("h-3 w-3 rounded-full shadow-xs", `bg-${cat.color}-500`)} />
+                                    <span className="text-sm font-bold text-slate-900">{cat.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => handleDeleteCategory(cat.name)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-white rounded-lg transition-all"><Trash2 className="h-4 w-4" /></button>
+                                    <button onClick={() => handleDeleteCategory(cat.name)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white rounded-lg transition-all cursor-pointer"><Trash2 className="h-4 w-4" /></button>
                                 </div>
                             </div>
                         ))}
                     </div>
                     <div className="relative group">
-                        <Plus className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-brand-500" />
+                        <Plus className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-brand-500" />
                         <input
                             type="text"
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
                             placeholder="New Category Label..."
-                            className="w-full pl-11 pr-4 py-4 bg-white ring-1 ring-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                         />
                     </div>
-                    <button onClick={handleAddCategory} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all">GENERATE NEW CATEGORY</button>
+                    <button onClick={handleAddCategory} className="w-full py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer">ADD NEW CATEGORY</button>
                 </div>
             </Modal>
         </div>

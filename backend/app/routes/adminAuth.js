@@ -18,9 +18,6 @@ import {
     settleTransaction,
     bulkSettleDelivery,
     getActiveSellers,
-    getPendingSellers,
-    approveSellerApplication,
-    rejectSellerApplication,
     getSellerWithdrawals,
     getDeliveryWithdrawals,
     updateWithdrawalStatus,
@@ -33,9 +30,15 @@ import {
     getUserById,
     getSellers,
     getSellerLocations,
+    updateSeller,
     getPlatformSettings,
     updatePlatformSettings
 } from "../controller/adminController.js";
+import {
+    getPendingSellers,
+    approveSellerApplication,
+    rejectSellerApplication,
+} from "../controller/admin/sellerApplicationsController.js";
 import {
     exportAdminFinanceStatementController,
     getAdminFinanceLedgerController,
@@ -165,6 +168,7 @@ router.get("/users/:id", verifyToken, allowRoles("admin"), getUserById);
 router.get("/sellers", verifyToken, allowRoles("admin"), getSellers);
 router.get("/sellers/locations", verifyToken, allowRoles("admin"), getSellerLocations);
 router.get("/sellers/active", verifyToken, allowRoles("admin"), getActiveSellers);
+router.put("/sellers/:id", verifyToken, allowRoles("admin"), updateSeller);
 router.get("/sellers/pending", verifyToken, allowRoles("admin"), getPendingSellers);
 router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin"), approveSellerApplication);
 router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin"), rejectSellerApplication);

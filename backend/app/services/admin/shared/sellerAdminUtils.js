@@ -15,7 +15,8 @@ function getSellerDocumentLabel(key) {
 }
 
 function isViewableDocumentUrl(value = "") {
-  return /^https?:\/\//i.test(String(value).trim());
+  const str = String(value).trim();
+  return /^https?:\/\//i.test(str) || /^data:/i.test(str);
 }
 
 export function formatSellerDocuments(documents) {

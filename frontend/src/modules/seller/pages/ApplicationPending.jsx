@@ -11,7 +11,7 @@ const ApplicationPending = () => {
   const { settings } = useSettings();
 
   const appName = settings?.appName || "App";
-  const logoUrl = "/Vitszeefinallog-removebg-preview.png";
+  const logoUrl = "/LogoVitszee.png";
 
   const applicationStatus =
     location.state?.applicationStatus ||

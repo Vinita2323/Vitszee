@@ -27,7 +27,7 @@ const Topbar = ({ onMenuClick }) => {
     const location = useLocation();
 
     const appName = settings?.appName || 'App';
-    const logoUrl = "/Vitszeefinallog-removebg-preview.png";
+    const logoUrl = "/LogoVitszee.png";
 
     const [searchQuery, setSearchQuery] = React.useState('');
     const [notifications, setNotifications] = React.useState([]);
@@ -183,25 +183,25 @@ const Topbar = ({ onMenuClick }) => {
                 {/* Mobile Logo */}
                 <div className="flex items-center space-x-2 mr-4 md:hidden">
                     {logoUrl ? (
-                        <div className="h-8 w-8 rounded-lg overflow-hidden shadow-md shadow-[#1A4516]/10 border border-gray-100">
+                        <div className="h-8 w-8 rounded-lg overflow-hidden shadow-md shadow-blue-500/10 border border-gray-100">
                             <img src={logoUrl} alt={appName} className="h-full w-full object-contain" />
                         </div>
                     ) : (
-                        <div className="h-8 w-8 rounded-lg bg-[#1A4516] flex items-center justify-center text-white font-black text-sm shadow-md">
+                        <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md">
                             {appName.charAt(0)}
                         </div>
                     )}
                 </div>
 
                 <form onSubmit={handleSearchSubmit} className="relative w-full md:w-[400px] group hidden md:block">
-                    <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#1A4516] transition-all duration-300" />
+                    <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-all duration-300" />
                     <input
                         type="text"
                         placeholder={isSeller ? "Search products by name or SKU..." : "Search anything..."}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#1A4516]/10 focus:border-[#1A4516]/20 transition-all duration-500 outline-none"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/20 transition-all duration-500 outline-none"
                     />
                 </form>
             </div>
@@ -211,8 +211,8 @@ const Topbar = ({ onMenuClick }) => {
                     <button
                         onClick={() => setShowNotifications(!showNotifications)}
                         className={cn(
-                            "p-2 hover:bg-[#1A4516]/5 text-gray-500 hover:text-[#1A4516] rounded-xl transition-all duration-300 relative group",
-                            showNotifications && "bg-[#1A4516]/5 text-[#1A4516]"
+                            "p-2 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-xl transition-all duration-300 relative group",
+                            showNotifications && "bg-blue-50 text-blue-600"
                         )}
                     >
                         <HiOutlineBell className="h-5 w-5" />
@@ -248,7 +248,7 @@ const Topbar = ({ onMenuClick }) => {
                     }}
                     className="flex items-center space-x-2.5 p-1 pr-3 hover:bg-gray-50 rounded-xl transition-all duration-300 group ring-1 ring-transparent hover:ring-gray-100 shadow-sm hover:shadow-md"
                 >
-                    <div className="h-8 w-8 rounded-lg bg-[#1A4516] flex items-center justify-center text-white font-bold text-xs shadow-md group-hover:scale-105 transition-transform">
+                    <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-md group-hover:scale-105 transition-transform">
                         {user?.name?.[0] || 'A'}
                     </div>
                     <div>

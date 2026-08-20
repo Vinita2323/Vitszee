@@ -1,11 +1,11 @@
 import React from 'react';
 import { Facebook, Twitter, Instagram, Youtube, Mail, MapPin, Phone } from 'lucide-react';
-import Logo from '@/assets/Vitszeefinallog-removebg-preview.png';
+import Logo from '@/assets/LogoVitszee.png';
 import { useSettings } from '@core/context/SettingsContext';
 
 const Footer = () => {
     const { settings } = useSettings();
-    const logoUrl = "/Vitszeefinallog-removebg-preview.png";
+    const logoUrl = "/LogoVitszee.png";
     const primaryColor = settings?.primaryColor || 'var(--primary)';
 
     return (

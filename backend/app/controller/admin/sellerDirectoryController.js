@@ -4,6 +4,7 @@ import {
   getActiveSellersData,
   getSellerLocationsData,
   getSellerOptions,
+  updateSellerDetailsById,
 } from "../../services/admin/sellerDirectoryService.js";
 
 export const getSellerLocations = async (req, res) => {
@@ -67,6 +68,19 @@ export const getSellers = async (req, res) => {
   try {
     const sellers = await getSellerOptions();
     return handleResponse(res, 200, "Sellers fetched", sellers);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const updateSeller = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const seller = await updateSellerDetailsById(id, req.body);
+    if (!seller) {
+      return handleResponse(res, 404, "Seller not found");
+    }
+    return handleResponse(res, 200, "Seller details updated successfully", seller);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

@@ -551,6 +551,11 @@ export async function issueSellerResetOtp({
     maskedTarget:
       normalizedChannel === "email" ? maskEmail(target) : maskPhone(target),
     expiresInSeconds: OTP_EXPIRY_MINUTES() * 60,
+    ...(process.env.NODE_ENV !== "production" &&
+    ((normalizedChannel === "email" && !useRealEmailOTP()) ||
+      (normalizedChannel === "phone" && !useRealSMS()))
+      ? { debugOtp: otp }
+      : {}),
   };
 }
 

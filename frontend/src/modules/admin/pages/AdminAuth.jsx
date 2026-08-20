@@ -9,11 +9,14 @@ import {
   User,
   ArrowRight,
   Eye,
-  EyeOff
+  EyeOff,
+  ShieldCheck,
+  Zap,
+  BarChart3,
+  Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "../services/adminApi";
-import sellerLoginImg from "../../../assets/SellerLogin.png";
 
 const AdminAuth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,7 +25,8 @@ const AdminAuth = () => {
   const { login } = useAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
-  const appName = settings?.appName || "App";
+  const appName = settings?.appName || "Vitszee";
+  const primaryColor = settings?.primaryColor || "#1A4516";
 
   const [formData, setFormData] = useState({
     email: "",
@@ -88,78 +92,139 @@ const AdminAuth = () => {
     }
   };
 
+  const features = [
+    { icon: Zap, title: "Live Fleet & Order Sync", desc: "Real-time routing & status updates" },
+    { icon: BarChart3, title: "Finance & Analytics Hub", desc: "Automated settlements & metrics" },
+    { icon: ShieldCheck, title: "Enterprise Security", desc: "Encrypted role-based privileges" },
+  ];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#fcfaff] p-6 font-['Outfit',_sans-serif] overflow-hidden relative">
-      {/* Elegant Ambient Background */}
+    <div className="flex min-h-screen items-center justify-center bg-[#F4F7FB] p-4 sm:p-6 font-['Outfit',_sans-serif] overflow-hidden relative selection:bg-blue-500 selection:text-white">
+      {/* Light Ambient Background with Soft Blue Glows */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-[#1A4516]/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-slate-50/50 rounded-full blur-[100px]" />
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full blur-[140px] bg-blue-400/15" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full blur-[140px] bg-sky-400/15" />
+        <div className="absolute inset-0 bg-[radial-gradient(#0066ff0a_1px,transparent_1px)] [background-size:24px_24px]" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative z-10 w-full max-w-[950px] min-h-[580px] max-h-[90vh] bg-white rounded-2xl shadow-[0_50px_120px_rgba(0,0,0,0.06)] border border-slate-100 flex flex-col md:flex-row overflow-hidden"
+        initial={{ opacity: 0, scale: 0.97, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-[1000px] min-h-[580px] bg-white rounded-3xl shadow-[0_20px_70px_-15px_rgba(0,102,255,0.12)] border border-blue-100 flex flex-col md:flex-row overflow-hidden"
       >
-        {/* Left Side: Deep Green Side Panel */}
-        <div className="hidden md:flex w-[45%] bg-[#0B3B24] relative flex-col items-center justify-between p-8 pt-10 pb-6 overflow-hidden">
-          {/* Light backdrop circles */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none">
-            <div className="absolute top-0 left-0 w-64 h-64 bg-white/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-            <div className="absolute bottom-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+        {/* Left Side: Modern Light Blue Enterprise Panel */}
+        <div className="hidden md:flex w-[46%] bg-gradient-to-br from-blue-50/90 via-sky-50/50 to-indigo-50/60 relative flex-col justify-between p-8 lg:p-10 overflow-hidden text-slate-800 border-r border-blue-100">
+          {/* Ambient Glows & Grid Pattern */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full blur-3xl bg-blue-300/25" />
+            <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-3xl bg-sky-300/20" />
+            <div className="absolute inset-0 bg-[radial-gradient(#0066ff08_1px,transparent_1px)] [background-size:20px_20px]" />
           </div>
 
+          {/* Top Brand Header */}
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="relative z-10 w-full flex flex-col items-center text-center"
+            transition={{ duration: 0.6 }}
+            className="relative z-10"
           >
-            {/* White Square Logo Wrapper */}
-            <div className="w-36 h-28 rounded-2xl p-3 flex items-center justify-center mb-4 bg-white shadow-lg border border-slate-100 flex-shrink-0">
-              <img
-                src="/Vitszeefinallog-removebg-preview.png"
-                alt="Vitzee Market Logo"
-                className="w-full h-full object-contain"
-              />
+            <div className="flex items-center gap-3.5 mb-6">
+              <div className="w-14 h-14 rounded-2xl p-2 flex items-center justify-center bg-white shadow-md shadow-blue-500/10 ring-1 ring-blue-100 flex-shrink-0">
+                <img
+                  src="/LogoVitszee.png"
+                  alt={`${appName} Logo`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-slate-900 uppercase">
+                  {appName}
+                </h2>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                  <span className="text-[11px] font-bold text-blue-600 uppercase tracking-widest">
+                    Control Center
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <h2 className="text-white text-xl font-extrabold tracking-wide uppercase">
-              Vitzee Market
-            </h2>
-            <p className="text-white/60 text-[10px] font-black tracking-widest mt-1 uppercase font-mono">
-              → And Vegetables ←
-            </p>
+            <div className="space-y-1.5">
+              <h3 className="text-2xl font-black text-slate-900 leading-tight">
+                Enterprise Command & Operations
+              </h3>
+              <p className="text-xs text-slate-600 font-medium">
+                Unified administration for catalog, sellers, logistics & revenue.
+              </p>
+            </div>
           </motion.div>
 
-          {/* Grocery Basket Image */}
+          {/* Center Features List */}
+          <div className="relative z-10 space-y-3.5 my-6">
+            {features.map((feat, idx) => {
+              const Icon = feat.icon;
+              return (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.15 + idx * 0.1 }}
+                  className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/80 border border-blue-100/90 shadow-sm shadow-blue-500/5 hover:bg-white hover:border-blue-200 hover:shadow-md transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/25 flex items-center justify-center flex-shrink-0">
+                    <Icon size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 tracking-wide">
+                      {feat.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {feat.desc}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Security Footer */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="relative z-10 w-full flex justify-center mt-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="relative z-10 pt-4 border-t border-blue-100 flex items-center justify-between text-[11px] text-slate-500 font-medium"
           >
-            <img
-              src={sellerLoginImg}
-              alt="Fresh Farm Vegetables Basket"
-              className="w-full max-w-[270px] h-auto object-contain rounded-xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
-            />
+            <span className="flex items-center gap-1.5 font-semibold text-slate-600">
+              <ShieldCheck size={15} className="text-blue-600" />
+              256-Bit SSL Encrypted
+            </span>
+            <span className="text-blue-700 bg-blue-100/80 px-2.5 py-0.5 rounded-full font-mono text-[10px] font-bold">
+              PORTAL v3.2
+            </span>
           </motion.div>
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="w-full md:w-[55%] min-h-0 p-8 md:p-12 flex flex-col justify-center bg-white overflow-y-auto custom-scrollbar">
-          <div className="space-y-6 py-2">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-                Welcome Back!
+        <div className="w-full md:w-[54%] min-h-0 p-8 sm:p-10 lg:p-12 flex flex-col justify-center bg-white overflow-y-auto">
+          <div className="max-w-md w-full mx-auto space-y-6">
+            {/* Header */}
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                {isLogin ? "Administrator Access" : "Create Administrator"}
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {isLogin ? "Welcome Back!" : "Register Admin"}
               </h1>
-              <p className="text-slate-500 font-semibold text-xs uppercase tracking-wider">
-                {isLogin ? "Admin Login" : "Admin Register"}
+              <p className="text-slate-500 font-medium text-xs">
+                {isLogin
+                  ? "Enter your verified administrator credentials to continue."
+                  : "Fill in the required information to register a new administrator."}
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <AnimatePresence mode="popLayout">
                 {!isLogin && (
                   <motion.div
@@ -168,12 +233,12 @@ const AdminAuth = () => {
                     exit={{ height: 0, opacity: 0, y: -10 }}
                     className="space-y-1.5"
                   >
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block ml-0.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block ml-0.5">
                       Full Name
                     </label>
                     <div className="relative group">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1A4516] transition-colors">
-                        <User size={16} />
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                        <User size={18} />
                       </div>
                       <input
                         type="text"
@@ -181,21 +246,22 @@ const AdminAuth = () => {
                         required
                         value={formData.name}
                         onChange={handleChange}
-                        placeholder="Enter your name"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516]/20 focus:ring-2 focus:ring-[#1A4516]/10 transition-all"
+                        placeholder="Enter your full name"
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                       />
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
+              {/* Email Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block ml-0.5">
-                  Email
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block ml-0.5">
+                  Email Address
                 </label>
                 <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1A4516] transition-colors">
-                    <Mail size={16} />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <Mail size={18} />
                   </div>
                   <input
                     type="email"
@@ -203,19 +269,20 @@ const AdminAuth = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="Enter your email"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516]/20 focus:ring-2 focus:ring-[#1A4516]/10 transition-all"
+                    placeholder="admin@vitszee.com"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                   />
                 </div>
               </div>
 
+              {/* Password Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block ml-0.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block ml-0.5">
                   Password
                 </label>
                 <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1A4516] transition-colors">
-                    <Lock size={16} />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <Lock size={18} />
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
@@ -224,40 +291,42 @@ const AdminAuth = () => {
                     autoComplete="current-password"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Enter your password"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516]/20 focus:ring-2 focus:ring-[#1A4516]/10 transition-all"
+                    placeholder="Enter your secure password"
+                    className="w-full pl-11 pr-11 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#1A4516] transition-colors focus:outline-none"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors focus:outline-none p-1"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
+              {/* Remember & Forgot */}
               <div className="flex items-center justify-between text-xs font-semibold pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-600">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
                   <input
                     type="checkbox"
-                    className="rounded border-slate-300 text-[#1A4516] focus:ring-[#1A4516]"
+                    className="rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                   />
-                  <span>Remember me</span>
+                  <span>Remember this device</span>
                 </label>
                 <button
                   type="button"
-                  onClick={() => toast.info("Password reset feature coming soon")}
-                  className="text-[#1A4516] hover:underline"
+                  onClick={() => toast.info("Please contact system administrator to reset credentials.")}
+                  className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
                 >
                   Forgot Password?
                 </button>
               </div>
 
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-2 bg-[#1A4516] hover:bg-[#133A10] text-white rounded-lg py-3 text-sm font-bold shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3.5 text-sm font-bold shadow-lg shadow-blue-600/25 hover:shadow-blue-600/35 hover:scale-[1.005] active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer"
               >
                 {isLoading ? (
                   <motion.div
@@ -267,8 +336,8 @@ const AdminAuth = () => {
                   />
                 ) : (
                   <>
-                    <span>Login</span>
-                    <ArrowRight size={16} />
+                    <span>{isLogin ? "Sign In to Admin" : "Create Account"}</span>
+                    <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                   </>
                 )}
               </button>

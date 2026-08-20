@@ -17,6 +17,9 @@ import {
   HiOutlineArrowPath,
   HiOutlineDocumentText,
   HiOutlineTrash,
+  HiOutlinePencilSquare,
+  HiOutlineCheck,
+  HiOutlineArrowTopRightOnSquare,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -65,6 +68,15 @@ const normalizeSeller = (seller) => {
 
   return {
     ...seller,
+    documents: Array.isArray(seller.documents) ? seller.documents : [],
+    documentFiles: Array.isArray(seller.documentFiles) ? seller.documentFiles : [],
+    rawDocuments: seller.rawDocuments || seller.documents || {},
+    address: seller.address || seller.location || "",
+    locality: seller.locality || "",
+    pincode: seller.pincode || "",
+    city: seller.city || "",
+    state: seller.state || "",
+    description: seller.description || "",
     totalOrders: safeNumber(seller.totalOrders),
     deliveredOrders: safeNumber(seller.deliveredOrders),
     pendingOrders: safeNumber(seller.pendingOrders),
@@ -79,7 +91,7 @@ const normalizeSeller = (seller) => {
     lastOrderLabel: seller.lastOrderAt
       ? new Date(seller.lastOrderAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : "No orders yet",
-    location: seller.location || "Location not set",
+    location: seller.location || seller.address || "Location not set",
     avatar:
       seller.avatar ||
       `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
@@ -108,6 +120,31 @@ const ActiveSellers = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [selectedSeller, setSelectedSeller] = useState(null);
+
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    shopName: "",
+    email: "",
+    phone: "",
+    category: "",
+    serviceRadius: 5,
+    address: "",
+    description: "",
+  });
+
+  useEffect(() => {
+    if (selectedSeller || previewDoc) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [selectedSeller, previewDoc]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -191,6 +228,42 @@ const ActiveSellers = () => {
     }
   };
 
+  const handleStartEdit = (seller) => {
+    setEditFormData({
+      name: seller.ownerName || seller.name || "",
+      shopName: seller.shopName || "",
+      email: seller.email || "",
+      phone: seller.phone || "",
+      category: seller.category || "General",
+      serviceRadius: seller.serviceRadius || 5,
+      address: seller.address || seller.location || "",
+      description: seller.description || "",
+    });
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedSeller?.id) return;
+    setIsSavingEdit(true);
+    try {
+      await adminApi.updateSeller(selectedSeller.id, editFormData);
+      toast.success("Seller details updated successfully");
+      setIsEditing(false);
+      setSelectedSeller((prev) => ({
+        ...prev,
+        ...editFormData,
+        ownerName: editFormData.name,
+        location: editFormData.address || prev.location,
+      }));
+      setRefreshTick((t) => t + 1);
+    } catch (err) {
+      console.error("Failed to update seller", err);
+      toast.error(err.response?.data?.message || "Failed to update seller details");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const summaryCards = useMemo(
     () => [
       {
@@ -226,27 +299,36 @@ const ActiveSellers = () => {
   );
 
   return (
-    <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-2 duration-700 pb-16">
+    <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-2 duration-700 pb-16 space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="ds-h1 flex items-center gap-2">
+          <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
             Active Sellers
             <Badge
               variant="success"
-              className="admin-tiny px-1.5 py-0 font-bold uppercase tracking-wider"
+              className="text-xs px-2.5 py-0.5 font-bold uppercase tracking-wider"
             >
               Live
             </Badge>
           </h1>
-          <p className="ds-description mt-0.5">
+          <p className="text-sm font-medium text-slate-500 mt-1">
             Review every verified seller, their performance, and current store health.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl ring-1 ring-slate-100">
+          <button
+            onClick={() => setRefreshTick((value) => value + 1)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
+            title="Refresh active sellers"
+          >
+            <HiOutlineArrowPath className={cn("h-4 w-4 text-slate-600", loading && "animate-spin")} />
+            <span>Refresh</span>
+          </button>
+          <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2.5 rounded-xl ring-1 ring-slate-200 text-xs font-bold text-slate-700">
             <HiOutlineClock className="h-4 w-4 text-slate-500" />
-            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+            <span className="uppercase tracking-wider">
               {lastSyncAt
                 ? `Synced ${lastSyncAt.toLocaleTimeString([], {
                     hour: "2-digit",
@@ -255,50 +337,49 @@ const ActiveSellers = () => {
                 : "Sync pending"}
             </span>
           </div>
-          <button
-            onClick={() => setRefreshTick((value) => value + 1)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xl hover:bg-slate-800 transition-all"
-          >
-            <HiOutlineArrowPath className={cn("h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Quick Stats - Compacted */}
+      <div className="flex flex-wrap gap-3 items-center">
         {summaryCards.map((card) => (
-          <Card key={card.label} className="border-none shadow-sm ring-1 ring-slate-100 p-5">
-            <div className="flex items-start justify-between gap-4">
+          <Card
+            key={card.label}
+            className="border-none shadow-xs ring-1 ring-slate-200/80 px-4 py-2.5 bg-white rounded-lg w-full sm:w-56 md:w-60 shrink-0"
+          >
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="ds-label">{card.label}</p>
-                <h4 className="ds-stat-medium mt-1">{card.value}</h4>
-                <p className="text-[10px] font-semibold text-slate-400 mt-1 uppercase tracking-widest">
-                  {card.note}
+                <p className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                  {card.label}
                 </p>
+                <h4 className="text-2xl font-black text-slate-900 mt-0.5">
+                  {card.value}
+                </h4>
               </div>
               <div
                 className={cn(
-                  "h-12 w-12 rounded-2xl flex items-center justify-center",
-                  statClass[card.color],
+                  "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+                  statClass[card.color] || "bg-brand-50 text-brand-600",
                 )}
               >
-                <card.icon className="h-6 w-6" />
+                <card.icon className="h-5 w-5" />
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      <Card className="border-none shadow-xl ring-1 ring-slate-100 p-4 bg-white/80 backdrop-blur-xl">
+      {/* Search & Filters */}
+      <Card className="border-none shadow-xl ring-1 ring-slate-200/80 p-4 bg-white rounded-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
-            <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by store name, owner, email, phone or location..."
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-semibold outline-none ring-1 ring-transparent focus:ring-primary/20"
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200/70 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all placeholder:text-slate-400"
             />
           </div>
 
@@ -306,7 +387,7 @@ const ActiveSellers = () => {
             <select
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
-              className="px-4 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              className="px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all"
             >
               <option value="all">All categories</option>
               {categories.map((category) => (
@@ -319,7 +400,7 @@ const ActiveSellers = () => {
             <select
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
-              className="px-4 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              className="px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -331,25 +412,26 @@ const ActiveSellers = () => {
         </div>
       </Card>
 
-      <Card className="border-none shadow-xl ring-1 ring-slate-100 overflow-hidden rounded-xl">
+      {/* Table */}
+      <Card className="border-none shadow-xl ring-1 ring-slate-200/80 overflow-hidden rounded-xl bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="ds-table-header-cell px-6">Store Entity</th>
-                <th className="ds-table-header-cell px-6">Performance</th>
-                <th className="ds-table-header-cell px-6">Business Intel</th>
-                <th className="ds-table-header-cell px-6">Status</th>
-                <th className="ds-table-header-cell px-6 text-right">Actions</th>
+              <tr className="bg-slate-50/80 border-b border-slate-100">
+                <th className="text-xs uppercase tracking-wider font-bold text-slate-500 px-6 py-3.5">Store Entity</th>
+                <th className="text-xs uppercase tracking-wider font-bold text-slate-500 px-6 py-3.5">Performance</th>
+                <th className="text-xs uppercase tracking-wider font-bold text-slate-500 px-6 py-3.5">Business Intel</th>
+                <th className="text-xs uppercase tracking-wider font-bold text-slate-500 px-6 py-3.5">Status</th>
+                <th className="text-xs uppercase tracking-wider font-bold text-slate-500 px-6 py-3.5 !text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-24 text-center">
+                  <td colSpan="5" className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
-                      <HiOutlineArrowPath className="h-8 w-8 text-slate-300 animate-spin" />
-                      <p className="text-slate-500 font-bold text-sm">
+                      <HiOutlineArrowPath className="h-8 w-8 text-slate-400 animate-spin" />
+                      <p className="text-slate-600 font-bold text-base">
                         Loading active sellers...
                       </p>
                     </div>
@@ -357,15 +439,15 @@ const ActiveSellers = () => {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-24 text-center">
+                  <td colSpan="5" className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-16 w-16 rounded-full bg-rose-50 flex items-center justify-center">
-                        <HiOutlineXMark className="h-8 w-8 text-rose-400" />
+                        <HiOutlineXMark className="h-8 w-8 text-rose-500" />
                       </div>
-                      <p className="text-sm font-bold text-slate-600">{error}</p>
+                      <p className="text-base font-bold text-slate-700">{error}</p>
                       <button
                         onClick={() => setRefreshTick((value) => value + 1)}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                        className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
                       >
                         Retry
                       </button>
@@ -374,10 +456,10 @@ const ActiveSellers = () => {
                 </tr>
               ) : sellers.length > 0 ? (
                 sellers.map((seller) => (
-                  <tr key={seller.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr key={seller.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4.5 align-middle">
                       <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl overflow-hidden bg-slate-100 ring-2 ring-slate-100 flex items-center justify-center">
+                        <div className="h-11 w-11 rounded-xl overflow-hidden bg-slate-100 ring-2 ring-slate-100 flex items-center justify-center shrink-0">
                           <img
                             src={seller.avatar}
                             alt={seller.shopName}
@@ -388,15 +470,15 @@ const ActiveSellers = () => {
                           />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900">
+                          <p className="text-base font-bold text-slate-900 group-hover:text-primary transition-colors">
                             {seller.shopName}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="text-[10px] font-semibold text-slate-400">
+                            <span className="text-xs font-semibold text-slate-500">
                               {seller.ownerName}
                             </span>
                             <span className="h-1 w-1 rounded-full bg-slate-300" />
-                            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                            <span className="text-[11px] font-bold text-brand-600 uppercase tracking-wide">
                               {seller.category || "General"}
                             </span>
                           </div>
@@ -404,17 +486,17 @@ const ActiveSellers = () => {
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4.5 align-middle">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-slate-900">
+                          <span className="text-sm font-bold text-slate-900">
                             {(seller.totalOrders || 0).toLocaleString("en-IN")} Orders
                           </span>
-                          <span className="text-[10px] font-bold text-brand-600">
+                          <span className="text-xs font-bold text-brand-600">
                             {currency(seller.totalRevenue)}
                           </span>
                         </div>
-                        <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-brand-500 rounded-full"
                             style={{
@@ -422,56 +504,56 @@ const ActiveSellers = () => {
                             }}
                           />
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                           {(seller.fulfillmentRate || 0)}% fulfillment
                         </p>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4.5 align-middle">
                       <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-slate-700">
-                          <HiOutlineDocumentText className="h-3.5 w-3.5 text-slate-400" />
-                          <span className="text-[10px] font-bold">
+                        <div className="flex items-center gap-2 text-slate-800">
+                          <HiOutlineDocumentText className="h-4 w-4 text-slate-500" />
+                          <span className="text-xs font-bold text-slate-800">
                             {(seller.productCount || 0).toLocaleString("en-IN")} products
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-700">
-                          <HiOutlineMapPin className="h-3.5 w-3.5 text-slate-400" />
-                          <span className="text-[10px] font-bold truncate max-w-[260px]">
+                          <HiOutlineMapPin className="h-4 w-4 text-slate-500 shrink-0" />
+                          <span className="text-xs font-semibold text-slate-700 truncate max-w-[260px]">
                             {seller.location || "Location not set"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <HiOutlineCalendarDays className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-bold">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <HiOutlineCalendarDays className="h-4 w-4 text-slate-400" />
+                          <span className="text-xs font-semibold text-slate-500">
                             Joined {seller.joinedDate || "N/A"}
                           </span>
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-2">
+                    <td className="px-6 py-4.5 align-middle">
+                      <div className="flex flex-col gap-1.5">
                         <Badge
                           variant="success"
-                          className="w-fit text-[8px] font-black uppercase tracking-widest"
+                          className="w-fit text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider"
                         >
                           Active
                         </Badge>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                           Last order: {seller.lastOrderLabel || "No orders yet"}
                         </span>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4.5 text-right align-middle">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedSeller(seller)}
-                          className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2"
+                          className="h-9 px-4 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-primary transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                         >
-                          <HiOutlineEye className="h-3.5 w-3.5" />
+                          <HiOutlineEye className="h-4 w-4" />
                           VIEW PROFILE
                         </button>
                       </div>
@@ -480,15 +562,15 @@ const ActiveSellers = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-24 text-center">
+                  <td colSpan="5" className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center">
-                        <HiOutlineBuildingOffice2 className="h-8 w-8 text-slate-200" />
+                        <HiOutlineBuildingOffice2 className="h-8 w-8 text-slate-300" />
                       </div>
-                      <p className="text-slate-500 font-bold text-sm">
+                      <p className="text-slate-700 font-bold text-base">
                         No active sellers found.
                       </p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <p className="text-xs font-semibold text-slate-400">
                         Try a different search or filter.
                       </p>
                     </div>
@@ -512,198 +594,514 @@ const ActiveSellers = () => {
         />
       </div>
 
+      {/* Seller Profile / Edit Modal */}
       <AnimatePresence>
         {selectedSeller && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/75 backdrop-blur-md"
-              onClick={() => setSelectedSeller(null)}
-            />
+          <div className="fixed inset-0 z-[120] overflow-y-auto">
+            <div className="min-h-full flex items-center justify-center p-3 sm:p-4 lg:p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-950/75 backdrop-blur-md"
+                onClick={() => {
+                  if (!isSavingEdit) {
+                    setSelectedSeller(null);
+                    setIsEditing(false);
+                  }
+                }}
+              />
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 24 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 24 }}
-              className="relative z-10 w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="flex items-start justify-between p-5 border-b border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-2xl overflow-hidden bg-slate-100 ring-4 ring-white shadow-lg">
-                    <img
-                      src={selectedSeller.avatar}
-                      alt={selectedSeller.shopName}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-900">
-                      {selectedSeller.shopName}
-                    </h3>
-                    <p className="text-sm font-semibold text-slate-500">
-                      Owned by {selectedSeller.ownerName}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge
-                        variant="success"
-                        className="text-[8px] font-black uppercase tracking-widest"
-                      >
-                        Active
-                      </Badge>
-                      <Badge
-                        variant="primary"
-                        className="text-[8px] font-black uppercase tracking-widest"
-                      >
-                        {selectedSeller.category || "General"}
-                      </Badge>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 24 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 24 }}
+                className="relative z-10 w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-start justify-between p-5 lg:p-6 border-b border-slate-100 shrink-0 bg-white z-20">
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-2xl overflow-hidden bg-slate-100 ring-4 ring-white shadow-lg shrink-0">
+                      <img
+                        src={selectedSeller.avatar}
+                        alt={selectedSeller.shopName}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl lg:text-3xl font-black text-slate-900 leading-tight">
+                        {selectedSeller.shopName}
+                      </h3>
+                      <p className="text-sm font-bold text-slate-600 mt-0.5">
+                        Owned by {selectedSeller.ownerName}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="success"
+                          className="text-xs px-2.5 py-0.5 font-bold uppercase tracking-wider"
+                        >
+                          Active
+                        </Badge>
+                        <Badge
+                          variant="primary"
+                          className="text-xs px-2.5 py-0.5 font-bold uppercase tracking-wider"
+                        >
+                          {selectedSeller.category || "General"}
+                        </Badge>
+                        {isEditing && (
+                          <Badge
+                            variant="warning"
+                            className="text-xs px-2.5 py-0.5 font-bold uppercase tracking-wider animate-pulse"
+                          >
+                            Editing
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedSeller(null);
+                      setIsEditing(false);
+                    }}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                  >
+                    <HiOutlineXMark className="h-6 w-6 text-slate-500" />
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setSelectedSeller(null)}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                >
-                  <HiOutlineXMark className="h-6 w-6 text-slate-400" />
-                </button>
-              </div>
+                {/* Modal Body */}
+                <div className="overflow-y-auto flex-1 overscroll-contain">
+                  {isEditing ? (
+                    /* Edit Form */
+                    <div className="flex flex-col min-h-full">
+                      <div className="p-6 lg:p-8 space-y-5 flex-1">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                          <div>
+                            <h4 className="text-lg font-black text-slate-900">Edit Store Information</h4>
+                            <p className="text-xs font-semibold text-slate-500">Update verified seller profile, contact, and operations.</p>
+                          </div>
+                        </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12">
-                <div className="lg:col-span-4 bg-slate-50 p-5 border-r border-slate-100">
-                  <div className="space-y-5">
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                        Contact
-                      </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Shop / Store Name *</label>
+                            <input
+                              type="text"
+                              value={editFormData.shopName}
+                              onChange={(e) => setEditFormData({ ...editFormData, shopName: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="Store Name"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Owner Name *</label>
+                            <input
+                              type="text"
+                              value={editFormData.name}
+                              onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="Owner Name"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Business Email *</label>
+                            <input
+                              type="email"
+                              value={editFormData.email}
+                              onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="seller@email.com"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Phone Number *</label>
+                            <input
+                              type="text"
+                              value={editFormData.phone}
+                              onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="10-digit phone"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Category</label>
+                            <input
+                              type="text"
+                              value={editFormData.category}
+                              onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="e.g. Grocery, Fruits & Vegetables"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Service Radius (km)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={editFormData.serviceRadius}
+                              onChange={(e) => setEditFormData({ ...editFormData, serviceRadius: Number(e.target.value) || 5 })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 md:col-span-2">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Store Full Address</label>
+                            <textarea
+                              rows="2"
+                              value={editFormData.address}
+                              onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="Complete store location and address..."
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 md:col-span-2">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Store Note / Description</label>
+                            <textarea
+                              rows="2"
+                              value={editFormData.description}
+                              onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                              placeholder="Optional store description or note..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sticky Edit Footer */}
+                      <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm p-4 px-6 lg:px-8 border-t border-slate-100 flex items-center justify-end gap-3 z-10">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditing(false)}
+                          disabled={isSavingEdit}
+                          className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveEdit}
+                          disabled={isSavingEdit}
+                          className="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingEdit ? (
+                            <HiOutlineArrowPath className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <HiOutlineCheck className="h-4 w-4" />
+                          )}
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                  /* Standard Profile View */
+                  <div className="grid grid-cols-1 lg:grid-cols-12">
+                    {/* Left Column: Contact, Health, Documents */}
+                    <div className="lg:col-span-5 bg-slate-50/80 p-5 lg:p-6 border-r border-slate-100 space-y-6">
+                      {/* Contact Info */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-3 text-slate-700">
-                          <HiOutlineEnvelope className="h-4 w-4 text-slate-400" />
-                          <span className="text-xs font-semibold break-all">
-                            {selectedSeller.email || "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-slate-700">
-                          <HiOutlinePhone className="h-4 w-4 text-slate-400" />
-                          <span className="text-xs font-semibold">
-                            {selectedSeller.phone || "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-slate-700">
-                          <HiOutlineMapPin className="h-4 w-4 text-slate-400" />
-                          <span className="text-xs font-semibold leading-relaxed">
-                            {selectedSeller.location || "Location not set"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                        Store Health
-                      </p>
-                      <div className="p-4 bg-white rounded-2xl ring-1 ring-slate-100">
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600">
-                          <span>Verification</span>
-                          <span className="text-brand-600">Verified</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 mt-3">
-                          <span>Joined</span>
-                          <span>{selectedSeller.joinedDate || "N/A"}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 mt-3">
-                          <span>Service radius</span>
-                          <span>{selectedSeller.serviceRadius || 5} km</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 mt-3">
-                          <span>Last order</span>
-                          <span>{selectedSeller.lastOrderLabel || "No orders yet"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="lg:col-span-8 p-5 bg-white">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                    {[
-                      {
-                        label: "Orders",
-                        value: (selectedSeller.totalOrders || 0).toLocaleString("en-IN"),
-                      },
-                      { label: "Revenue", value: currency(selectedSeller.totalRevenue) },
-                      {
-                        label: "Products",
-                        value: (selectedSeller.productCount || 0).toLocaleString("en-IN"),
-                      },
-                      {
-                        label: "Delivered",
-                        value: (selectedSeller.deliveredOrders || 0).toLocaleString("en-IN"),
-                      },
-                      {
-                        label: "Pending",
-                        value: (selectedSeller.pendingOrders || 0).toLocaleString("en-IN"),
-                      },
-                      {
-                        label: "Fulfillment",
-                        value: `${selectedSeller.fulfillmentRate || 0}%`,
-                      },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="p-4 rounded-2xl bg-slate-50 border border-slate-100"
-                      >
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                          {item.label}
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                          Contact Details
                         </p>
-                        <p className="text-lg font-black text-slate-900">{item.value}</p>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 text-slate-800">
+                            <HiOutlineEnvelope className="h-4 w-4 text-slate-500 shrink-0" />
+                            <span className="text-xs font-bold break-all">
+                              {selectedSeller.email || "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-slate-800">
+                            <HiOutlinePhone className="h-4 w-4 text-slate-500 shrink-0" />
+                            <span className="text-xs font-bold">
+                              {selectedSeller.phone || "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-slate-800">
+                            <HiOutlineMapPin className="h-4 w-4 text-slate-500 shrink-0" />
+                            <span className="text-xs font-bold leading-relaxed">
+                              {selectedSeller.location || "Location not set"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                      <p className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-1">
-                        Performance
-                      </p>
-                      <p className="text-sm font-semibold text-slate-700 leading-relaxed">
-                        {(selectedSeller.fulfillmentRate || 0)}% of the orders for this seller have been completed successfully.
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                        Average order value
-                      </p>
-                      <p className="text-sm font-semibold text-slate-700 leading-relaxed">
-                        {currency(selectedSeller.avgOrderValue)}
-                      </p>
-                    </div>
-                  </div>
+                      {/* Store Health */}
+                      <div className="space-y-3">
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                          Store Health
+                        </p>
+                        <div className="p-4 bg-white rounded-2xl ring-1 ring-slate-200 space-y-3">
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span>Verification</span>
+                            <span className="text-brand-600 font-extrabold">Verified & Active</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span>Joined Date</span>
+                            <span className="text-slate-900 font-extrabold">{selectedSeller.joinedDate || "N/A"}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span>Service Radius</span>
+                            <span className="text-slate-900 font-extrabold">{selectedSeller.serviceRadius || 5} km</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span>Last Order</span>
+                            <span className="text-slate-900 font-extrabold">{selectedSeller.lastOrderLabel || "No orders yet"}</span>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="mt-6 flex items-center justify-end gap-3">
-                    <button
-                      onClick={() => handleDeleteSeller(selectedSeller.id)}
-                      disabled={isDeleting}
-                      className="px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl text-xs font-bold hover:bg-rose-100 hover:border-rose-200 transition-all flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isDeleting ? (
-                        <HiOutlineArrowPath className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <HiOutlineTrash className="h-4 w-4" />
-                      )}
-                      Delete Store
-                    </button>
-                    <button
-                      onClick={() => setSelectedSeller(null)}
-                      className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all"
-                    >
-                      Close
-                    </button>
+                      {/* Submitted Documents */}
+                      <div className="space-y-3">
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                          Verification Documents
+                        </p>
+                        {Array.isArray(selectedSeller.documentFiles) && selectedSeller.documentFiles.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedSeller.documentFiles.map((doc, idx) => (
+                              <div
+                                key={doc.key || idx}
+                                className="p-3 bg-white rounded-xl ring-1 ring-slate-200 flex items-center justify-between gap-3 shadow-xs hover:border-brand-300 transition-all"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                    <HiOutlineDocumentText className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-900 truncate">
+                                      {doc.label}
+                                    </p>
+                                    <p className="text-[10px] font-semibold text-slate-400 truncate">
+                                      {doc.isViewable ? "Uploaded file" : doc.value || "Submitted"}
+                                    </p>
+                                  </div>
+                                </div>
+                                {doc.isViewable && doc.url ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewDoc(doc)}
+                                    className="px-2.5 py-1 bg-brand-50 hover:bg-brand-600 text-brand-600 hover:text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                                    title="View document in viewer"
+                                  >
+                                    <HiOutlineEye className="h-3.5 w-3.5" />
+                                    <span>View</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Verified</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : Array.isArray(selectedSeller.documents) && selectedSeller.documents.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedSeller.documents.map((doc, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg ring-1 ring-blue-100 uppercase"
+                              >
+                                {doc}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white rounded-xl ring-1 ring-slate-200 text-xs font-bold text-slate-400 text-center">
+                            No documents submitted
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Column: Performance & Stats */}
+                    <div className="lg:col-span-7 p-5 lg:p-6 bg-white flex flex-col justify-between space-y-6">
+                      <div className="space-y-6">
+                        {/* 6 Metrics Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                          {[
+                            {
+                              label: "Orders",
+                              value: (selectedSeller.totalOrders || 0).toLocaleString("en-IN"),
+                            },
+                            { label: "Revenue", value: currency(selectedSeller.totalRevenue) },
+                            {
+                              label: "Products",
+                              value: (selectedSeller.productCount || 0).toLocaleString("en-IN"),
+                            },
+                            {
+                              label: "Delivered",
+                              value: (selectedSeller.deliveredOrders || 0).toLocaleString("en-IN"),
+                            },
+                            {
+                              label: "Pending",
+                              value: (selectedSeller.pendingOrders || 0).toLocaleString("en-IN"),
+                            },
+                            {
+                              label: "Fulfillment",
+                              value: `${selectedSeller.fulfillmentRate || 0}%`,
+                            },
+                          ].map((item) => (
+                            <div
+                              key={item.label}
+                              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100"
+                            >
+                              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5">
+                                {item.label}
+                              </p>
+                              <p className="text-xl font-black text-slate-900">{item.value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Performance & Average order value */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div className="p-4 rounded-2xl bg-brand-50 border border-brand-100">
+                            <p className="text-xs font-black text-brand-600 uppercase tracking-wider mb-1">
+                              Performance
+                            </p>
+                            <p className="text-sm font-bold text-slate-800 leading-relaxed">
+                              {(selectedSeller.fulfillmentRate || 0)}% of orders completed successfully.
+                            </p>
+                          </div>
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-1">
+                              Avg Order Value
+                            </p>
+                            <p className="text-sm font-bold text-slate-800 leading-relaxed">
+                              {currency(selectedSeller.avgOrderValue)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {selectedSeller.description && (
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                            <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-1">
+                              Store Note
+                            </p>
+                            <p className="text-xs font-medium text-slate-700 leading-relaxed">
+                              {selectedSeller.description}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Footer */}
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <button
+                          onClick={() => handleStartEdit(selectedSeller)}
+                          className="px-4 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <HiOutlinePencilSquare className="h-4 w-4" />
+                          Edit Store
+                        </button>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleDeleteSeller(selectedSeller.id)}
+                            disabled={isDeleting}
+                            className="px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-600 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isDeleting ? (
+                              <HiOutlineArrowPath className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <HiOutlineTrash className="h-4 w-4" />
+                            )}
+                            Delete Store
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedSeller(null);
+                              setIsEditing(false);
+                            }}
+                            className="px-4 py-2.5 bg-slate-100 text-slate-800 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all cursor-pointer"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* In-App Document Preview Modal */}
+      <AnimatePresence>
+        {previewDoc && (
+          <div className="fixed inset-0 z-[130] overflow-y-auto">
+            <div className="min-h-full flex items-center justify-center p-4 lg:p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+                onClick={() => setPreviewDoc(null)}
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="w-full max-w-4xl max-h-[92vh] relative z-10 bg-white border border-slate-200 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-900"
+              >
+                {/* Header */}
+                <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between bg-white">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 text-brand-600 flex items-center justify-center shrink-0 ring-1 ring-blue-100">
+                      <HiOutlineDocumentText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 leading-tight">{previewDoc.label}</h3>
+                      <p className="text-xs font-semibold text-slate-500">{previewDoc.fileName || 'Submitted Document'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => window.open(previewDoc.url, '_blank', 'noopener,noreferrer')}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer ring-1 ring-slate-200/60"
+                      title="Open full view in new tab"
+                    >
+                      <HiOutlineArrowTopRightOnSquare className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDoc(null)}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 transition-colors cursor-pointer ring-1 ring-slate-200/60"
+                      title="Close preview"
+                    >
+                      <HiOutlineXMark className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Viewer Body */}
+                <div className="flex-1 bg-slate-50 flex items-center justify-center p-6 min-h-[400px] max-h-[75vh] overflow-auto">
+                  {previewDoc.fileType === 'pdf' || (previewDoc.url && previewDoc.url.toLowerCase().endsWith('.pdf')) ? (
+                    <iframe
+                      src={previewDoc.url}
+                      title={previewDoc.label}
+                      className="w-full h-[70vh] rounded-2xl bg-white border border-slate-200 shadow-sm"
+                    />
+                  ) : (
+                    <img
+                      src={previewDoc.url}
+                      alt={previewDoc.label}
+                      className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-md border border-slate-200 bg-white"
+                    />
+                  )}
+                </div>
+              </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>

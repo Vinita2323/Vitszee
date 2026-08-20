@@ -91,7 +91,7 @@ const ChatPage = () => {
 
   const appName = settings?.appName || "App";
   const [logoFailed, setLogoFailed] = useState(false);
-  const brandLogoUrl = "/Vitszeefinallog-removebg-preview.png";
+  const brandLogoUrl = "/LogoVitszee.png";
   const supportPhone = String(settings?.supportPhone || "").trim();
   const supportPhoneSanitized = supportPhone
     ? supportPhone.replace(/(?!^\+)[^\d]/g, "")

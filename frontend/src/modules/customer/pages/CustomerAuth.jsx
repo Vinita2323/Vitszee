@@ -76,7 +76,7 @@ const CustomerAuth = () => {
     const { login } = useAuth();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
-    const logoUrl = "/Vitszeefinallog-removebg-preview.png";
+    const logoUrl = "/LogoVitszee.png";
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({

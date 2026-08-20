@@ -6,6 +6,8 @@ import {
   computeMapCenter,
   escapeRegExp,
   extractSellerCity,
+  formatSellerDocuments,
+  formatSellerDocumentFiles,
   getSellerDisplayLocation,
   hasValidSellerLocation,
   matchSellerLifecycleFilter,
@@ -106,30 +108,30 @@ export async function getSellerLocationsData({
 
   const ordersBySeller = sellerIds.length
     ? await Order.aggregate([
-        { $match: { seller: { $in: sellerIds } } },
-        {
-          $group: {
-            _id: "$seller",
-            totalOrders: { $sum: 1 },
-            activeOrders: {
-              $sum: {
-                $cond: [{ $in: ["$status", activeStatuses] }, 1, 0],
-              },
+      { $match: { seller: { $in: sellerIds } } },
+      {
+        $group: {
+          _id: "$seller",
+          totalOrders: { $sum: 1 },
+          activeOrders: {
+            $sum: {
+              $cond: [{ $in: ["$status", activeStatuses] }, 1, 0],
             },
-            deliveredOrders: {
-              $sum: {
-                $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
-              },
-            },
-            ordersLast24h: {
-              $sum: {
-                $cond: [{ $gte: ["$createdAt", recentWindowStart] }, 1, 0],
-              },
-            },
-            lastOrderAt: { $max: "$createdAt" },
           },
+          deliveredOrders: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
+            },
+          },
+          ordersLast24h: {
+            $sum: {
+              $cond: [{ $gte: ["$createdAt", recentWindowStart] }, 1, 0],
+            },
+          },
+          lastOrderAt: { $max: "$createdAt" },
         },
-      ])
+      },
+    ])
     : [];
 
   const orderMap = new Map(ordersBySeller.map((row) => [String(row._id), row]));
@@ -244,11 +246,11 @@ export async function getSellerLocationsData({
       totalDeliveredOrders,
       averageRadiusKm: radiusValues.length
         ? Number(
-            (
-              radiusValues.reduce((accumulator, value) => accumulator + value, 0) /
-              radiusValues.length
-            ).toFixed(2),
-          )
+          (
+            radiusValues.reduce((accumulator, value) => accumulator + value, 0) /
+            radiusValues.length
+          ).toFixed(2),
+        )
         : 0,
       maxRadiusKm: radiusValues.length ? Math.max(...radiusValues) : 0,
     },
@@ -314,79 +316,79 @@ export async function getActiveSellersData({
   const [ordersBySeller, productsBySeller, overallOrderStats] = await Promise.all([
     sellerIds.length
       ? Order.aggregate([
-          { $match: { seller: { $in: sellerIds } } },
-          {
-            $group: {
-              _id: "$seller",
-              totalOrders: { $sum: 1 },
-              deliveredOrders: {
-                $sum: {
-                  $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
-                },
+        { $match: { seller: { $in: sellerIds } } },
+        {
+          $group: {
+            _id: "$seller",
+            totalOrders: { $sum: 1 },
+            deliveredOrders: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
               },
-              pendingOrders: {
-                $sum: {
-                  $cond: [
-                    {
-                      $in: [
-                        "$status",
-                        ["pending", "confirmed", "packed", "out_for_delivery"],
-                      ],
-                    },
-                    1,
-                    0,
-                  ],
-                },
-              },
-              totalRevenue: {
-                $sum: {
-                  $cond: [
-                    { $eq: ["$status", "delivered"] },
-                    { $ifNull: ["$pricing.total", 0] },
-                    0,
-                  ],
-                },
-              },
-              lastOrderAt: { $max: "$createdAt" },
             },
+            pendingOrders: {
+              $sum: {
+                $cond: [
+                  {
+                    $in: [
+                      "$status",
+                      ["pending", "confirmed", "packed", "out_for_delivery"],
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            totalRevenue: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "delivered"] },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0,
+                ],
+              },
+            },
+            lastOrderAt: { $max: "$createdAt" },
           },
-        ])
+        },
+      ])
       : Promise.resolve([]),
     sellerIds.length
       ? Product.aggregate([
-          { $match: { sellerId: { $in: sellerIds } } },
-          {
-            $group: {
-              _id: "$sellerId",
-              productCount: { $sum: 1 },
-              activeProductCount: {
-                $sum: {
-                  $cond: [{ $eq: ["$status", "active"] }, 1, 0],
-                },
+        { $match: { sellerId: { $in: sellerIds } } },
+        {
+          $group: {
+            _id: "$sellerId",
+            productCount: { $sum: 1 },
+            activeProductCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "active"] }, 1, 0],
               },
             },
           },
-        ])
+        },
+      ])
       : Promise.resolve([]),
     allActiveSellerIds.length
       ? Order.aggregate([
-          { $match: { seller: { $in: allActiveSellerIds } } },
-          {
-            $group: {
-              _id: null,
-              totalOrders: { $sum: 1 },
-              totalRevenue: {
-                $sum: {
-                  $cond: [
-                    { $eq: ["$status", "delivered"] },
-                    { $ifNull: ["$pricing.total", 0] },
-                    0,
-                  ],
-                },
+        { $match: { seller: { $in: allActiveSellerIds } } },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            totalRevenue: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "delivered"] },
+                  { $ifNull: ["$pricing.total", 0] },
+                  0,
+                ],
               },
             },
           },
-        ])
+        },
+      ])
       : Promise.resolve([]),
   ]);
 
@@ -426,10 +428,10 @@ export async function getActiveSellersData({
       lastOrderAt: orderStats.lastOrderAt || null,
       lastOrderLabel: orderStats.lastOrderAt
         ? new Date(orderStats.lastOrderAt).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
         : "No orders yet",
       totalOrders,
       deliveredOrders,
@@ -439,6 +441,16 @@ export async function getActiveSellersData({
       fulfillmentRate,
       productCount,
       activeProductCount,
+      documents: formatSellerDocuments(seller.documents),
+      documentFiles: formatSellerDocumentFiles(seller.documents),
+      rawDocuments: seller.documents || {},
+      address: seller.address || "",
+      locality: seller.locality || "",
+      pincode: seller.pincode || "",
+      state: seller.state || "",
+      description: seller.description || "",
+      dob: seller.dob || "",
+      bloodGroup: seller.bloodGroup || "",
       serviceRadius: Number(seller.serviceRadius || 5),
       location: getSellerDisplayLocation(seller),
       city: seller.address || "Location not set",
@@ -511,4 +523,47 @@ export async function getSellerOptions() {
     .select("_id shopName name email phone")
     .sort({ shopName: 1 })
     .lean();
+}
+
+export async function updateSellerDetailsById(sellerId, updates = {}) {
+  const allowedFields = [
+    "name",
+    "shopName",
+    "email",
+    "phone",
+    "category",
+    "description",
+    "address",
+    "locality",
+    "city",
+    "state",
+    "pincode",
+    "serviceRadius",
+    "dob",
+    "bloodGroup",
+    "isActive",
+    "isVerified",
+  ];
+
+  const updateData = {};
+  for (const field of allowedFields) {
+    if (updates[field] !== undefined) {
+      updateData[field] = updates[field];
+    }
+  }
+
+  if (updates.lat !== undefined && updates.lng !== undefined) {
+    updateData.location = {
+      type: "Point",
+      coordinates: [Number(updates.lng) || 0, Number(updates.lat) || 0],
+    };
+  }
+
+  const seller = await Seller.findByIdAndUpdate(
+    sellerId,
+    { $set: updateData },
+    { new: true }
+  ).lean();
+
+  return seller;
 }

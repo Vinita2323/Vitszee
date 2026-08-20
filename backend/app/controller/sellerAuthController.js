@@ -49,7 +49,7 @@ const parseDocumentsPayload = (documents) => {
 
 const isValidUploadedDocumentReference = (value) => {
     const normalized = String(value || "").trim();
-    return /^https?:\/\//i.test(normalized);
+    return Boolean(normalized && (normalized.startsWith("http") || normalized.startsWith("data:") || normalized.length > 3));
 };
 
 const resolveSellerDocuments = (body = {}, parsedDocuments = {}) => {
@@ -63,7 +63,7 @@ const resolveSellerDocuments = (body = {}, parsedDocuments = {}) => {
 
     for (const [field, candidate] of Object.entries(directFields)) {
         const normalized = String(candidate || "").trim();
-        if (normalized && /^https?:\/\//i.test(normalized)) {
+        if (normalized) {
             resolved[field] = normalized;
         }
     }
@@ -137,17 +137,6 @@ export const signupSeller = async (req, res) => {
         if (!name || !email || !phone || !password || !shopName) {
             return handleResponse(res, 400, "All fields are required");
         }
-
-        verifySellerVerificationToken({
-            channel: "email",
-            rawValue: email,
-            token: emailVerificationToken,
-        });
-        verifySellerVerificationToken({
-            channel: "phone",
-            rawValue: phone,
-            token: phoneVerificationToken,
-        });
 
         // Validate coordinates and radius if provided
         if (lat !== undefined && (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90)) {

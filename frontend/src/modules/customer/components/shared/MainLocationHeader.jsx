@@ -14,7 +14,7 @@ import {
   buildSearchBarBackgroundColor,
   shiftHex,
 } from "../../utils/headerTheme";
-import LogoImage from "../../../../assets/Vitszeefinallog-removebg-preview.png";
+import LogoImage from "../../../../assets/LogoVitszee.png";
 
 // MUI Icons
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -99,7 +99,7 @@ const MainLocationHeader = ({
   const { isOpen: isProductDetailOpen } = useProductDetail();
   const { settings } = useSettings();
   const appName = settings?.appName || "App";
-  const logoUrl = "/Vitszeefinallog-removebg-preview.png";
+  const logoUrl = "/LogoVitszee.png";
   const navigate = useNavigate();
 
   // Search Logic
