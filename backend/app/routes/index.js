@@ -26,6 +26,7 @@ import authOtpRoute from "../modules/otp/otp.routes.js";
 import milestoneCampaignRoute from "./milestoneCampaignRoutes.js";
 import customerMilestoneRoute from "./customerMilestoneRoutes.js";
 import headerCategoryMappingRoute from "./headerCategoryMappingRoutes.js";
+import lowestPriceRoute from "./lowestPriceRoutes.js";
 
 import express from "express";
 
@@ -68,6 +69,7 @@ const setupRoutes = (app) => {
     router.use("/", experienceRoute);
     router.use("/", offerRoute);
     router.use("/", couponRoute);
+    router.use("/", lowestPriceRoute);
     router.use("/notifications", notificationRoute);
     router.use("/auth/otp", authOtpRoute);
     router.use("/push", pushRoute);

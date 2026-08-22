@@ -203,8 +203,8 @@ const Orders = () => {
             label: 'Total Orders',
             value: summary.totalOrders,
             icon: HiOutlineArchiveBoxXMark,
-            color: 'text-emerald-700',
-            bg: 'bg-emerald-50'
+            color: 'text-[#1A8CFF]',
+            bg: 'bg-blue-50'
         },
         {
             label: 'Pending',
@@ -217,15 +217,15 @@ const Orders = () => {
             label: 'Confirmed',
             value: summary.confirmed,
             icon: HiOutlineCheck,
-            color: 'text-emerald-700',
-            bg: 'bg-emerald-50'
+            color: 'text-[#1A8CFF]',
+            bg: 'bg-blue-50'
         },
         {
             label: 'Delivered',
             value: summary.delivered,
             icon: HiOutlineCheck,
-            color: 'text-emerald-700',
-            bg: 'bg-emerald-50'
+            color: 'text-[#1A8CFF]',
+            bg: 'bg-blue-50'
         }
     ], [summary]);
 
@@ -360,7 +360,7 @@ const Orders = () => {
                                             className={cn(
                                                 "relative py-3 px-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300",
                                                 activeTab === tab
-                                                    ? "text-[#1A4516] scale-105 font-bold"
+                                                    ? "text-[#1A8CFF] scale-105 font-bold"
                                                     : "text-slate-600 hover:text-slate-700"
                                             )}
                                         >
@@ -368,7 +368,7 @@ const Orders = () => {
                                             {activeTab === tab && (
                                                 <motion.div
                                                     layoutId="tab-underline"
-                                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1A4516] rounded-full mx-2"
+                                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1A8CFF] rounded-full mx-2"
                                                 />
                                             )}
                                         </button>
@@ -379,13 +379,13 @@ const Orders = () => {
                             {/* Toolbox */}
                             <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
                                 <div className="relative flex-1 group w-full">
-                                    <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-[#1A4516] transition-all" />
+                                    <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-[#1A8CFF] transition-all" />
                                     <input
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder="Search by Order ID or Customer Name..."
-                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-lg text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-[#1A4516]/5 transition-all outline-none"
+                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-lg text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all outline-none"
                                     />
                                 </div>
                                 <div className="flex gap-3 shrink-0 w-full lg:w-auto items-center justify-end flex-wrap">
@@ -571,7 +571,7 @@ const Orders = () => {
                                                 >
                                                     <td className="px-4 lg:px-6 py-3 lg:py-4">
                                                         <div>
-                                                            <span className="text-xs font-semibold text-slate-800 group-hover:text-[#1A4516] transition-colors cursor-pointer" onClick={() => handleViewDetails(order)}>
+                                                            <span className="text-xs font-semibold text-slate-800 group-hover:text-[#1A8CFF] transition-colors cursor-pointer" onClick={() => handleViewDetails(order)}>
                                                                 #{order.id}
                                                             </span>
                                                             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mt-1">
@@ -733,7 +733,7 @@ const Orders = () => {
                                 >
                                     <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className="h-9 w-9 bg-[#1A4516] text-white rounded-full flex items-center justify-center shadow-lg shadow-[#1A4516]/10 shrink-0">
+                                            <div className="h-9 w-9 bg-[#1A8CFF] text-white rounded-full flex items-center justify-center shadow-lg shadow-[#1A8CFF]/10 shrink-0">
                                                 <HiOutlineChartBar className="h-4.5 w-4.5" />
                                             </div>
                                             <div className="min-w-0">
@@ -749,12 +749,12 @@ const Orders = () => {
                                     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                                         {/* Summary Grid */}
                                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                                            <div className="p-3 sm:p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100/50">
-                                                <p className="text-[10px] sm:text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Total Revenue</p>
+                                            <div className="p-3 sm:p-4 rounded-2xl bg-blue-50/40 border border-blue-100/50">
+                                                <p className="text-[10px] sm:text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Total Revenue</p>
                                                 <p className="text-base sm:text-lg font-bold text-slate-800 truncate">₹{summary.totalAmount.toLocaleString('en-IN')}</p>
                                             </div>
-                                            <div className="p-3 sm:p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100/50">
-                                                <p className="text-[10px] sm:text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Avg. Order Value</p>
+                                            <div className="p-3 sm:p-4 rounded-2xl bg-blue-50/40 border border-blue-100/50">
+                                                <p className="text-[10px] sm:text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Avg. Order Value</p>
                                                 <p className="text-base sm:text-lg font-bold text-slate-800">₹{summary.totalOrders ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0'}</p>
                                             </div>
                                         </div>
@@ -766,7 +766,7 @@ const Orders = () => {
                                                 setIsQuickViewModalOpen(false);
                                                 setActiveTab('Pending');
                                             }}
-                                            className="w-full py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold bg-[#1A4516] hover:bg-[#133A10] text-white rounded-xl shadow-lg shadow-[#1A4516]/10 transition-all uppercase tracking-wider"
+                                            className="w-full py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold bg-[#1A8CFF] hover:bg-[#1177db] text-white rounded-xl shadow-lg shadow-[#1A8CFF]/10 transition-all uppercase tracking-wider"
                                         >
                                             VIEW ALL PENDING ORDERS
                                         </button>

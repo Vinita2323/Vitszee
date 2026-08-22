@@ -199,7 +199,7 @@ const SellerProfile = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#154D1A]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1A8CFF]"></div>
       </div>
     );
   }
@@ -222,7 +222,7 @@ const SellerProfile = () => {
       className="max-w-[1200px] mx-auto p-4 md:p-8 font-['Poppins',_sans-serif] bg-[#F7F9F7] space-y-8 pb-20"
     >
       {/* ==================== TOP HERO SECTION ==================== */}
-      <div className="relative bg-gradient-to-br from-[#154D1A] via-[#103D14] to-[#0B290E] rounded-[24px] shadow-xl overflow-hidden p-6 md:p-8 text-white">
+      <div className="relative bg-gradient-to-br from-[#1A8CFF] via-[#1177db] to-[#0d5cb5] rounded-[24px] shadow-xl overflow-hidden p-6 md:p-8 text-white">
         {/* Abstract design elements */}
         <div className="absolute top-0 right-0 w-80 h-80 opacity-10 pointer-events-none">
           <svg viewBox="0 0 100 100" className="w-full h-full text-white fill-none stroke-current" strokeWidth="0.5">
@@ -253,7 +253,7 @@ const SellerProfile = () => {
           <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
             <div className="h-24 w-24 md:h-28 md:w-28 rounded-full bg-white/10 backdrop-blur-md p-1.5 shadow-lg flex-shrink-0">
               <div className="h-full w-full rounded-full bg-white/90 flex items-center justify-center border-2 border-white/20">
-                <span className="text-4xl font-extrabold text-[#154D1A]">
+                <span className="text-4xl font-extrabold text-[#1A8CFF]">
                   {profile?.name?.charAt(0)}
                 </span>
               </div>
@@ -268,11 +268,11 @@ const SellerProfile = () => {
                   onClick={toggleStatus}
                   className={`flex items-center gap-1.5 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all hover:scale-105 active:scale-95 ${
                     profile?.isActive
-                      ? "bg-[#2E7D32] text-white border-[#2E7D32]"
+                      ? "bg-[#1A8CFF] text-white border-blue-400"
                       : "bg-rose-600 text-white border-rose-500"
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${profile?.isActive ? "bg-emerald-300 animate-pulse" : "bg-rose-200"}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${profile?.isActive ? "bg-blue-200 animate-pulse" : "bg-rose-200"}`} />
                   {profile?.isActive ? "Active" : "Inactive"}
                 </button>
               </div>
@@ -301,7 +301,7 @@ const SellerProfile = () => {
             {!isEditing ? (
               <Button
                 onClick={() => setIsEditing(true)}
-                className="w-full sm:w-auto bg-white text-[#154D1A] hover:bg-slate-50 transition-all rounded-xl px-6 py-3 font-bold text-xs flex items-center justify-center gap-2 hover:scale-[1.03] active:scale-[0.97]"
+                className="w-full sm:w-auto bg-white text-[#1A8CFF] hover:bg-slate-50 transition-all rounded-xl px-6 py-3 font-bold text-xs flex items-center justify-center gap-2 hover:scale-[1.03] active:scale-[0.97]"
               >
                 <Edit2 size={14} /> Edit Profile
               </Button>
@@ -316,7 +316,7 @@ const SellerProfile = () => {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSaving}
-                  className="flex-1 sm:flex-none bg-white text-[#154D1A] hover:bg-slate-50 transition-all rounded-xl px-6 py-3 font-bold text-xs flex items-center justify-center gap-2"
+                  className="flex-1 sm:flex-none bg-white text-[#1A8CFF] hover:bg-slate-50 transition-all rounded-xl px-6 py-3 font-bold text-xs flex items-center justify-center gap-2"
                 >
                   {isSaving ? "Saving..." : <><Save size={14} /> Save</>}
                 </Button>
@@ -337,7 +337,7 @@ const SellerProfile = () => {
         {/* Business Information Card */}
         <Card className="p-6 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-[20px] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
           <h3 className="text-base font-bold text-slate-800 mb-6 flex items-center gap-2 pb-3 border-b border-slate-50">
-            <User size={18} className="text-[#154D1A]" />
+            <User size={18} className="text-[#1A8CFF]" />
             Business Profile
           </h3>
 
@@ -347,8 +347,8 @@ const SellerProfile = () => {
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
                 Seller Identity
               </label>
-              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
-                <User size={16} className="text-slate-400 mr-3 group-focus-within:text-[#154D1A]" />
+              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
+                <User size={16} className="text-slate-400 mr-3 group-focus-within:text-[#1A8CFF]" />
                 <input
                   type="text"
                   name="name"
@@ -365,7 +365,7 @@ const SellerProfile = () => {
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
                 Store Name
               </label>
-              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
                 <Store size={16} className="text-slate-400 mr-3" />
                 <input
                   type="text"
@@ -383,7 +383,7 @@ const SellerProfile = () => {
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
                 Phone Number
               </label>
-              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
                 <Phone size={16} className="text-slate-400 mr-3" />
                 <input
                   type="tel"
@@ -401,7 +401,7 @@ const SellerProfile = () => {
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
                 Email Address
               </label>
-              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
                 <Mail size={16} className="text-slate-400 mr-3" />
                 <input
                   type="email"
@@ -419,7 +419,7 @@ const SellerProfile = () => {
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
                 Date of Birth
               </label>
-              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+              <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
                 <Calendar size={16} className="text-slate-400 mr-3" />
                 <input
                   type="date"
@@ -480,11 +480,11 @@ const SellerProfile = () => {
         </Card>
 
         {/* Security & Trust Card */}
-        <Card className="bg-[#154D1A] text-white p-6 md:p-8 rounded-[20px] shadow-[0_4px_25px_rgba(21,77,26,0.15)] flex flex-col justify-between">
+        <Card className="bg-[#1A8CFF] text-white p-6 md:p-8 rounded-[20px] shadow-[0_4px_25px_rgba(26,140,255,0.2)] flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-200/60 mb-6 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-100/70 mb-6 flex items-center justify-between">
               <span>Security & Trust</span>
-              <Shield size={16} className="text-emerald-300" />
+              <Shield size={16} className="text-blue-200" />
             </h3>
 
             <div className="space-y-5">
@@ -496,10 +496,10 @@ const SellerProfile = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Verification</p>
-                    <p className="text-[10px] text-emerald-200/70">Verified Merchant</p>
+                    <p className="text-[10px] text-blue-100/80">Verified Merchant</p>
                   </div>
                 </div>
-                <span className="bg-emerald-500 text-white rounded-full p-0.5 text-[8px]">✔️</span>
+                <span className="bg-white/20 text-white rounded-full p-0.5 text-[8px]">✔️</span>
               </div>
 
               {/* Row 2 */}
@@ -510,10 +510,10 @@ const SellerProfile = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Identity Check</p>
-                    <p className="text-[10px] text-emerald-200/70">KYC Compliant</p>
+                    <p className="text-[10px] text-blue-100/80">KYC Compliant</p>
                   </div>
                 </div>
-                <span className="bg-emerald-500 text-white rounded-full p-0.5 text-[8px]">✔️</span>
+                <span className="bg-white/20 text-white rounded-full p-0.5 text-[8px]">✔️</span>
               </div>
 
               {/* Row 3 */}
@@ -524,10 +524,10 @@ const SellerProfile = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Growth Tier</p>
-                    <p className="text-[10px] text-emerald-200/70">Premium Seller Level</p>
+                    <p className="text-[10px] text-blue-100/80">Premium Seller Level</p>
                   </div>
                 </div>
-                <span className="bg-emerald-500 text-white rounded-full p-0.5 text-[8px]">✔️</span>
+                <span className="bg-white/20 text-white rounded-full p-0.5 text-[8px]">✔️</span>
               </div>
 
               {/* Row 4 */}
@@ -538,10 +538,10 @@ const SellerProfile = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Service Region</p>
-                    <p className="text-[10px] text-emerald-200/70">Pan India Delivery</p>
+                    <p className="text-[10px] text-blue-100/80">Pan India Delivery</p>
                   </div>
                 </div>
-                <span className="bg-emerald-500 text-white rounded-full p-0.5 text-[8px]">✔️</span>
+                <span className="bg-white/20 text-white rounded-full p-0.5 text-[8px]">✔️</span>
               </div>
 
               {/* Row 5 */}
@@ -552,10 +552,10 @@ const SellerProfile = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Seller Rating</p>
-                    <p className="text-[10px] text-emerald-200/70">4.8 / 5.0 Rating</p>
+                    <p className="text-[10px] text-blue-100/80">4.8 / 5.0 Rating</p>
                   </div>
                 </div>
-                <span className="bg-emerald-500 text-white rounded-full p-0.5 text-[8px]">✔️</span>
+                <span className="bg-white/20 text-white rounded-full p-0.5 text-[8px]">✔️</span>
               </div>
             </div>
           </div>
@@ -566,7 +566,7 @@ const SellerProfile = () => {
       <Card className="p-6 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-[20px] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] mb-8">
         <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-3">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Wallet size={18} className="text-[#154D1A]" />
+            <Wallet size={18} className="text-[#1A8CFF]" />
             Bank Details
           </h3>
         </div>
@@ -574,7 +574,7 @@ const SellerProfile = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5 group">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">Bank Name</label>
-            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
               <input
                 type="text"
                 name="bankName"
@@ -589,7 +589,7 @@ const SellerProfile = () => {
           
           <div className="space-y-1.5 group">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">Account Number</label>
-            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
               <input
                 type="text"
                 name="accountNumber"
@@ -604,7 +604,7 @@ const SellerProfile = () => {
           
           <div className="space-y-1.5 group">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">IFSC Code</label>
-            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
               <input
                 type="text"
                 name="ifscCode"
@@ -619,7 +619,7 @@ const SellerProfile = () => {
           
           <div className="space-y-1.5 group">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">Account Holder Name</label>
-            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#154D1A]/20 focus-within:border-[#154D1A] focus-within:bg-white">
+            <div className="relative flex items-center bg-slate-50/50 border border-slate-100/80 rounded-xl px-4 py-3 transition-all hover:border-[#1A8CFF]/20 focus-within:border-[#1A8CFF] focus-within:bg-white">
               <input
                 type="text"
                 name="accountHolderName"
@@ -638,7 +638,7 @@ const SellerProfile = () => {
       <Card className="p-6 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-[20px] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-3">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <MapPin size={18} className="text-[#154D1A]" />
+            <MapPin size={18} className="text-[#1A8CFF]" />
             Location & Service Area
           </h3>
           {isEditing && (
@@ -656,7 +656,7 @@ const SellerProfile = () => {
           <div className="space-y-4">
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0 border border-emerald-100">
+                <div className="h-8 w-8 rounded-full bg-blue-50 text-[#1A8CFF] flex items-center justify-center shrink-0 border border-blue-100">
                   <MapPin size={16} />
                 </div>
                 <div>
@@ -696,9 +696,9 @@ const SellerProfile = () => {
               </div>
             </div>
 
-            <div className="p-3.5 bg-emerald-50/40 rounded-xl border border-emerald-100/50 flex items-start gap-2">
-              <span className="bg-emerald-100 text-emerald-800 rounded-full p-0.5 text-[8px] mt-0.5">✔</span>
-              <p className="text-[10px] text-emerald-800 font-medium leading-relaxed">
+            <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100/50 flex items-start gap-2">
+              <span className="bg-blue-100 text-[#1A8CFF] rounded-full p-0.5 text-[8px] mt-0.5">✔</span>
+              <p className="text-[10px] text-blue-800 font-medium leading-relaxed">
                 Active Service Coverage: <span className="font-bold">{formData.radius} KM</span> radius around Indore, MP.
               </p>
             </div>
@@ -708,7 +708,7 @@ const SellerProfile = () => {
             {formData.lat ? (
               <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col text-slate-400">
                 {/* Simulated map placeholder style */}
-                <div className="h-10 w-10 bg-[#154D1A] rounded-full flex items-center justify-center text-white mb-2 shadow-md">
+                <div className="h-10 w-10 bg-[#1A8CFF] rounded-full flex items-center justify-center text-white mb-2 shadow-md">
                   <MapPin size={20} />
                 </div>
                 <span className="text-xs font-bold text-slate-700">Map Pin Set</span>
@@ -727,8 +727,8 @@ const SellerProfile = () => {
       {/* ==================== FOURTH ROW (Statistics Cards) ==================== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Orders", value: "128", icon: ShoppingBag, gradient: "from-emerald-500 to-teal-600" },
-          { label: "Revenue", value: "₹24.5K", icon: TrendingUp, gradient: "from-[#154D1A] to-[#2E7D32]" },
+          { label: "Orders", value: "128", icon: ShoppingBag, gradient: "from-blue-500 to-indigo-600" },
+          { label: "Revenue", value: "₹24.5K", icon: TrendingUp, gradient: "from-[#1A8CFF] to-[#0066d6]" },
           { label: "Customers", value: "2.4K+", icon: Users, gradient: "from-indigo-500 to-blue-600" },
           { label: "Products", value: "48", icon: Award, gradient: "from-amber-500 to-orange-600" },
         ].map((stat, i) => (
@@ -753,7 +753,7 @@ const SellerProfile = () => {
       {/* ==================== FIFTH ROW (Performance Overview) ==================== */}
       <Card className="p-6 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-[20px] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
         <h3 className="text-base font-bold text-slate-800 mb-6 flex items-center gap-2 pb-3 border-b border-slate-50">
-          <BarChart3 size={18} className="text-[#154D1A]" />
+          <BarChart3 size={18} className="text-[#1A8CFF]" />
           Performance Analytics
         </h3>
 
@@ -764,15 +764,15 @@ const SellerProfile = () => {
               <AreaChart data={performanceData}>
                 <defs>
                   <linearGradient id="profileRevenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#154D1A" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#154D1A" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#1A8CFF" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#1A8CFF" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
                 <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#154D1A" strokeWidth={2} fillOpacity={1} fill="url(#profileRevenueGrad)" />
+                <Area type="monotone" dataKey="revenue" stroke="#1A8CFF" strokeWidth={2} fillOpacity={1} fill="url(#profileRevenueGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -784,7 +784,7 @@ const SellerProfile = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Orders</span>
                 <p className="text-base font-bold text-slate-800 mt-0.5">890 Orders</p>
               </div>
-              <span className="text-emerald-700 bg-emerald-50 text-[10px] font-bold px-2 py-0.5 rounded-full">+12% MoM</span>
+              <span className="text-[#1A8CFF] bg-blue-50 text-[10px] font-bold px-2 py-0.5 rounded-full">+12% MoM</span>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
@@ -792,7 +792,7 @@ const SellerProfile = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Revenue Growth</span>
                 <p className="text-base font-bold text-slate-800 mt-0.5">₹15,400</p>
               </div>
-              <span className="text-emerald-700 bg-emerald-50 text-[10px] font-bold px-2 py-0.5 rounded-full">+18.5% Growth</span>
+              <span className="text-[#1A8CFF] bg-blue-50 text-[10px] font-bold px-2 py-0.5 rounded-full">+18.5% Growth</span>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
@@ -800,7 +800,7 @@ const SellerProfile = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase">CSAT Score</span>
                 <p className="text-base font-bold text-slate-800 mt-0.5">4.8 / 5.0 Rating</p>
               </div>
-              <span className="text-emerald-700 bg-emerald-50 text-[10px] font-bold px-2 py-0.5 rounded-full">98% Happy</span>
+              <span className="text-[#1A8CFF] bg-blue-50 text-[10px] font-bold px-2 py-0.5 rounded-full">98% Happy</span>
             </div>
           </div>
         </div>
@@ -854,10 +854,10 @@ const SellerProfile = () => {
               whileTap={{ scale: 0.98 }}
               className="p-4 bg-white border border-slate-100 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] hover:shadow-md transition-all text-center flex flex-col items-center justify-center gap-2 group cursor-pointer"
             >
-              <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-800 group-hover:bg-[#154D1A] group-hover:text-white flex items-center justify-center transition-all">
+              <div className="h-10 w-10 rounded-full bg-blue-50 text-[#1A8CFF] group-hover:bg-[#1A8CFF] group-hover:text-white flex items-center justify-center transition-all">
                 <act.icon size={18} />
               </div>
-              <span className="text-xs font-bold text-slate-700 group-hover:text-[#154D1A] transition-colors leading-tight">
+              <span className="text-xs font-bold text-slate-700 group-hover:text-[#1A8CFF] transition-colors leading-tight">
                 {act.label}
               </span>
             </motion.a>

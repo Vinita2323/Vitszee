@@ -21,9 +21,9 @@ const Pagination = ({
     const end = Math.min(page * pageSize, total);
 
     return (
-        <div className={cn("flex items-center justify-between gap-4", compact && "gap-2", className)}>
-            <p className="ds-caption text-gray-500">
-                Showing <span className="font-semibold text-gray-900">{start}-{end}</span> of {total}
+        <div className={cn("flex flex-wrap items-center justify-between gap-4 py-3", compact && "gap-2", className)}>
+            <p className="text-xs md:text-sm font-medium text-slate-500">
+                Showing <span className="font-bold text-slate-800">{start}–{end}</span> of <span className="font-bold text-slate-800">{total}</span>
             </p>
             <div className="flex items-center gap-2">
                 {onPageSizeChange && (
@@ -32,12 +32,12 @@ const Pagination = ({
                         onChange={(e) => onPageSizeChange(Number(e.target.value))}
                         disabled={loading}
                         className={cn(
-                            "rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600",
-                            "focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 cursor-pointer"
+                            "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm",
+                            "focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 cursor-pointer transition-all hover:bg-slate-50"
                         )}
                     >
                         {PAGE_SIZE_OPTIONS.map((size) => (
-                            <option key={size} value={size}>{size}</option>
+                            <option key={size} value={size}>{size} / page</option>
                         ))}
                     </select>
                 )}
@@ -45,28 +45,28 @@ const Pagination = ({
                     disabled={page <= 1 || loading}
                     onClick={() => onPageChange(page - 1)}
                     className={cn(
-                        "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest",
-                        "bg-gray-50 text-gray-600 border border-gray-100 hover:bg-gray-100",
-                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-50"
+                        "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold",
+                        "bg-white text-slate-700 border border-slate-200 shadow-sm hover:bg-slate-50 active:scale-95 transition-all",
+                        "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
                     )}
                 >
-                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <ChevronLeft className="h-4 w-4" />
                     Prev
                 </button>
-                <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                <span className="px-2 text-xs font-bold text-slate-600">
                     Page {page} {totalPages > 0 && `of ${totalPages}`}
                 </span>
                 <button
                     disabled={page >= totalPages || loading}
                     onClick={() => onPageChange(page + 1)}
                     className={cn(
-                        "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest",
-                        "bg-gray-50 text-gray-600 border border-gray-100 hover:bg-gray-100",
-                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-50"
+                        "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold",
+                        "bg-white text-slate-700 border border-slate-200 shadow-sm hover:bg-slate-50 active:scale-95 transition-all",
+                        "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
                     )}
                 >
                     Next
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <ChevronRight className="h-4 w-4" />
                 </button>
             </div>
         </div>

@@ -1,573 +1,445 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@core/context/AuthContext';
-import { useSettings } from '@core/context/SettingsContext';
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@core/context/AuthContext";
+import { useSettings } from "@core/context/SettingsContext";
 import {
-    Phone,
-    ShieldCheck,
-    User,
-    ShoppingBag,
-    ChevronRight,
-    MapPin,
-    Zap,
-    Utensils,
-    Smartphone,
-    ShoppingBasket,
-    Heart,
-    Star,
-    ChevronLeft,
-    Calendar,
-    Droplets
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { customerApi } from '../services/customerApi';
-import BgImage from '@/assets/image.png';
-
-const CATEGORIES = [
-    {
-        title: "Grocery",
-        icon: <ShoppingBasket size={28} />,
-        color: "#ecfeff",
-        ring: "var(--primary)",
-        text: "var(--brand-500)",
-        theme: "var(--primary)",
-        shadow: "rgba(97, 218, 251, 0.3)",
-        img: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600"
-    },
-    {
-        title: "Store",
-        icon: <Smartphone size={28} />,
-        color: "#f0f9ff",
-        ring: "var(--brand-400)",
-        text: "#0369a1",
-        theme: "var(--brand-500)",
-        shadow: "rgba(14, 165, 233, 0.3)",
-        img: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=600"
-    },
-    {
-        title: "Food",
-        icon: <Utensils size={28} />,
-        color: "#f0fdfa",
-        ring: "#22d3ee",
-        text: "#0e7490",
-        theme: "var(--brand-500)",
-        shadow: "rgba(14, 165, 233, 0.3)",
-        img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=600"
-    },
-    {
-        title: "Health",
-        icon: <ShieldCheck size={28} />,
-        color: "#eff6ff",
-        ring: "#60a5fa",
-        text: "#1d4ed8",
-        theme: "#3b82f6",
-        shadow: "rgba(59, 130, 246, 0.3)",
-        img: "https://images.unsplash.com/photo-1512678080530-7760d81faba6?q=80&w=1200&auto=format&fit=crop"
-    },
-];
+  Phone,
+  ShieldCheck,
+  User,
+  ShoppingBag,
+  ChevronLeft,
+  ArrowRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { customerApi } from "../services/customerApi";
+import HeroFood from "@/assets/auth-hero-food.jpg";
 
 const CustomerAuth = () => {
-    const [isLogin, setIsLogin] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
-    const [showOtp, setShowOtp] = useState(false);
-    const [timer, setTimer] = useState(0);
-    const [carouselIndex, setCarouselIndex] = useState(0);
-    const { login } = useAuth();
-    const { settings } = useSettings();
-    const appName = settings?.appName || 'App';
-    const logoUrl = "/LogoVitszee.png";
-    const navigate = useNavigate();
+  const location = useLocation();
+  const [isLogin, setIsLogin] = useState(location.pathname !== "/signup");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showOtp, setShowOtp] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const { login } = useAuth();
+  const { settings } = useSettings();
+  const navigate = useNavigate();
+  const otpInputsRef = useRef([]);
 
-    const [formData, setFormData] = useState({
-        phone: '',
-        otp: '',
-        name: '',
-        dob: '',
-        bloodGroup: ''
-    });
+  const [formData, setFormData] = useState({
+    phone: "",
+    otp: "",
+    name: "",
+    dob: "",
+    bloodGroup: "",
+  });
 
-    const activeCategory = CATEGORIES[carouselIndex];
+  useEffect(() => {
+    setIsLogin(location.pathname !== "/signup");
+  }, [location.pathname]);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setCarouselIndex((prev) => (prev + 1) % CATEGORIES.length);
-        }, 3000);
-        return () => clearInterval(interval);
-    }, []);
+  useEffect(() => {
+    let interval;
+    if (timer > 0) {
+      interval = setInterval(() => setTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
 
-    useEffect(() => {
-        let interval;
-        if (timer > 0) {
-            interval = setInterval(() => setTimer(t => t - 1), 1000);
-        }
-        return () => clearInterval(interval);
-    }, [timer]);
+  const handleSendOtp = async (e) => {
+    e?.preventDefault();
+    if (!formData.phone || formData.phone.length !== 10) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
 
-    const handleSendOtp = async (e) => {
-        e?.preventDefault();
-        if (formData.phone.length !== 10) {
-            toast.error('Enter valid 10-digit number');
-            return;
-        }
-        setIsLoading(true);
-        try {
-            if (isLogin) {
-                await customerApi.sendLoginOtp({ phone: formData.phone });
-            } else {
-                await customerApi.sendSignupOtp({ 
-                    name: formData.name, 
-                    phone: formData.phone,
-                    dob: formData.dob,
-                    bloodGroup: formData.bloodGroup 
-                });
-            }
-            setShowOtp(true);
-            setTimer(60);
-            toast.success('OTP sent!');
-        } catch (error) {
-            const apiMessage = error?.response?.data?.message || '';
-            const match = apiMessage.match(/wait (\d+)s/);
-            if (match && match[1]) {
-                setTimer(parseInt(match[1], 10));
-            }
-            toast.error(apiMessage || 'Failed to send OTP');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    if (!isLogin && !formData.name?.trim()) {
+      toast.error("Please enter your full name");
+      return;
+    }
 
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        if (formData.otp.length !== 4) {
-            toast.error('Enter 4-digit code');
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const response = await customerApi.verifyOtp({ phone: formData.phone, otp: formData.otp });
-            const { token, customer } = response.data.result;
-            login({ ...customer, token, role: 'customer' });
-            toast.success('Successfully Logged In!');
-            navigate('/');
-        } catch (error) {
-            const apiMessage = error?.response?.data?.message;
-            toast.error(apiMessage || 'Invalid OTP');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    setIsLoading(true);
+    try {
+      if (isLogin) {
+        await customerApi.sendLoginOtp({ phone: formData.phone });
+      } else {
+        await customerApi.sendSignupOtp({
+          name: formData.name.trim(),
+          phone: formData.phone,
+          dob: formData.dob || undefined,
+          bloodGroup: formData.bloodGroup || undefined,
+        });
+      }
+      setShowOtp(true);
+      setTimer(60);
+      toast.success(`OTP sent to +91 ${formData.phone}`);
+    } catch (error) {
+      const apiMessage = error?.response?.data?.message || "";
+      const match = apiMessage.match(/wait (\d+)s/);
+      if (match && match[1]) {
+        setTimer(parseInt(match[1], 10));
+      }
+      toast.error(apiMessage || "Failed to send OTP. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <div className="min-h-screen w-full relative flex items-center justify-center font-['Outfit',_sans-serif] overflow-hidden">
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault();
+    if (!formData.otp || formData.otp.length !== 4) {
+      toast.error("Please enter the complete 4-digit OTP code");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await customerApi.verifyOtp({
+        phone: formData.phone,
+        otp: formData.otp,
+      });
+      const { token, customer } = response.data.result;
+      login({ ...customer, token, role: "customer" });
+      toast.success("Welcome to Vitszee!");
+      navigate("/");
+    } catch (error) {
+      const apiMessage = error?.response?.data?.message;
+      toast.error(apiMessage || "Invalid OTP. Please check and re-enter.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            {/* Dynamic Atmospheric Background */}
-            <div 
-                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
-                style={{ backgroundImage: `url(${BgImage})` }}
-            >
-                <motion.div
-                    animate={{ backgroundColor: activeCategory.color }}
-                    transition={{ duration: 1.5 }}
-                    className="absolute inset-0 opacity-80 backdrop-blur-sm"
-                />
+  return (
+    <div className="min-h-screen w-full bg-white flex flex-col justify-between font-['Outfit',_sans-serif] overflow-x-hidden">
+      {/* Centered App Container - Flush Full Width on Mobile, Max Width on Large Screens with No Outer Radius */}
+      <div className="w-full max-w-md mx-auto min-h-screen bg-white flex flex-col justify-between">
+        {/* Top Content Section */}
+        <div className="w-full">
+          {/* Top Hero Banner with Food Image & S-Curve Wave */}
+          <div className="relative h-[240px] sm:h-[260px] w-full overflow-hidden bg-slate-900">
+            <img
+              src={HeroFood}
+              alt="Food Inside"
+              className="w-full h-full object-cover object-center scale-105"
+            />
+            {/* Dark Vignette Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75" />
+
+            {/* Top Bar: Bag Icon & "VITZEE MARKET" */}
+            <div className="absolute top-5 left-5 right-5 flex items-center gap-2.5 z-10">
+              <div className="h-9 w-9 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-sm">
+                <ShoppingBag size={18} strokeWidth={2.2} />
+              </div>
+              <span className="text-white font-black tracking-tight text-base sm:text-lg uppercase drop-shadow-md">
+                VITZEE MARKET
+              </span>
             </div>
 
-            {/* Animated Blurred Blobs */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <motion.div
-                    animate={{
-                        backgroundColor: activeCategory.theme,
-                        x: [0, 50, 0],
-                        y: [0, 30, 0],
-                        scale: [1, 1.2, 1]
-                    }}
-                    transition={{
-                        backgroundColor: { duration: 1.5 },
-                        x: { duration: 8, repeat: Infinity, ease: "easeInOut" },
-                        y: { duration: 10, repeat: Infinity, ease: "easeInOut" },
-                        scale: { duration: 12, repeat: Infinity, ease: "easeInOut" }
-                    }}
-                    className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-[100px] opacity-20"
-                />
-                <motion.div
-                    animate={{
-                        backgroundColor: activeCategory.theme,
-                        x: [0, -40, 0],
-                        y: [0, -60, 0],
-                        scale: [1, 1.1, 1]
-                    }}
-                    transition={{
-                        backgroundColor: { duration: 1.5 },
-                        x: { duration: 9, repeat: Infinity, ease: "easeInOut" },
-                        y: { duration: 7, repeat: Infinity, ease: "easeInOut" },
-                        scale: { duration: 15, repeat: Infinity, ease: "easeInOut" }
-                    }}
-                    className="absolute -bottom-24 -right-24 w-[500px] h-[500px] rounded-full blur-[120px] opacity-30"
-                />
+            {/* Centered Big Hero Text: "FOOD INSIDE" */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pt-2 z-10 pointer-events-none">
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase leading-none drop-shadow-lg">
+                FOOD INSIDE
+              </h2>
+              <p className="text-[10px] sm:text-[11px] font-bold text-white/90 uppercase tracking-[3px] mt-2 drop-shadow-sm">
+                EVERYTHING DELIVERED FAST
+              </p>
             </div>
 
-            {/* Premium Centered Card Container */}
-            <div className="w-[92%] max-w-[400px] h-[85vh] max-h-[780px] bg-white relative z-10 overflow-hidden rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
+            {/* Smooth S-Curve Wave Divider */}
+            <div className="absolute -bottom-1 left-0 right-0 w-full leading-[0] z-10 pointer-events-none">
+              <svg
+                viewBox="0 0 1440 260"
+                preserveAspectRatio="none"
+                className="w-full h-16 sm:h-20"
+              >
+                <path
+                  fill="#ffffff"
+                  d="M0,128L48,138.7C96,149,192,171,288,160C384,149,480,107,576,106.7C672,107,768,149,864,165.3C960,181,1056,171,1152,149.3C1248,128,1344,96,1392,80L1440,64L1440,260L1392,260C1344,260,1248,260,1152,260C1056,260,960,260,864,260C768,260,672,260,576,260C480,260,384,260,288,260C192,260,96,260,48,260L0,260Z"
+                />
+              </svg>
+            </div>
+          </div>
 
-                {/* Scrollable Content Container */}
-                <div className="h-full overflow-y-auto no-scrollbar pb-20">
+          {/* Floating Centered Logo Card Protruding Down */}
+          <div className="relative -mt-11 sm:-mt-12 flex justify-center z-20">
+            <div className="w-32 sm:w-36 h-20 sm:h-24 rounded-3xl bg-white border-[3px] border-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] p-2 flex items-center justify-center">
+              <img
+                src="/LogoVitszee.png"
+                alt="Vitszee Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                  e.target.nextSibling.style.display = "block";
+                }}
+              />
+              <span
+                style={{ display: "none" }}
+                className="text-2xl font-black text-[#0057B7] tracking-tighter uppercase"
+              >
+                VITSZEE
+              </span>
+            </div>
+          </div>
 
-                    {/* Header: Immersive Category Visuals */}
-                    <motion.div
-                        animate={{ backgroundColor: activeCategory.theme }}
-                        transition={{ duration: 1 }}
-                        className="relative h-[35%] min-h-[240px] shrink-0 w-full overflow-hidden"
+          {/* Form Content Area */}
+          <div className="px-6 pt-5 pb-6">
+            <AnimatePresence mode="wait">
+              {!showOtp ? (
+                <motion.div
+                  key="phone-form"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  {/* Segmented Pill Switcher: [ LOGIN ] | [ SIGN UP ] */}
+                  <div className="flex bg-[#F1F5F3] rounded-2xl p-1 border border-slate-100/80 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLogin(true);
+                        navigate("/login", { replace: true });
+                      }}
+                      className={`flex-1 py-2.5 sm:py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+                        isLogin
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-400 hover:text-slate-600"
+                      }`}
                     >
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={carouselIndex}
-                                initial={{ opacity: 0, scale: 1.1 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 1.05 }}
-                                transition={{ duration: 0.8 }}
-                                className="absolute inset-0"
-                            >
-                                <img
-                                    src={activeCategory.img}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                    alt="banner"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/10 to-transparent opacity-60" style={{ backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.1), ${activeCategory.theme})` }} />
-                            </motion.div>
-                        </AnimatePresence>
+                      LOGIN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLogin(false);
+                        navigate("/signup", { replace: true });
+                      }}
+                      className={`flex-1 py-2.5 sm:py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+                        !isLogin
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-400 hover:text-slate-600"
+                      }`}
+                    >
+                      SIGN UP
+                    </button>
+                  </div>
 
-                        {/* Top Branding Bar */}
-                        <div className="absolute top-8 left-0 w-full px-6 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30">
-                                    <ShoppingBag size={20} className="text-white" />
-                                </div>
-                                <span className="text-white font-black tracking-tighter text-xl">{appName.toUpperCase()}</span>
-                            </div>
-                        </div>
+                  {/* Headline & Subtitle */}
+                  <div className="text-center pt-1 pb-1">
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                      {isLogin ? "Welcome Back!" : "Create Account"}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      OTP WILL BE SENT FOR VERIFICATION
+                    </p>
+                  </div>
 
-                        {/* Centered App Message */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 text-white pt-10">
-                            <motion.h2
-                                key={carouselIndex}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="text-2xl font-black tracking-tight leading-none mb-2"
-                            >
-                                {activeCategory.title.toUpperCase()} INSIDE
-                            </motion.h2>
-                            <p className="text-[10px] font-bold uppercase tracking-[4px] opacity-70">Everything delivered fast</p>
+                  {/* Input Form */}
+                  <form onSubmit={handleSendOtp} className="space-y-3.5 pt-1">
+                    {/* Sign Up Additional Fields */}
+                    {!isLogin && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-3"
+                      >
+                        {/* Name Input */}
+                        <div className="relative flex items-center bg-[#F8FAF9] border border-slate-200/80 rounded-2xl p-1.5 focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600/10 transition-all shadow-sm">
+                          <div className="pl-3 pr-2 text-slate-400">
+                            <User size={18} />
+                          </div>
+                          <input
+                            required
+                            type="text"
+                            placeholder="Full Name"
+                            value={formData.name}
+                            onChange={(e) =>
+                              setFormData({ ...formData, name: e.target.value })
+                            }
+                            className="w-full bg-transparent border-none text-sm font-bold text-slate-800 outline-none pr-3 py-2 placeholder:text-slate-400 placeholder:font-medium"
+                          />
                         </div>
+                      </motion.div>
+                    )}
 
-                        {/* S-Curve Divider */}
-                        <div className="absolute -bottom-1 left-0 w-full leading-[0]">
-                            <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-24">
-                                <path
-                                    fill="#ffffff"
-                                    d="M0,224L40,213.3C80,203,160,181,240,186.7C320,192,400,224,480,240C560,256,640,256,720,234.7C800,213,880,171,960,165.3C1040,160,1120,192,1200,208C1280,224,1360,224,1400,224L1440,224L1440,320L1400,320C1360,320,1280,320,1200,320C1120,320,1040,320,960,320C880,320,800,320,720,320C640,320,560,320,480,320C400,320,320,320,240,320C160,320,80,320,40,320L0,320Z"
-                                />
-                            </svg>
-                        </div>
-                    </motion.div>
-
-                    {/* Square Logo Box */}
-                    <div className="relative -mt-14 flex justify-center z-20">
-                        <div className="w-36 h-28 rounded-2xl bg-white border-4 border-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] flex items-center justify-center p-2.5 transition-shadow duration-1000" style={{ boxShadow: `0 15px 40px ${activeCategory.shadow}` }}>
-                            <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={carouselIndex}
-                                        initial={{ opacity: 0, scale: 0.5 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 1.2 }}
-                                        className="w-full h-full flex items-center justify-center"
-                                        style={{ color: activeCategory.text }}
-                                    >
-                                        {logoUrl ? (
-                                            <img
-                                                src={logoUrl}
-                                                alt={`${appName} logo`}
-                                                loading="lazy"
-                                                className="w-full h-full object-contain"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: activeCategory.color }}>
-                                                {activeCategory.icon}
-                                            </div>
-                                        )}
-                                    </motion.div>
-                            </AnimatePresence>
-                        </div>
+                    {/* Mobile Number Input Container */}
+                    <div className="relative flex items-center bg-[#F8FAF9] border border-slate-200/80 rounded-2xl p-1.5 focus-within:border-emerald-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600/10 transition-all shadow-sm">
+                      <div className="pl-3 pr-2 text-slate-400">
+                        <Phone size={18} />
+                      </div>
+                      <div className="flex items-center text-sm font-black text-slate-700 pr-2.5 border-r border-slate-300">
+                        +91
+                      </div>
+                      <input
+                        required
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={10}
+                        placeholder="Mobile Number"
+                        value={formData.phone}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            phone: e.target.value.replace(/\D/g, ""),
+                          })
+                        }
+                        className="w-full bg-transparent border-none text-sm font-bold text-slate-900 outline-none pl-3 pr-3 py-2.5 placeholder:text-slate-400 placeholder:font-medium tracking-wide"
+                      />
                     </div>
 
+                    {/* Primary Action Button */}
+                    <button
+                      type="submit"
+                      disabled={isLoading || timer > 0}
+                      className="w-full py-4 rounded-2xl bg-[#2E7D32] hover:bg-[#256828] text-white font-black text-xs uppercase tracking-[2px] shadow-lg shadow-emerald-900/15 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : timer > 0 ? (
+                        `Wait ${timer}s`
+                      ) : isLogin ? (
+                        "GET OTP"
+                      ) : (
+                        "GET OTP & CONTINUE"
+                      )}
+                      {!isLoading && timer === 0 && (
+                        <ArrowRight size={16} strokeWidth={2.5} />
+                      )}
+                    </button>
 
-                    {/* Authentication Form Block */}
-                    <div className="px-6 pt-6 pb-10">
-                        <AnimatePresence mode="wait">
-                            {!showOtp ? (
-                                <motion.div
-                                    key="main-form"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                    className="space-y-5"
-                                >
-                                    {/* App Style Tab Switcher */}
-                                    <div className="flex bg-gray-50 rounded-2xl p-1.5 border border-gray-100">
-                                        <button
-                                            onClick={() => setIsLogin(true)}
-                                            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
-                                            style={{ color: isLogin ? activeCategory.theme : undefined }}
-                                        >
-                                            Login
-                                        </button>
-                                        <button
-                                            onClick={() => setIsLogin(false)}
-                                            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${!isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
-                                            style={{ color: !isLogin ? activeCategory.theme : undefined }}
-                                        >
-                                            Sign Up
-                                        </button>
-                                    </div>
+                    {/* Trust Notice with Shield */}
+                    <div className="flex items-center justify-center gap-2 pt-2 text-center">
+                      <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                      <p className="text-[10px] font-medium text-slate-500">
+                        We'll send you a One Time Password on your mobile number
+                      </p>
+                    </div>
+                  </form>
+                </motion.div>
+              ) : (
+                /* OTP Verification View */
+                <motion.div
+                  key="otp-form"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6 pt-2"
+                >
+                  {/* Top Bar with Back Button */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowOtp(false)}
+                      className="h-10 w-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">
+                        Verify OTP
+                      </h3>
+                      <p className="text-xs font-bold text-slate-400 mt-1">
+                        Code sent to +91 {formData.phone}
+                      </p>
+                    </div>
+                  </div>
 
-                                    <div className="space-y-2 text-center">
-                                        <h3 className="text-xl font-black text-gray-900 tracking-tight">
-                                            {isLogin ? 'Welcome Back!' : 'Create Account'}
-                                        </h3>
-                                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                            OTP will be sent for verification
-                                        </p>
-                                    </div>
+                  <form onSubmit={handleVerifyOtp} className="space-y-6">
+                    {/* 4-Box OTP Input */}
+                    <div className="flex justify-center gap-3 py-2">
+                      {[0, 1, 2, 3].map((index) => (
+                        <input
+                          key={index}
+                          ref={(el) => (otpInputsRef.current[index] = el)}
+                          type="tel"
+                          maxLength={1}
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={formData.otp[index] || ""}
+                          onKeyDown={(e) => {
+                            if (e.key === "Backspace" && !formData.otp[index] && index > 0) {
+                              otpInputsRef.current[index - 1]?.focus();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            const currentOtp = formData.otp.split("");
+                            currentOtp[index] = val;
+                            const newOtp = currentOtp.join("").slice(0, 4);
+                            setFormData({ ...formData, otp: newOtp });
 
-                                    <form onSubmit={handleSendOtp} className="space-y-4">
-                                        {!isLogin && (
-                                            <>
-                                                <div className="relative group">
-                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
-                                                        <User size={18} className="group-focus-within:text-[var(--theme-color)]" style={{ color: 'inherit' }} />
-                                                    </div>
-                                                    <input
-                                                        required
-                                                        name="name"
-                                                        value={formData.name || ''}
-                                                        maxLength={50}
-                                                        pattern="[a-zA-Z\s]*"
-                                                        placeholder="Full Name"
-                                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                        style={{ '--theme-color': activeCategory.theme }}
-                                                        onChange={(e) => setFormData({ ...formData, name: e.target.value.replace(/[^a-zA-Z\s]/g, '') })}
-                                                        onFocus={(e) => {
-                                                            e.target.style.borderColor = activeCategory.theme;
-                                                            const target = e.target;
-                                                            setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                                                        }}
-                                                        onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                                    />
-                                                </div>
-
-                                                <div className="relative group">
-                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
-                                                        <Calendar size={18} className="group-focus-within:text-[var(--theme-color)]" style={{ color: 'inherit' }} />
-                                                    </div>
-                                                    <input
-                                                        type="date"
-                                                        name="dob"
-                                                        value={formData.dob || ''}
-                                                        placeholder="Date of Birth (Optional)"
-                                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                        style={{ '--theme-color': activeCategory.theme }}
-                                                        onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                                                        onFocus={(e) => {
-                                                            e.target.style.borderColor = activeCategory.theme;
-                                                            const target = e.target;
-                                                            setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                                                        }}
-                                                        onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                                    />
-                                                </div>
-
-                                                <div className="relative group">
-                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
-                                                        <Droplets size={18} className="group-focus-within:text-[var(--theme-color)]" style={{ color: 'inherit' }} />
-                                                    </div>
-                                                    <select
-                                                        name="bloodGroup"
-                                                        value={formData.bloodGroup || ''}
-                                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all appearance-none"
-                                                        style={{ '--theme-color': activeCategory.theme }}
-                                                        onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                                                        onFocus={(e) => {
-                                                            e.target.style.borderColor = activeCategory.theme;
-                                                            const target = e.target;
-                                                            setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                                                        }}
-                                                        onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                                    >
-                                                        <option value="" disabled>Select Blood Group (Optional)</option>
-                                                        <option value="A+">A+</option>
-                                                        <option value="A-">A-</option>
-                                                        <option value="B+">B+</option>
-                                                        <option value="B-">B-</option>
-                                                        <option value="O+">O+</option>
-                                                        <option value="O-">O-</option>
-                                                        <option value="AB+">AB+</option>
-                                                        <option value="AB-">AB-</option>
-                                                    </select>
-                                                </div>
-                                            </>
-                                        )}
-                                        <div className="relative group">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
-                                                <Phone size={18} />
-                                            </div>
-                                            <div className="absolute left-11 top-1/2 -translate-y-1/2 font-black text-sm text-gray-400 border-r border-gray-200 pr-2">
-                                                +91
-                                            </div>
-                                            <input
-                                                required
-                                                type="tel"
-                                                inputMode="numeric"
-                                                pattern="[0-9]*"
-                                                autoComplete="tel"
-                                                name="phone"
-                                                value={formData.phone || ''}
-                                                maxLength={10}
-                                                placeholder="Mobile Number"
-                                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                                                onFocus={(e) => {
-                                                    e.target.style.borderColor = activeCategory.theme;
-                                                    const target = e.target;
-                                                    setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                                                }}
-                                                onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                            />
-                                        </div>
-
-                                        <button
-                                            type="submit"
-                                            disabled={isLoading || timer > 0}
-                                            className={`w-full text-white py-5 rounded-[24px] text-xs font-black tracking-[4px] flex items-center justify-center gap-3 active:scale-95 transition-all uppercase ${timer > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            style={{ backgroundColor: activeCategory.theme, boxShadow: `0 20px 40px ${activeCategory.shadow}` }}
-                                        >
-                                            {isLoading ? 'Verifying...' : timer > 0 ? `Wait ${timer}s` : 'Continue'}
-                                            {timer === 0 && !isLoading && <ChevronRight size={18} />}
-                                        </button>
-                                    </form>
-
-                                    {/* Legal Agreement Footer */}
-                                    <div className="pt-2 flex flex-col items-center gap-1">
-                                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center">
-                                            By continuing, you agree to our
-                                        </p>
-                                        <div className="flex items-center gap-1.5 underline decoration-gray-200 underline-offset-4">
-                                            <button 
-                                                onClick={() => navigate('/terms')}
-                                                className="text-[10px] font-black uppercase tracking-widest hover:text-gray-900 transition-colors"
-                                                style={{ color: activeCategory.theme }}
-                                            >
-                                                Terms & Condition
-                                            </button>
-                                            <span className="text-[8px] text-gray-300">•</span>
-                                            <button 
-                                                onClick={() => navigate('/privacy-policy')}
-                                                className="text-[10px] font-black uppercase tracking-widest hover:text-gray-900 transition-colors"
-                                                style={{ color: activeCategory.theme }}
-                                            >
-                                                Privacy Policy
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="otp-view"
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="space-y-10"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            onClick={() => setShowOtp(false)}
-                                            className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-400"
-                                        >
-                                            <ChevronLeft size={20} />
-                                        </button>
-                                        <div>
-                                            <h3 className="text-xl font-black text-gray-900 tracking-tight">Verify Device</h3>
-                                            <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">+91 {formData.phone}</p>
-                                        </div>
-                                    </div>
-
-                                    <form onSubmit={handleVerifyOtp} className="space-y-10">
-                                        <div className="flex justify-between gap-3 px-1">
-                                            {[...Array(4)].map((_, i) => (
-                                                <input
-                                                    key={i}
-                                                    type="tel"
-                                                    maxLength={1}
-                                                    className="w-14 h-16 bg-white border-2 border-gray-200 rounded-3xl text-center text-2xl font-black outline-none shadow-[0_18px_45px_rgba(15,23,42,0.35)] focus:bg-white focus:border-[var(--theme-color)] focus:shadow-[0_24px_65px_rgba(15,23,42,0.55)] transition-all"
-                                                    style={{ color: activeCategory.theme }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Backspace' && !e.target.value && i > 0) {
-                                                            e.target.previousElementSibling.focus();
-                                                        }
-                                                    }}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        if (val && i < 3) (e.target.nextElementSibling).focus();
-                                                        const otpArr = formData.otp.split('');
-                                                        otpArr[i] = val;
-                                                        setFormData({ ...formData, otp: otpArr.join('') });
-                                                    }}
-                                                    onFocus={(e) => {
-                                                        e.target.style.borderColor = activeCategory.theme;
-                                                        const target = e.target;
-                                                        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                                                    }}
-                                                    onBlur={(e) => e.target.style.borderColor = ''}
-                                                />
-                                            ))}
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <button
-                                                type="submit"
-                                                disabled={isLoading}
-                                                className="w-full bg-gray-900 text-white py-5 rounded-[24px] text-xs font-black tracking-[4px] shadow-2xl flex items-center justify-center gap-3 uppercase active:scale-95 transition-all"
-                                            >
-                                                {isLoading ? 'Authenticating...' : `Enter ${appName}`}
-                                            </button>
-                                            <div className="flex justify-center">
-                                                <button
-                                                    type="button"
-                                                    disabled={timer > 0}
-                                                    onClick={handleSendOtp}
-                                                    className={`text-[10px] font-black uppercase tracking-widest ${timer > 0 ? 'text-gray-300' : 'underline'}`}
-                                                    style={{ color: timer > 0 ? undefined : activeCategory.theme }}
-                                                >
-                                                    {timer > 0 ? `Resend Code in ${timer}s` : 'Resend Now'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                            if (val && index < 3) {
+                              otpInputsRef.current[index + 1]?.focus();
+                            }
+                          }}
+                          className="h-16 w-14 rounded-2xl bg-slate-50 border-2 border-slate-200 text-center text-2xl font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 shadow-sm transition-all"
+                        />
+                      ))}
                     </div>
 
-                </div>
-            </div>
+                    {/* Verify & Enter Button */}
+                    <button
+                      type="submit"
+                      disabled={isLoading || formData.otp.length !== 4}
+                      className="w-full py-4 rounded-2xl bg-[#2E7D32] hover:bg-[#256828] text-white font-black text-xs uppercase tracking-[2px] shadow-lg shadow-emerald-900/15 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        "VERIFY & ENTER"
+                      )}
+                    </button>
 
-            {/* Desktop Message */}
-            <div className="hidden md:block absolute bottom-10 right-10 text-white/20 text-xs font-bold uppercase tracking-[4px]">
-                Adaptive Theme Simulator
-            </div>
+                    {/* Resend OTP Timer */}
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        disabled={timer > 0 || isLoading}
+                        onClick={handleSendOtp}
+                        className={`text-xs font-bold uppercase tracking-wider ${
+                          timer > 0
+                            ? "text-slate-400 cursor-not-allowed"
+                            : "text-emerald-700 hover:text-emerald-800 underline"
+                        }`}
+                      >
+                        {timer > 0 ? `Resend code in ${timer}s` : "Resend OTP"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-    );
+
+        {/* Bottom Terms & Conditions Footer */}
+        <div className="px-6 pb-6 pt-3 text-center border-t border-slate-50">
+          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+            By continuing, you agree to our
+          </p>
+          <div className="flex items-center justify-center gap-2 mt-0.5">
+            <button
+              onClick={() => navigate("/terms")}
+              className="text-[10px] font-black text-emerald-800 uppercase tracking-wider hover:underline"
+            >
+              Terms & Conditions
+            </button>
+            <span className="text-[8px] text-slate-300">•</span>
+            <button
+              onClick={() => navigate("/privacy")}
+              className="text-[10px] font-black text-emerald-800 uppercase tracking-wider hover:underline"
+            >
+              Privacy Policy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default CustomerAuth;
-
-

@@ -107,16 +107,16 @@ const Analytics = () => {
       value: statsData?.overview?.totalSales || "₹0",
       trend: statsData?.overview?.salesTrend || "0%",
       icon: HiOutlineArrowTrendingUp,
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
+      color: "text-[#1A8CFF]",
+      bg: "bg-blue-50",
     },
     {
       label: "Total Orders",
       value: statsData?.overview?.totalOrders || "0",
       trend: statsData?.overview?.ordersTrend || "0%",
       icon: HiOutlineShoppingBag,
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
+      color: "text-[#1A8CFF]",
+      bg: "bg-blue-50",
     },
     {
       label: "Avg Order Value",
@@ -207,7 +207,7 @@ const Analytics = () => {
               Advanced Analytics
               <Badge
                 variant="success"
-                className="text-[9px] px-1.5 py-0 font-semibold tracking-wider uppercase bg-emerald-50 text-emerald-800">
+                className="text-[9px] px-1.5 py-0 font-semibold tracking-wider uppercase bg-blue-50 text-[#1A8CFF]">
                 Real-time Insights
               </Badge>
             </h1>
@@ -225,7 +225,7 @@ const Analytics = () => {
                   className={cn(
                     "px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0",
                     activeTab === tab
-                      ? "bg-white text-[#1A4516] shadow-sm border border-slate-200 font-bold"
+                      ? "bg-white text-[#1A8CFF] shadow-sm border border-slate-200 font-bold"
                       : "text-slate-600 hover:text-slate-700",
                   )}>
                   {tab}
@@ -234,7 +234,7 @@ const Analytics = () => {
             </div>
             <ShimmerButton
               onClick={handleDownloadReport}
-              background="#1A4516"
+              background="#1A8CFF"
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 sm:px-5 rounded-lg text-xs sm:text-sm font-bold text-white shadow-lg disabled:opacity-50 shrink-0"
               disabled={isExporting}>
               <HiOutlineArrowDownTray className="h-4 w-4 shrink-0" />
@@ -256,8 +256,8 @@ const Analytics = () => {
             <MagicCard
               className="border-none shadow-sm overflow-hidden group bg-white p-0"
               gradientColor={
-                stat.bg.includes("emerald")
-                  ? "#ecfdf5"
+                stat.bg.includes("blue") || stat.bg.includes("emerald")
+                  ? "#eff6ff"
                   : stat.bg.includes("amber")
                     ? "#fffbeb"
                     : "#fff1f2"

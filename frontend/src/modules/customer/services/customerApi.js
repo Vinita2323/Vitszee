@@ -138,6 +138,8 @@ export const customerApi = {
   getOffers: () => getWithDedupe("/offers"),
   // Offer sections (category → products, banner + side image)
   getOfferSections: (params) => getWithDedupe("/offer-sections", params),
+  // Lowest Price section
+  getLowestPriceSection: (params) => getWithDedupe("/lowest-price", params),
 
   // Coupons
   validateCoupon: (data) => axiosInstance.post("/coupons/validate", data),

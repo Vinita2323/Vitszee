@@ -32,7 +32,7 @@ const BottomNav = ({ navItems }) => {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#133110] border-t border-white/10 z-[60] md:hidden px-2 flex items-center justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.4)]">
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#1A8CFF] border-t border-white/10 z-[60] md:hidden px-2 flex items-center justify-around shadow-[0_-10px_30px_rgba(26,140,255,0.25)]">
             {primaryItems.map((item) => (
                 <NavLink
                     key={item.path}
@@ -40,7 +40,7 @@ const BottomNav = ({ navItems }) => {
                     end={item.end}
                     className={({ isActive }) => cn(
                         "flex flex-col items-center justify-center space-y-1 w-16 transition-all duration-300",
-                        isActive ? "text-white" : "text-emerald-100/60 hover:text-white/90"
+                        isActive ? "text-white font-black" : "text-blue-100/70 hover:text-white"
                     )}
                 >
                     <item.icon className="h-5 w-5" />

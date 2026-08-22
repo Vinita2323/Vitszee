@@ -583,7 +583,7 @@ const Auth = () => {
                               name="name"
                               required
                               placeholder="Owner Name"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                               value={formData.name}
                               onChange={handleChange}
                             />
@@ -597,7 +597,7 @@ const Auth = () => {
                               name="shopName"
                               required
                               placeholder="Shop Name"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                               value={formData.shopName}
                               onChange={handleChange}
                             />
@@ -650,7 +650,7 @@ const Auth = () => {
                           minLength={6}
                           autoComplete="current-password"
                           placeholder="Enter your password"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300 pr-12"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300 pr-12"
                           value={formData.password}
                           onChange={handleChange}
                         />
@@ -672,7 +672,7 @@ const Auth = () => {
                             <input
                               type="date"
                               name="dob"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                               value={formData.dob}
                               onChange={handleChange}
                             />
@@ -683,7 +683,7 @@ const Auth = () => {
                           <div className="relative group">
                             <select
                               name="bloodGroup"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all appearance-none"
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all appearance-none"
                               value={formData.bloodGroup}
                               onChange={handleChange}
                             >
@@ -757,7 +757,7 @@ const Auth = () => {
                           name="locality"
                           required
                           placeholder="Locality / Area"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                           value={formData.locality}
                           onChange={handleChange}
                         />
@@ -769,7 +769,7 @@ const Auth = () => {
                           name="pincode"
                           required
                           placeholder="Pincode"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                           value={formData.pincode}
                           onChange={handleChange}
                         />
@@ -781,7 +781,7 @@ const Auth = () => {
                           name="city"
                           required
                           placeholder="City"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                           value={formData.city}
                           onChange={handleChange}
                         />
@@ -793,7 +793,7 @@ const Auth = () => {
                           name="state"
                           required
                           placeholder="State"
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
                           value={formData.state}
                           onChange={handleChange}
                         />
@@ -807,7 +807,7 @@ const Auth = () => {
                         rows={2}
                         required
                         placeholder="Full address details"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A4516] focus:ring-2 focus:ring-[#1A4516]/10 transition-all placeholder:text-slate-300 resize-none"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300 resize-none"
                         value={formData.address}
                         onChange={handleChange}
                       />
@@ -835,12 +835,12 @@ const Auth = () => {
                             <label
                               htmlFor={doc.id}
                               className={`flex items-center justify-between p-3 rounded-lg border border-dashed transition-all cursor-pointer ${documents[doc.id]
-                                ? "border-emerald-200 bg-emerald-50/20"
+                                ? "border-blue-200 bg-blue-50/20"
                                 : "border-slate-200 bg-slate-50 hover:border-slate-300"
                                 }`}>
                               <div className="flex items-center gap-2.5">
                                 <div
-                                  className={`p-1.5 rounded-md ${documents[doc.id] ? "bg-emerald-100 text-emerald-700" : "bg-white text-slate-600 shadow-xs"}`}>
+                                  className={`p-1.5 rounded-md ${documents[doc.id] ? "bg-blue-100 text-[#1A8CFF]" : "bg-white text-slate-600 shadow-xs"}`}>
                                   {documents[doc.id] ? (
                                     <CheckCircle className="w-3.5 h-3.5" />
                                   ) : (
@@ -849,7 +849,7 @@ const Auth = () => {
                                 </div>
                                 <div className="text-left">
                                   <p
-                                    className={`text-[11px] font-extrabold ${documents[doc.id] ? "text-emerald-800" : "text-slate-600"}`}>
+                                    className={`text-[11px] font-extrabold ${documents[doc.id] ? "text-blue-800" : "text-slate-600"}`}>
                                     {doc.label}
                                   </p>
                                   <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">
@@ -873,13 +873,13 @@ const Auth = () => {
                     <label className="flex items-center gap-1.5 font-semibold text-slate-500 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="rounded border-gray-300 text-[#1A4516] focus:ring-[#1A4516]"
+                        className="rounded border-gray-300 text-[#1A8CFF] focus:ring-[#1A8CFF]"
                       />
                       Remember me
                     </label>
                     <button
                       type="button"
-                      className="font-bold text-[#1A4516] hover:text-[#133A10] transition-colors"
+                      className="font-bold text-[#1A8CFF] hover:text-[#1177db] transition-colors"
                       onClick={() => toast.info("Please contact admin to reset your password.")}
                     >
                       Forgot Password?
@@ -899,7 +899,7 @@ const Auth = () => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className={`${!isLogin && signupStep > 1 ? "w-2/3" : "w-full"} bg-[#1A4516] hover:bg-[#133A10] text-white rounded-lg py-3 text-xs font-black tracking-widest shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer`}>
+                    className={`${!isLogin && signupStep > 1 ? "w-2/3" : "w-full"} bg-[#1A8CFF] hover:bg-[#1177db] text-white rounded-lg py-3 text-xs font-black tracking-widest shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer`}>
                     {isLoading
                       ? "WORKING..."
                       : isLogin
@@ -929,7 +929,7 @@ const Auth = () => {
                           phone: createInitialVerificationState(),
                         });
                       }}
-                      className="text-[#1A4516] hover:text-[#133A10] font-extrabold transition-colors px-1">
+                      className="text-[#1A8CFF] hover:text-[#1177db] font-extrabold transition-colors px-1">
                       Sign In
                     </button>
                   </p>
@@ -944,7 +944,7 @@ const Auth = () => {
                         setIsLogin(false);
                         setSignupStep(1);
                       }}
-                      className="text-[#1A4516] hover:underline font-bold"
+                      className="text-[#1A8CFF] hover:underline font-bold"
                     >
                       Register here
                     </button>

@@ -1,156 +1,212 @@
 /* ============================================
-   DESIGN SYSTEM - CONSISTENT TYPOGRAPHY & SPACING
+   DESIGN SYSTEM - MODERN PROFESSIONAL TYPOGRAPHY & SPACING
+   Applies to Admin & Seller Dashboard Panes
    ============================================ */
 
-/* Typography Scale - Professional & Compact */
+/* Typography Scale - Modern, Prominent & Highly Readable */
 .ds-h1 {
-  font-size: 1.25rem;
-  line-height: 1.75rem;
-  font-weight: 700;
-  color: rgb(17 24 39);
+  font-size: 1.625rem;
+  line-height: 2.125rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
   letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .ds-h1 {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+  }
 }
 
 .ds-h2 {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   line-height: 1.75rem;
-  font-weight: 600;
-  color: rgb(17 24 39);
-  letter-spacing: -0.025em;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+  .ds-h2 {
+    font-size: 1.375rem;
+    line-height: 1.875rem;
+  }
 }
 
 .ds-h3 {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.5rem;
   font-weight: 600;
-  color: rgb(17 24 39);
+  color: rgb(15 23 42);
+  letter-spacing: -0.015em;
+}
+
+@media (min-width: 768px) {
+  .ds-h3 {
+    font-size: 1.125rem;
+    line-height: 1.625rem;
+  }
 }
 
 .ds-h4 {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
   font-weight: 600;
-  color: rgb(17 24 39);
+  color: rgb(30 41 59);
+}
+
+@media (min-width: 768px) {
+  .ds-h4 {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
 }
 
 .ds-body {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: rgb(55 65 81);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  color: rgb(51 65 85);
+  font-weight: 400;
 }
 
 .ds-body-sm {
-  font-size: 0.6875rem;
-  line-height: 1rem;
-  color: rgb(75 85 99);
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
+  color: rgb(100 116 139);
+  font-weight: 400;
 }
 
 .ds-caption {
-  font-size: 0.625rem;
-  line-height: 0.875rem;
-  color: rgb(107 114 128);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  color: rgb(100 116 139);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .ds-label {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 500;
-  color: rgb(55 65 81);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: rgb(51 65 85);
 }
 
 .ds-description {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: rgb(107 114 128);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  color: rgb(100 116 139);
+  font-weight: 400;
 }
 
 /* Stat Values */
 .ds-stat-large {
-  font-size: 1.875rem;
-  line-height: 2.25rem;
-  font-weight: 700;
-  color: rgb(17 24 39);
-  letter-spacing: -0.025em;
+  font-size: 2rem;
+  line-height: 2.375rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+  letter-spacing: -0.03em;
+}
+
+@media (min-width: 768px) {
+  .ds-stat-large {
+    font-size: 2.125rem;
+    line-height: 2.5rem;
+  }
 }
 
 .ds-stat-medium {
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   line-height: 2rem;
-  font-weight: 700;
-  color: rgb(17 24 39);
+  font-weight: 800;
+  color: rgb(15 23 42);
   letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .ds-stat-medium {
+    font-size: 1.75rem;
+    line-height: 2.125rem;
+  }
 }
 
 .ds-stat-small {
   font-size: 1.25rem;
-  line-height: 1.75rem;
+  line-height: 1.625rem;
   font-weight: 700;
-  color: rgb(17 24 39);
-  letter-spacing: -0.025em;
+  color: rgb(15 23 42);
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+  .ds-stat-small {
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+  }
 }
 
 /* Card Layouts - Consistent Spacing */
 .ds-card {
   background-color: rgb(255 255 255);
-  border-radius: 0.5rem;
-  border: 1px solid rgb(243 244 246);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  border-radius: 0.875rem;
+  border: 1px solid rgb(241 245 249);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
 }
 
 .ds-card-compact {
-  padding: 1rem;
+  padding: 1.125rem;
 }
 
 .ds-card-standard {
-  padding: 1.25rem;
-}
-
-.ds-card-spacious {
   padding: 1.5rem;
 }
 
+.ds-card-spacious {
+  padding: 1.75rem;
+}
+
 .ds-card-header {
-  border-bottom: 1px solid rgb(243 244 246);
-  padding-bottom: 0.75rem;
-  margin-bottom: 1rem;
+  border-bottom: 1px solid rgb(241 245 249);
+  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .ds-card-footer {
-  border-top: 1px solid rgb(243 244 246);
-  padding-top: 0.75rem;
-  margin-top: 1rem;
+  border-top: 1px solid rgb(241 245 249);
+  padding-top: 1rem;
+  margin-top: 1.25rem;
 }
 
 /* Stat Cards */
 .ds-stat-card {
   background-color: rgb(255 255 255);
-  border-radius: 0.5rem;
-  border: 1px solid rgb(243 244 246);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  padding: 1rem;
-  transition: all 0.3s;
+  border-radius: 1rem;
+  border: 1px solid rgb(241 245 249);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  padding: 1.25rem 1.375rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ds-stat-card:hover {
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  box-shadow: 0 12px 20px -4px rgb(0 0 0 / 0.08);
+  border-color: rgb(226 232 240);
+  transform: translateY(-2px);
 }
 
 .ds-stat-card-icon {
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  padding: 0.625rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
 }
 
 .ds-stat-card-trend {
   display: flex;
   align-items: center;
-  font-size: 0.625rem;
-  line-height: 0.875rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
   border-radius: 9999px;
 }
 
@@ -158,7 +214,7 @@
 .ds-grid-stats {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 @media (min-width: 640px) {
@@ -176,7 +232,7 @@
 .ds-grid-cards {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 @media (min-width: 1024px) {
@@ -188,7 +244,7 @@
 .ds-grid-cards-3 {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 @media (min-width: 1024px) {
@@ -201,27 +257,27 @@
 .ds-section-spacing {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
 .ds-content-spacing {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .ds-tight-spacing {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.875rem;
 }
 
 /* Page Headers */
 .ds-page-header {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.875rem;
+  margin-bottom: 1.75rem;
 }
 
 @media (min-width: 768px) {
@@ -235,149 +291,160 @@
 .ds-page-title-group {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.375rem;
 }
 
 .ds-page-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
-/* Buttons - Consistent Sizing */
+/* Buttons - Modern & Readable */
 .ds-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ds-btn-sm {
-  padding: 0.375rem 0.625rem;
-  height: 1.75rem;
+  padding: 0.4375rem 0.75rem;
+  height: 2.125rem;
+  font-size: 0.75rem;
 }
 
 .ds-btn-md {
-  padding: 0.5rem 0.75rem;
-  height: 2rem;
+  padding: 0.5625rem 1rem;
+  height: 2.5rem;
+  font-size: 0.8125rem;
 }
 
 .ds-btn-lg {
-  padding: 0.625rem 1rem;
-  height: 2.25rem;
+  padding: 0.6875rem 1.25rem;
+  height: 2.75rem;
+  font-size: 0.875rem;
 }
 
 /* Form Elements */
 .ds-input {
-  height: 2rem;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid rgb(229 231 235);
-  transition: all 0.3s;
+  height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(226 232 240);
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+  transition: all 0.2s;
 }
 
 .ds-input:focus {
   outline: none;
-  ring: 1px;
-  ring-color: var(--primary);
+  background-color: rgb(255 255 255);
   border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .ds-textarea {
-  min-height: 4.375rem;
-  padding: 0.375rem 0.625rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid rgb(229 231 235);
-  transition: all 0.3s;
+  min-height: 5.5rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(226 232 240);
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+  transition: all 0.2s;
 }
 
 .ds-textarea:focus {
   outline: none;
-  ring: 1px;
-  ring-color: var(--primary);
+  background-color: rgb(255 255 255);
   border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .ds-select {
-  height: 2rem;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid rgb(229 231 235);
-  transition: all 0.3s;
+  height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(226 232 240);
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+  transition: all 0.2s;
 }
 
 .ds-select:focus {
   outline: none;
-  ring: 1px;
-  ring-color: var(--primary);
+  background-color: rgb(255 255 255);
   border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 /* Tables */
 .ds-table {
   width: 100%;
-  font-size: 0.75rem;
-  line-height: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
 }
 
 .ds-table-header {
-  background-color: rgb(249 250 251);
-  border-bottom: 1px solid rgb(229 231 235);
+  background-color: rgb(248 250 252);
+  border-bottom: 1px solid rgb(226 232 240);
 }
 
 .ds-table-header-cell {
-  padding: 0.625rem 1rem;
+  padding: 0.875rem 1.125rem;
   text-align: left;
-  font-size: 0.625rem;
-  line-height: 0.875rem;
-  font-weight: 600;
-  color: rgb(75 85 99);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  font-weight: 700;
+  color: rgb(100 116 139);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .ds-table-cell {
-  padding: 0.75rem 1rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: rgb(55 65 81);
+  padding: 0.875rem 1.125rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: rgb(51 65 85);
 }
 
 .ds-table-row {
-  border-bottom: 1px solid rgb(243 244 246);
-  transition: background-color 0.3s;
+  border-bottom: 1px solid rgb(241 245 249);
+  transition: background-color 0.2s;
 }
 
 .ds-table-row:hover {
-  background-color: rgb(249 250 251);
+  background-color: rgb(248 250 252);
 }
 
 /* Badges */
 .ds-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.625rem;
-  line-height: 0.875rem;
-  font-weight: 600;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .ds-badge-success {
-  background-color: rgb(236 254 255); /* Cyan 50 */
-  color: rgb(8 145 178); /* Cyan 700 */
-  border: 1px solid rgb(165 243 252); /* Cyan 200 */
+  background-color: rgb(236 253 245);
+  color: rgb(4 120 87);
+  border: 1px solid rgb(167 243 208);
 }
 
 .ds-badge-warning {
@@ -399,49 +466,49 @@
 }
 
 .ds-badge-gray {
-  background-color: rgb(249 250 251);
-  color: rgb(55 65 81);
-  border: 1px solid rgb(229 231 235);
+  background-color: rgb(241 245 249);
+  color: rgb(71 85 105);
+  border: 1px solid rgb(226 232 240);
 }
 
 /* Icons */
 .ds-icon-sm {
-  height: 0.875rem;
-  width: 0.875rem;
+  height: 0.9375rem;
+  width: 0.9375rem;
 }
 
 .ds-icon-md {
-  height: 1rem;
-  width: 1rem;
+  height: 1.125rem;
+  width: 1.125rem;
 }
 
 .ds-icon-lg {
-  height: 1.25rem;
-  width: 1.25rem;
+  height: 1.375rem;
+  width: 1.375rem;
 }
 
 .ds-icon-xl {
-  height: 1.5rem;
-  width: 1.5rem;
+  height: 1.625rem;
+  width: 1.625rem;
 }
 
 /* Chart Containers */
 .ds-chart-container {
-  height: 18.75rem;
+  height: 20rem;
   width: 100%;
-  margin-top: 0.75rem;
+  margin-top: 1rem;
 }
 
 .ds-chart-container-lg {
-  height: 21.875rem;
+  height: 24rem;
   width: 100%;
-  margin-top: 0.75rem;
+  margin-top: 1rem;
 }
 
 .ds-chart-container-sm {
-  height: 15.625rem;
+  height: 16.5rem;
   width: 100%;
-  margin-top: 0.75rem;
+  margin-top: 1rem;
 }
 
 /* Empty States */
@@ -450,48 +517,48 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 0;
+  padding: 3.5rem 1rem;
   text-align: center;
 }
 
 .ds-empty-state-icon {
-  height: 3rem;
-  width: 3rem;
-  color: rgb(209 213 219);
-  margin-bottom: 0.75rem;
+  height: 3.5rem;
+  width: 3.5rem;
+  color: rgb(203 213 225);
+  margin-bottom: 1rem;
 }
 
 .ds-empty-state-title {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: 600;
-  color: rgb(17 24 39);
-  margin-bottom: 0.25rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 0.375rem;
 }
 
 .ds-empty-state-description {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: rgb(107 114 128);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: rgb(100 116 139);
 }
 
 /* Loading States */
 .ds-skeleton {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  background-color: rgb(229 231 235);
-  border-radius: 0.25rem;
+  background-color: rgb(226 232 240);
+  border-radius: 0.5rem;
 }
 
 .ds-skeleton-text {
-  height: 0.75rem;
-  background-color: rgb(229 231 235);
-  border-radius: 0.25rem;
+  height: 0.875rem;
+  background-color: rgb(226 232 240);
+  border-radius: 0.375rem;
 }
 
 .ds-skeleton-title {
-  height: 1rem;
-  background-color: rgb(229 231 235);
-  border-radius: 0.25rem;
+  height: 1.25rem;
+  background-color: rgb(226 232 240);
+  border-radius: 0.375rem;
 }
 
 @keyframes pulse {
@@ -505,42 +572,241 @@
 
 /* Dividers */
 .ds-divider {
-  border-top: 1px solid rgb(243 244 246);
-  margin: 1rem 0;
+  border-top: 1px solid rgb(241 245 249);
+  margin: 1.25rem 0;
 }
 
 .ds-divider-thick {
-  border-top: 2px solid rgb(229 231 235);
-  margin: 1.25rem 0;
+  border-top: 2px solid rgb(226 232 240);
+  margin: 1.5rem 0;
 }
 
 /* Shadows */
 .ds-shadow-sm {
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
 }
 
 .ds-shadow-md {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
 }
 
 .ds-shadow-lg {
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
 }
 
 /* Hover Effects */
 .ds-hover-lift {
-  transition: all 0.3s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ds-hover-lift:hover {
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  transform: translateY(-0.125rem);
+  box-shadow: 0 12px 20px -4px rgb(0 0 0 / 0.08);
+  transform: translateY(-2px);
 }
 
 .ds-hover-scale {
-  transition: transform 0.3s;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ds-hover-scale:hover {
-  transform: scale(1.05);
+  transform: scale(1.03);
+}
+
+/* ==========================================================================
+   ADMIN & SELLER MAIN CONTENT TYPOGRAPHY & READABILITY OVERRIDES
+   Scattered inline micro-typography scaling across all right-side dashboard pages
+   ========================================================================== */
+
+.admin-main-content,
+.seller-main-content,
+.dashboard-main-content {
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgb(51 65 85);
+}
+
+/* Page Headers in Admin & Seller */
+.admin-main-content h1:not([class*="text-"]),
+.seller-main-content h1:not([class*="text-"]),
+.dashboard-main-content h1:not([class*="text-"]) {
+  font-size: 1.625rem;
+  line-height: 2.125rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .admin-main-content h1:not([class*="text-"]),
+  .seller-main-content h1:not([class*="text-"]),
+  .dashboard-main-content h1:not([class*="text-"]) {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+  }
+}
+
+/* Section Headings */
+.admin-main-content h2:not([class*="text-"]),
+.seller-main-content h2:not([class*="text-"]),
+.dashboard-main-content h2:not([class*="text-"]) {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  letter-spacing: -0.02em;
+}
+
+.admin-main-content h3:not([class*="text-"]),
+.seller-main-content h3:not([class*="text-"]),
+.dashboard-main-content h3:not([class*="text-"]) {
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  color: rgb(15 23 42);
+}
+
+.admin-main-content h4:not([class*="text-"]),
+.seller-main-content h4:not([class*="text-"]),
+.dashboard-main-content h4:not([class*="text-"]) {
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  font-weight: 600;
+  color: rgb(30 41 59);
+}
+
+/* Form Labels in Admin & Seller */
+.admin-main-content label,
+.seller-main-content label,
+.dashboard-main-content label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(71 85 105);
+  letter-spacing: 0.01em;
+}
+
+/* Text Inputs, Selects and Textareas */
+.admin-main-content input:not([type="checkbox"]):not([type="radio"]),
+.seller-main-content input:not([type="checkbox"]):not([type="radio"]),
+.dashboard-main-content input:not([type="checkbox"]):not([type="radio"]),
+.admin-main-content select,
+.seller-main-content select,
+.dashboard-main-content select,
+.admin-main-content textarea,
+.seller-main-content textarea,
+.dashboard-main-content textarea {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.admin-main-content input::placeholder,
+.seller-main-content input::placeholder,
+.dashboard-main-content input::placeholder,
+.admin-main-content textarea::placeholder,
+.seller-main-content textarea::placeholder,
+.dashboard-main-content textarea::placeholder {
+  font-size: 0.8125rem;
+  color: rgb(148 163 184);
+}
+
+/* Table Enhancements in Admin & Seller */
+.admin-main-content table th,
+.seller-main-content table th,
+.dashboard-main-content table th {
+  font-size: 0.75rem !important;
+  line-height: 1.125rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: rgb(100 116 139) !important;
+  padding-top: 0.875rem !important;
+  padding-bottom: 0.875rem !important;
+}
+
+.admin-main-content table td,
+.seller-main-content table td,
+.dashboard-main-content table td {
+  font-size: 0.875rem !important;
+  line-height: 1.375rem !important;
+  padding-top: 0.875rem !important;
+  padding-bottom: 0.875rem !important;
+}
+
+/* Universal Scaled Micro-Typography for Admin & Seller */
+.admin-main-content .text-\[9px\],
+.seller-main-content .text-\[9px\],
+.dashboard-main-content .text-\[9px\],
+.admin-main-content .text-\[10px\],
+.seller-main-content .text-\[10px\],
+.dashboard-main-content .text-\[10px\] {
+  font-size: 0.75rem !important; /* 12px instead of 9px/10px */
+  line-height: 1.125rem !important;
+}
+
+.admin-main-content .text-\[11px\],
+.seller-main-content .text-\[11px\],
+.dashboard-main-content .text-\[11px\] {
+  font-size: 0.8125rem !important; /* 13px instead of 11px */
+  line-height: 1.25rem !important;
+}
+
+.admin-main-content .text-xs,
+.seller-main-content .text-xs,
+.dashboard-main-content .text-xs {
+  font-size: 0.8125rem !important; /* 13px instead of 12px */
+  line-height: 1.25rem !important;
+}
+
+.admin-main-content .text-sm,
+.seller-main-content .text-sm,
+.dashboard-main-content .text-sm {
+  font-size: 0.875rem !important; /* 14px */
+  line-height: 1.375rem !important;
+}
+
+/* Card titles and headings in components */
+.admin-main-content .ds-h1,
+.seller-main-content .ds-h1,
+.dashboard-main-content .ds-h1 {
+  font-size: 1.625rem !important;
+  line-height: 2.125rem !important;
+  font-weight: 800 !important;
+}
+
+@media (min-width: 768px) {
+  .admin-main-content .ds-h1,
+  .seller-main-content .ds-h1,
+  .dashboard-main-content .ds-h1 {
+    font-size: 1.75rem !important;
+    line-height: 2.25rem !important;
+  }
+}
+
+.admin-main-content .ds-description,
+.seller-main-content .ds-description,
+.dashboard-main-content .ds-description {
+  font-size: 0.875rem !important;
+  line-height: 1.5rem !important;
+}
+
+/* Badges & Status in Admin & Seller */
+.admin-main-content [class*="badge"],
+.seller-main-content [class*="badge"],
+.dashboard-main-content [class*="badge"],
+.admin-main-content .ds-badge,
+.seller-main-content .ds-badge,
+.dashboard-main-content .ds-badge {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Tab and Filter Buttons */
+.admin-main-content .tab-btn,
+.seller-main-content .tab-btn,
+.dashboard-main-content .tab-btn,
+.admin-main-content [role="tab"],
+.seller-main-content [role="tab"],
+.dashboard-main-content [role="tab"] {
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
