@@ -78,7 +78,6 @@ const OrderDetail = React.lazy(() => import("../pages/OrderDetail"));
 const Returns = React.lazy(() => import("../pages/Returns"));
 const SellerDetail = React.lazy(() => import("../pages/SellerDetail"));
 const SupportTickets = React.lazy(() => import("../pages/SupportTickets"));
-const ReviewModeration = React.lazy(() => import("../pages/ReviewModeration"));
 const FleetTracking = React.lazy(() => import("../pages/FleetTracking"));
 const CouponManagement = React.lazy(() => import("../pages/CouponManagement"));
 const ContentManager = React.lazy(() => import("../pages/ContentManager"));
@@ -101,6 +100,7 @@ const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
 const BirthdayCenter = React.lazy(() => import("../pages/BirthdayCenter"));
 const MilestoneCampaigns = React.lazy(() => import("../pages/marketing/MilestoneCampaigns"));
 const CreateMilestoneCampaign = React.lazy(() => import("../pages/marketing/CreateMilestoneCampaign"));
+const LowestPriceManagement = React.lazy(() => import("../pages/LowestPriceManagement"));
 
 const navItems = [
   {
@@ -133,6 +133,7 @@ const navItems = [
       { label: "Send Notifications", path: "/admin/notifications" },
       { label: "Coupons & Promos", path: "/admin/coupons" },
       { label: "Offer Sections", path: "/admin/offer-sections" },
+      { label: "Lowest Price Section", path: "/admin/lowest-price" },
       { label: "Shop by Store", path: "/admin/shop-by-store" },
       { label: "Milestone Coupons", path: "/admin/marketing/milestones" },
     ],
@@ -143,7 +144,6 @@ const navItems = [
     color: "emerald",
     children: [
       { label: "Help Tickets", path: "/admin/support-tickets" },
-      { label: "Review Content", path: "/admin/moderation" },
     ],
   },
   {
@@ -266,12 +266,12 @@ const AdminRoutes = () => {
         <Route path="/sellers/active" element={<ActiveSellers />} />
         <Route path="/sellers/active/:id" element={<SellerDetail />} />
         <Route path="/support-tickets" element={<SupportTickets />} />
-        <Route path="/moderation" element={<ReviewModeration />} />
         <Route path="/experience-studio" element={<ContentManager />} />
         <Route path="/hero-categories" element={<HeroCategoriesPerPage />} />
         <Route path="/notifications" element={<NotificationComposer />} />
         <Route path="/offers" element={<OffersManagement />} />
         <Route path="/offer-sections" element={<OfferSectionsManagement />} />
+        <Route path="/lowest-price" element={<LowestPriceManagement />} />
         <Route path="/shop-by-store" element={<ShopByStoreManagement />} />
         <Route path="/coupons" element={<CouponManagement />} />
         <Route path="/marketing/milestones" element={<MilestoneCampaigns />} />

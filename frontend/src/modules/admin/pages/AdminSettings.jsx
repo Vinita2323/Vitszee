@@ -7,7 +7,6 @@ import {
     Building2,
     Share2,
     Smartphone,
-    Search,
     Upload,
     Mail,
     Phone,
@@ -204,7 +203,6 @@ const AdminSettings = () => {
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'legal', label: 'Legal & Contact', icon: Building2 },
         { id: 'social', label: 'Social & Apps', icon: Share2 },
-        { id: 'seo', label: 'SEO & Meta', icon: Search },
     ];
 
     return (
@@ -675,49 +673,6 @@ const AdminSettings = () => {
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </Card>
-                    )}
-
-                    {/* SEO Settings */}
-                    {activeTab === 'seo' && (
-                        <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
-                            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
-                                    SEO & Meta Information
-                                </h3>
-                            </div>
-                            <div className="p-8 space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Default Meta Title</label>
-                                    <input
-                                        type="text"
-                                        value={settings.metaTitle}
-                                        onChange={(e) => handleInputChange('metaTitle', e.target.value)}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Default Meta Description</label>
-                                    <textarea
-                                        rows={3}
-                                        value={settings.metaDescription}
-                                        onChange={(e) => handleInputChange('metaDescription', e.target.value)}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all resize-none"
-                                    />
-                                    <p className="text-[10px] font-bold text-slate-400 italic text-right">Recommended length: 150-160 characters</p>
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meta Keywords</label>
-                                    <input
-                                        type="text"
-                                        value={settings.metaKeywords}
-                                        onChange={(e) => handleInputChange('metaKeywords', e.target.value)}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
-                                        placeholder="keyword1, keyword2, keyword3"
-                                    />
-                                    <p className="text-[10px] font-bold text-slate-400 italic text-right">Separate keywords with commas</p>
                                 </div>
                             </div>
                         </Card>

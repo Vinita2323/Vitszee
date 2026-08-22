@@ -150,15 +150,15 @@ const Withdrawals = () => {
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
                             Money Requests
-                            <div className="p-1.5 bg-emerald-50 rounded-lg">
-                                <Wallet className="h-5 w-5 text-emerald-700" />
+                            <div className="p-1.5 bg-blue-50 rounded-lg">
+                                <Wallet className="h-5 w-5 text-[#1A8CFF]" />
                             </div>
                         </h1>
                         <p className="text-slate-500 text-base mt-1 font-medium">Request payouts and track your withdrawal history.</p>
                     </div>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="px-6 py-3 bg-[#1A4516] hover:bg-[#133A10] text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-xl active:scale-95 flex items-center gap-2 group"
+                        className="px-6 py-3 bg-[#1A8CFF] hover:bg-[#1177db] text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-xl active:scale-95 flex items-center gap-2 group"
                     >
                         <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                         New Request
@@ -169,22 +169,21 @@ const Withdrawals = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-[850px]">
                 {[
-                    { label: 'Available Balance', value: `₹${balances.available.toLocaleString()}`, icon: Wallet, color: 'emerald', sub: 'Ready to withdraw', path: '/seller/earnings' },
+                    { label: 'Available Balance', value: `₹${balances.available.toLocaleString()}`, icon: Wallet, color: 'blue', sub: 'Ready to withdraw', path: '/seller/earnings' },
                     { label: 'On Hold', value: `₹${balances.onHold.toLocaleString()}`, icon: Clock, color: 'blue', sub: 'Return window open', onClick: () => setIsOnHoldModalOpen(true) },
                     { label: 'Withdrawal Pending', value: `₹${balances.pending.toLocaleString()}`, icon: History, color: 'amber', sub: 'Awaiting approval' },
                     { label: 'Last Withdrawal', value: `₹${balances.lastWithdrawal.toLocaleString()}`, icon: CheckCircle2, color: 'indigo', sub: 'Sent to bank' },
                 ].map((stat, i) => (
                     <BlurFade key={i} delay={0.2 + i * 0.1}>
                         <Card 
-                            className={`!p-0 border-none shadow-sm ring-1 ring-slate-100 hover:ring-[#1A4516]/20 transition-all bg-white group relative overflow-hidden ${(stat.path || stat.onClick) ? 'cursor-pointer' : ''}`}
+                            className={`!p-0 border-none shadow-sm ring-1 ring-slate-100 hover:ring-[#1A8CFF]/20 transition-all bg-white group relative overflow-hidden ${(stat.path || stat.onClick) ? 'cursor-pointer' : ''}`}
                             onClick={() => stat.onClick ? stat.onClick() : (stat.path && navigate(stat.path))}
                         >
                             <div className="flex items-center gap-2.5 p-2.5 relative z-10">
                                 <div className={cn(
                                     "h-9 w-9 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105",
-                                    stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-700' :
-                                    stat.color === 'blue' ? 'bg-emerald-50 text-emerald-700' :
-                                    stat.color === 'indigo' ? 'bg-emerald-50 text-emerald-700' : 
+                                    stat.color === 'blue' ? 'bg-blue-50 text-[#1A8CFF]' :
+                                    stat.color === 'indigo' ? 'bg-indigo-50 text-indigo-700' : 
                                     'bg-amber-50 text-amber-700'
                                 )}>
                                     <stat.icon className="h-4 w-4" />
@@ -208,17 +207,17 @@ const Withdrawals = () => {
                 <Card className="border-none shadow-xl ring-1 ring-slate-100 overflow-hidden bg-white rounded-3xl">
                     <div className="p-4 sm:p-6 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-4">
                         <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <History className="h-5 w-5 text-[#1A4516]" />
+                            <History className="h-5 w-5 text-[#1A8CFF]" />
                             Withdrawal History
                         </h2>
                         <div className="relative w-full md:w-64 group">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 group-focus-within:text-[#1A4516] transition-colors" />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 group-focus-within:text-[#1A8CFF] transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search ID or Status..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-[#1A4516]/10 transition-all"
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all"
                             />
                         </div>
                     </div>

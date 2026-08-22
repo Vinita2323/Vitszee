@@ -41,7 +41,7 @@ import { toast } from "sonner";
 import { useSellerOrders } from "../context/SellerOrdersContext";
 
 const BAR_COLORS = [
-  "#0B3B24", // Deep Forest Green
+  "#1A8CFF", // Primary Brand Blue
   "#0F2537", // Deep Ocean Blue
   "#722F37", // Wine Red / Maroon
   "#8B5A2B", // Bronze Gold
@@ -108,8 +108,8 @@ const Dashboard = () => {
       change: statsData?.overview?.salesTrend || "0%",
       changeType: (statsData?.overview?.salesTrend || "").startsWith("-") ? "decrease" : "increase",
       icon: DollarSign,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-700",
+      iconBg: "bg-blue-50",
+      iconColor: "text-[#1A8CFF]",
       description: "vs last week",
     },
     {
@@ -118,8 +118,8 @@ const Dashboard = () => {
       change: statsData?.overview?.ordersTrend || "0%",
       changeType: (statsData?.overview?.ordersTrend || "").startsWith("-") ? "decrease" : "increase",
       icon: ShoppingBag,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-700",
+      iconBg: "bg-blue-50",
+      iconColor: "text-[#1A8CFF]",
       description: "vs last week",
     },
     {
@@ -128,8 +128,8 @@ const Dashboard = () => {
       change: "",
       changeType: "increase",
       icon: Package,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-700",
+      iconBg: "bg-blue-50",
+      iconColor: "text-[#1A8CFF]",
       description: "per order",
     },
     {
@@ -164,7 +164,7 @@ const Dashboard = () => {
       description: "Check your revenue and payouts",
       icon: DollarSign,
       path: "/seller/earnings",
-      variant: "outline-emerald", // white bg, border, emerald accent
+      variant: "outline-blue", // white bg, border, blue accent
     },
   ];
 
@@ -295,26 +295,26 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {quickActions.map((action) => {
           const isPrimary = action.variant === "primary";
-          const isEmerald = action.variant === "outline-emerald";
+          const isBlue = action.variant === "outline-blue" || action.variant === "outline-emerald";
           return (
             <button
               key={action.title}
               onClick={() => navigate(action.path)}
               className={cn(
                 "p-6 rounded-xl text-left transition-all duration-200 shadow-sm hover:shadow-md border-2",
-                isPrimary && "bg-[#1A4516] border-[#1A4516] text-white hover:bg-[#133A10] hover:border-[#133A10]",
-                action.variant === "outline" && "bg-white border-slate-200 text-slate-900 hover:border-[#1A4516] hover:bg-[#1A4516]/5",
-                isEmerald && "bg-white border-slate-200 text-slate-900 hover:border-[#1A4516] hover:bg-[#1A4516]/5"
+                isPrimary && "bg-[#1A8CFF] border-[#1A8CFF] text-white hover:bg-[#1177db] hover:border-[#1177db]",
+                action.variant === "outline" && "bg-white border-slate-200 text-slate-900 hover:border-[#1A8CFF] hover:bg-[#1A8CFF]/5",
+                isBlue && "bg-white border-slate-200 text-slate-900 hover:border-[#1A8CFF] hover:bg-[#1A8CFF]/5"
               )}
             >
               <div className="flex items-start gap-4">
                 <div className={cn(
                   "p-2 rounded-lg",
-                  isPrimary ? "bg-white/20" : isEmerald ? "bg-emerald-50" : "bg-slate-100"
+                  isPrimary ? "bg-white/20" : isBlue ? "bg-blue-50" : "bg-slate-100"
                 )}>
                   <action.icon className={cn(
                     "h-5 w-5",
-                    isPrimary ? "text-white" : isEmerald ? "text-[#1A4516]" : "text-slate-700"
+                    isPrimary ? "text-white" : isBlue ? "text-[#1A8CFF]" : "text-slate-700"
                   )} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -349,8 +349,8 @@ const Dashboard = () => {
               <AreaChart data={revenueChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1A4516" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#1A4516" stopOpacity={0.05} />
+                    <stop offset="5%" stopColor="#1A8CFF" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#1A8CFF" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -382,7 +382,7 @@ const Dashboard = () => {
                 <Area
                   type="monotone"
                   dataKey="sales"
-                  stroke="#1A4516"
+                  stroke="#1A8CFF"
                   strokeWidth={2}
                   fill="url(#revenueGradient)"
                   isAnimationActive={true}

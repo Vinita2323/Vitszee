@@ -42,8 +42,8 @@ const Transactions = () => {
       label: "Settled Balance",
       value: `₹${(data?.balances?.settledBalance || 0).toLocaleString()}`,
       icon: HiOutlineBanknotes,
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
+      color: "text-[#1A8CFF]",
+      bg: "bg-blue-50",
     },
     {
       label: "Pending Payouts",
@@ -56,8 +56,8 @@ const Transactions = () => {
       label: "Total Revenue",
       value: `₹${(data?.balances?.totalRevenue || 0).toLocaleString()}`,
       icon: HiOutlineCreditCard,
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
+      color: "text-[#1A8CFF]",
+      bg: "bg-blue-50",
     },
   ];
 
@@ -193,7 +193,7 @@ const Transactions = () => {
                   setIsDownloading(false);
                 }
               }}
-              className="rounded-lg px-4 py-2 bg-[#1A4516] hover:bg-[#133A10] text-white text-xs font-bold shadow-lg shadow-[#1A4516]/10 disabled:opacity-50 flex items-center transition-all"
+              className="rounded-lg px-4 py-2 bg-[#1A8CFF] hover:bg-[#1177db] text-white text-xs font-bold shadow-lg shadow-[#1A8CFF]/10 disabled:opacity-50 flex items-center transition-all"
               disabled={isDownloading || filteredTransactions.length === 0}>
               <HiOutlineDocumentText className="h-4 w-4 mr-2" />
               {isDownloading ? "DOWNLOADING..." : "DOWNLOAD STATEMENTS"}
@@ -208,7 +208,7 @@ const Transactions = () => {
           <BlurFade key={i} delay={0.1 + i * 0.05}>
             <MagicCard
               className="border-none shadow-sm overflow-hidden bg-white p-0"
-              gradientColor={stat.bg.includes("emerald") ? "#ecfdf5" : "#fffbeb"}>
+              gradientColor={stat.bg.includes("blue") ? "#eff6ff" : "#fffbeb"}>
               <div className="flex items-center gap-2.5 p-2.5 relative z-10">
                 <div
                   className={cn(
@@ -244,7 +244,7 @@ const Transactions = () => {
                   className={cn(
                     "px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap",
                     activeTab === tab
-                      ? "bg-white text-[#1A4516] shadow-sm font-bold"
+                      ? "bg-white text-[#1A8CFF] shadow-sm font-bold"
                       : "text-slate-600 hover:text-slate-700",
                   )}>
                   {tab === "Order Payment" ? "Payments" : tab}
@@ -255,7 +255,7 @@ const Transactions = () => {
               <HiOutlineMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <Input
                 placeholder="Search by customer..."
-                className="pl-10 pr-4 py-2.5 rounded-lg border-none ring-1 ring-slate-100 bg-slate-50/50 focus:ring-2 focus:ring-[#1A4516]/10 transition-all text-xs font-semibold"
+                className="pl-10 pr-4 py-2.5 rounded-lg border-none ring-1 ring-slate-100 bg-slate-50/50 focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all text-xs font-semibold"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -309,7 +309,7 @@ const Transactions = () => {
                             className={cn(
                               "h-9 w-9 rounded-full flex items-center justify-center font-bold transition-all group-hover:scale-105",
                               txn.amount > 0
-                                ? "bg-emerald-50 text-emerald-700"
+                                ? "bg-blue-50 text-[#1A8CFF]"
                                 : "bg-rose-50 text-rose-700",
                             )}>
                             {txn.amount > 0 ? (
@@ -319,7 +319,7 @@ const Transactions = () => {
                             )}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-800 group-hover:text-[#1A4516] transition-colors">
+                            <p className="text-sm font-semibold text-slate-800 group-hover:text-[#1A8CFF] transition-colors">
                               {txn.id ?? txn.ref ?? "—"}
                             </p>
                             <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">

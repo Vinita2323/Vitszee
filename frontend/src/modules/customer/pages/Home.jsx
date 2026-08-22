@@ -208,6 +208,7 @@ const Home = () => {
   const [subcategoryMap, setSubcategoryMap] = useState(() => cachedHomePageData?.subcategoryMap || {});
   const [pendingReturn, setPendingReturn] = useState(null);
   const [offerSections, setOfferSections] = useState(() => cachedHomePageData?.offerSections || []);
+  const [lowestPriceSection, setLowestPriceSection] = useState(() => cachedHomePageData?.lowestPriceSection || null);
   const [noServiceData, setNoServiceData] = useState(null);
 
   useEffect(() => {
@@ -229,6 +230,7 @@ const Home = () => {
     setProducts(data.products || []);
     setExperienceSections(data.experienceSections || []);
     setOfferSections(data.offerSections || []);
+    if (data.lowestPriceSection !== undefined) setLowestPriceSection(data.lowestPriceSection);
     if (data.heroConfig) setHeroConfig(data.heroConfig);
     setActiveCategory((prev) => {
       const parsed = getJSON(STORAGE_KEYS.EXPERIENCE_RETURN, null, { storage: "session" });
@@ -260,12 +262,13 @@ const Home = () => {
         productParams.lat = currentLocation.latitude;
         productParams.lng = currentLocation.longitude;
       }
-      const [catRes, prodRes, expRes, sectionsRes, headerCategoriesRes] = await Promise.all([
+      const [catRes, prodRes, expRes, sectionsRes, headerCategoriesRes, lowestPriceRes] = await Promise.all([
         customerApi.getCategories(),
         hasValidLocation ? customerApi.getProducts(productParams) : Promise.resolve({ data: { success: true, result: { items: [] } } }),
         customerApi.getExperienceSections({ pageType: "home" }).catch(() => null),
         hasValidLocation ? customerApi.getOfferSections({ lat: currentLocation.latitude, lng: currentLocation.longitude }).catch(() => ({ data: {} })) : Promise.resolve({ data: { results: [] } }),
         customerApi.getHeaderCategories().catch(() => ({ data: { result: [] } })),
+        customerApi.getLowestPriceSection(hasValidLocation ? { lat: currentLocation.latitude, lng: currentLocation.longitude } : {}).catch(() => ({ data: {} })),
       ]);
       const nextHomeData = {
         categories: [ALL_CATEGORY],
@@ -274,6 +277,7 @@ const Home = () => {
         quickCategories: [],
         experienceSections: [],
         offerSections: [],
+        lowestPriceSection: lowestPriceRes?.data?.result || null,
         categoryMap: {},
         subcategoryMap: {},
         formattedHeaders: [],
@@ -455,7 +459,22 @@ const Home = () => {
           </motion.div>
 
           <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
-          <LowestPriceSection products={products} onSeeAll={() => navigate("/category/all")} />
+          {lowestPriceSection ? (
+            lowestPriceSection.isActive !== false && (
+              <LowestPriceSection
+                title={lowestPriceSection.title || "Lowest Price ever"}
+                subtitle={lowestPriceSection.subtitle || "Unbeatable Savings • Updated hourly"}
+                products={
+                  lowestPriceSection.products?.length > 0
+                    ? lowestPriceSection.products
+                    : products
+                }
+                onSeeAll={() => navigate("/lowest-price")}
+              />
+            )
+          ) : (
+            <LowestPriceSection products={products} onSeeAll={() => navigate("/lowest-price")} />
+          )}
           <OfferSections sections={offerSections} noServiceData={noServiceData} />
 
           {sectionsForRenderer.length > 0 && (

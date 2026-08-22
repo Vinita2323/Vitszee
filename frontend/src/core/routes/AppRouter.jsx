@@ -27,6 +27,7 @@ const CategoriesPage = lazy(() => import('../../modules/customer/pages/Categorie
 const CategoryProductsPage = lazy(() => import('../../modules/customer/pages/CategoryProductsPage'));
 const WishlistPage = lazy(() => import('../../modules/customer/pages/WishlistPage'));
 const OffersPage = lazy(() => import('../../modules/customer/pages/OffersPage'));
+const LowestPricePage = lazy(() => import('../../modules/customer/pages/LowestPricePage'));
 const ShopByStorePage = lazy(() => import('../../modules/customer/pages/ShopByStorePage'));
 const ProfilePage = lazy(() => import('../../modules/customer/pages/ProfilePage'));
 const OrdersPage = lazy(() => import('../../modules/customer/pages/OrdersPage'));
@@ -160,6 +161,7 @@ const AppRouter = () => {
                         { path: 'privacy', element: <PrivacyPage /> },
                         { path: 'about', element: <AboutPage /> },
                         { path: 'offers', element: <OffersPage /> },
+                        { path: 'lowest-price', element: <LowestPricePage /> },
                         { path: 'shop-by-store', element: <ShopByStorePage /> },
                         { path: 'wishlist', element: <ProtectedRoute><WishlistPage /></ProtectedRoute> },
                         { path: 'orders', element: <ProtectedRoute><OrdersPage /></ProtectedRoute> },
