@@ -158,6 +158,7 @@ const EMPTY_HERO_CONFIG = {
 const homePageDataCache = new Map();
 const headerSectionsMemoryCache = {};
 const heroConfigMemoryCache = {};
+const headerProductsMemoryCache = {};
 
 const getHomePageDataCacheKey = (location) => {
   const lat = Number(location?.latitude);
@@ -194,9 +195,12 @@ const Home = () => {
   }, []);
 
   const [categories, setCategories] = useState(() => cachedHomePageData?.categories || [ALL_CATEGORY]);
+  const [allDbCategories, setAllDbCategories] = useState(() => cachedHomePageData?.allDbCategories || []);
   const [activeCategory, setActiveCategory] = useState(() => cachedHomePageData?.activeCategory || ALL_CATEGORY);
   const [products, setProducts] = useState(() => cachedHomePageData?.products || []);
   const productsRef = useRef(cachedHomePageData?.products || []);
+  const [headerProducts, setHeaderProducts] = useState([]);
+  const [isHeaderLoading, setIsHeaderLoading] = useState(false);
   const [quickCategories, setQuickCategories] = useState(() => cachedHomePageData?.quickCategories || []);
   const [isLoading, setIsLoading] = useState(() => !cachedHomePageData);
   const [experienceSections, setExperienceSections] = useState(() => cachedHomePageData?.experienceSections || []);
@@ -205,7 +209,6 @@ const Home = () => {
   const [mobileBannerIndex, setMobileBannerIndex] = useState(0);
   const [isInstantBannerJump, setIsInstantBannerJump] = useState(false);
   const [categoryMap, setCategoryMap] = useState(() => cachedHomePageData?.categoryMap || {});
-  const [subcategoryMap, setSubcategoryMap] = useState(() => cachedHomePageData?.subcategoryMap || {});
   const [pendingReturn, setPendingReturn] = useState(null);
   const [offerSections, setOfferSections] = useState(() => cachedHomePageData?.offerSections || []);
   const [lowestPriceSection, setLowestPriceSection] = useState(() => cachedHomePageData?.lowestPriceSection || null);
@@ -224,8 +227,8 @@ const Home = () => {
   const applyHomePageData = (data, { cacheKey, persist = true } = {}) => {
     if (!data) return;
     setCategoryMap(data.categoryMap || {});
-    setSubcategoryMap(data.subcategoryMap || {});
     setCategories(data.categories || [ALL_CATEGORY]);
+    if (data.allDbCategories) setAllDbCategories(data.allDbCategories);
     setQuickCategories(data.quickCategories || []);
     setProducts(data.products || []);
     setExperienceSections(data.experienceSections || []);
@@ -279,17 +282,16 @@ const Home = () => {
         offerSections: [],
         lowestPriceSection: lowestPriceRes?.data?.result || null,
         categoryMap: {},
-        subcategoryMap: {},
         formattedHeaders: [],
+        allDbCategories: [],
         heroConfig: heroConfigMemoryCache.__home__ || EMPTY_HERO_CONFIG,
       };
       if (catRes.data.success) {
         const dbCats = catRes.data.results || catRes.data.result || [];
+        nextHomeData.allDbCategories = dbCats;
         const catMap = {};
-        const subMap = {};
-        dbCats.forEach((c) => { if (c.type === "category") catMap[c._id] = c; else if (c.type === "subcategory") subMap[c._id] = c; });
+        dbCats.forEach((c) => { if (c.type === "category") catMap[c._id] = c; });
         nextHomeData.categoryMap = catMap;
-        nextHomeData.subcategoryMap = subMap;
         const formattedHeaders = (headerCategoriesRes?.data?.result || []).map((mapping) => {
           const cat = mapping.categoryId || {};
           const catName = mapping.customName || cat.name || "Unknown";
@@ -342,14 +344,16 @@ const Home = () => {
   useEffect(() => { fetchData(); }, [currentLocation?.latitude, currentLocation?.longitude]);
   const headerSectionsCache = useRef(headerSectionsMemoryCache);
   const heroConfigCache = useRef(heroConfigMemoryCache);
+  const headerProductsCache = useRef(headerProductsMemoryCache);
 
+  // Fetch header-specific experience sections
   useEffect(() => {
     const fetchHeaderSections = async () => {
-      if (!activeCategory || activeCategory._id === "all") { setHeaderSections([]); return; }
-      const cacheKey = activeCategory._id;
+      if (!activeCategory || activeCategory._id === "all" || activeCategory.id === "all") { setHeaderSections([]); return; }
+      const cacheKey = activeCategory._id || activeCategory.id;
       if (headerSectionsCache.current[cacheKey]) { setHeaderSections(headerSectionsCache.current[cacheKey]); return; }
       try {
-        const res = await customerApi.getExperienceSections({ pageType: "header", headerId: activeCategory._id });
+        const res = await customerApi.getExperienceSections({ pageType: "header", headerId: activeCategory._id || activeCategory.id });
         if (res.data.success) { const sections = Array.isArray(res.data.result || res.data.results) ? (res.data.result || res.data.results) : []; headerSectionsCache.current[cacheKey] = sections; setHeaderSections(sections); await hydrateSelectedSectionProducts(sections); }
         else setHeaderSections([]);
       } catch (e) { setHeaderSections([]); }
@@ -357,14 +361,16 @@ const Home = () => {
     fetchHeaderSections();
   }, [activeCategory]);
 
+  // Fetch header-specific hero banner config
   useEffect(() => {
     const fetchHeroConfig = async () => {
       try {
-        const isHeader = activeCategory && activeCategory._id !== "all";
-        const cacheKey = isHeader ? activeCategory._id : "__home__";
+        const isHeader = activeCategory && activeCategory._id !== "all" && activeCategory.id !== "all";
+        const headerKey = activeCategory?._id || activeCategory?.id;
+        const cacheKey = isHeader ? headerKey : "__home__";
         if (heroConfigCache.current[cacheKey]) { setHeroConfig(heroConfigCache.current[cacheKey]); return; }
         let payload = null;
-        if (isHeader) { const res = await customerApi.getHeroConfig({ pageType: "header", headerId: activeCategory._id }); if (res.data?.success && res.data?.result) payload = res.data.result; }
+        if (isHeader) { const res = await customerApi.getHeroConfig({ pageType: "header", headerId: headerKey }); if (res.data?.success && res.data?.result) payload = res.data.result; }
         if (!payload || (payload.banners?.items?.length === 0 && !payload.categoryIds?.length)) { const homeRes = await customerApi.getHeroConfig({ pageType: "home" }); if (homeRes.data?.success && homeRes.data?.result) payload = homeRes.data.result; }
         const resolved = payload && (payload.banners?.items?.length > 0 || payload.categoryIds?.length > 0) ? { banners: payload.banners || { items: [] }, categoryIds: payload.categoryIds || [] } : { banners: { items: [] }, categoryIds: [] };
         heroConfigCache.current[cacheKey] = resolved;
@@ -373,6 +379,79 @@ const Home = () => {
       } catch (e) { setHeroConfig(EMPTY_HERO_CONFIG); }
     };
     fetchHeroConfig();
+  }, [activeCategory, currentLocation?.latitude, currentLocation?.longitude]);
+
+  // Fetch all products of the specific header category
+  useEffect(() => {
+    const isHeader = activeCategory && activeCategory._id !== "all" && activeCategory.id !== "all";
+    if (!isHeader) {
+      setHeaderProducts([]);
+      setIsHeaderLoading(false);
+      return;
+    }
+
+    const fetchHeaderProducts = async () => {
+      const headerKey = activeCategory._id || activeCategory.id;
+      const cacheKey = `${headerKey}:${currentLocation?.latitude || ""}:${currentLocation?.longitude || ""}`;
+      if (headerProductsCache.current[cacheKey]) {
+        setHeaderProducts(headerProductsCache.current[cacheKey]);
+        setIsHeaderLoading(false);
+        return;
+      }
+
+      setIsHeaderLoading(true);
+      try {
+        const hasValidLocation =
+          Number.isFinite(currentLocation?.latitude) &&
+          Number.isFinite(currentLocation?.longitude);
+
+        const params = {
+          headerId: headerKey,
+          limit: 100,
+        };
+        if (hasValidLocation) {
+          params.lat = currentLocation.latitude;
+          params.lng = currentLocation.longitude;
+        }
+
+        const res = await customerApi.getProducts(params);
+        if (res.data?.success) {
+          const rawResult = res.data.result;
+          const dbProds = Array.isArray(res.data.results)
+            ? res.data.results
+            : Array.isArray(rawResult?.items)
+            ? rawResult.items
+            : Array.isArray(rawResult)
+            ? rawResult
+            : [];
+
+          const formatted = dbProds.map((p) => ({
+            ...p,
+            id: p._id,
+            image:
+              p.mainImage ||
+              p.image ||
+              "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=400&h=400",
+            price: p.salePrice || p.price,
+            originalPrice: p.price,
+            weight: p.weight || "1 unit",
+            deliveryTime: "8-15 mins",
+          }));
+
+          headerProductsCache.current[cacheKey] = formatted;
+          setHeaderProducts(formatted);
+        } else {
+          setHeaderProducts([]);
+        }
+      } catch (err) {
+        console.error("Error fetching header products:", err);
+        setHeaderProducts([]);
+      } finally {
+        setIsHeaderLoading(false);
+      }
+    };
+
+    fetchHeaderProducts();
   }, [activeCategory, currentLocation?.latitude, currentLocation?.longitude]);
 
   useEffect(() => {
@@ -393,12 +472,84 @@ const Home = () => {
   const handleBannerTransitionEnd = () => { if (mobileBannerIndex === 2) { setIsInstantBannerJump(true); setMobileBannerIndex(0); } };
   useEffect(() => { if (!isInstantBannerJump) return; const id = requestAnimationFrame(() => setIsInstantBannerJump(false)); return () => cancelAnimationFrame(id); }, [isInstantBannerJump]);
 
-  const productsById = useMemo(() => { const map = {}; products.forEach((p) => { map[p._id || p.id] = p; }); return map; }, [products]);
+  const productsById = useMemo(() => {
+    const map = {};
+    products.forEach((p) => { map[p._id || p.id] = p; });
+    headerProducts.forEach((p) => { map[p._id || p.id] = p; });
+    return map;
+  }, [products, headerProducts]);
+
+  const isAllTab = !activeCategory || activeCategory._id === "all" || activeCategory.id === "all";
+
   const effectiveQuickCategories = useMemo(() => {
+    // 1. If heroConfig explicitly configured categoryIds for this header
     const ids = heroConfig.categoryIds || [];
-    if (ids.length > 0) { const resolved = ids.map((id) => categoryMap[id]).filter(Boolean).map((c) => ({ id: c._id, name: c.name, image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png" })); if (resolved.length > 0) return resolved; }
+    if (ids.length > 0) {
+      const resolved = ids
+        .map((id) => categoryMap[id])
+        .filter(Boolean)
+        .map((c) => ({
+          id: c._id,
+          name: c.name,
+          image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png",
+        }));
+      if (resolved.length > 0) return resolved;
+    }
+
+    // 2. If on a specific header category, find all categories belonging to this header
+    if (!isAllTab && activeCategory) {
+      const headerIdStr = String(activeCategory._id || activeCategory.id);
+      const childCategories = (allDbCategories || []).filter(
+        (cat) =>
+          cat.type === "category" &&
+          cat.status === "active" &&
+          (String(cat.parentId) === headerIdStr ||
+            String(cat.parentId?._id) === headerIdStr ||
+            String(cat.headerId) === headerIdStr ||
+            String(cat.headerId?._id) === headerIdStr)
+      );
+      if (childCategories.length > 0) {
+        return childCategories.map((cat) => ({
+          id: cat._id,
+          name: cat.name,
+          image: cat.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png",
+        }));
+      }
+    }
+
     return quickCategories;
-  }, [heroConfig.categoryIds, categoryMap, quickCategories]);
+  }, [heroConfig.categoryIds, categoryMap, quickCategories, isAllTab, activeCategory, allDbCategories]);
+
+  const effectiveLowestPriceProducts = useMemo(() => {
+    if (isAllTab) {
+      return (
+        lowestPriceSection?.products?.length > 0
+          ? lowestPriceSection.products
+          : products
+      );
+    }
+
+    const headerIdStr = String(activeCategory?._id || activeCategory?.id || "");
+    const lpProducts = lowestPriceSection?.products || [];
+    const matched = lpProducts.filter(
+      (p) =>
+        String(p.headerId?._id || p.headerId) === headerIdStr ||
+        String(p.categoryId?.parentId || p.categoryId?.parentId?._id) === headerIdStr
+    );
+    if (matched.length > 0) return matched;
+
+    if (headerProducts.length > 0) {
+      return [...headerProducts]
+        .sort((a, b) => {
+          const discA = Number(a.originalPrice || a.price || 0) - Number(a.price || 0);
+          const discB = Number(b.originalPrice || b.price || 0) - Number(b.price || 0);
+          return discB - discA;
+        })
+        .slice(0, 12);
+    }
+
+    return [];
+  }, [isAllTab, activeCategory, lowestPriceSection, products, headerProducts]);
 
   const sectionsForRenderer = headerSections.length ? headerSections : experienceSections;
   const isMobile = useMemo(() => isMobileOrWebView(), []);
@@ -416,16 +567,16 @@ const Home = () => {
 
   const renderFloatingElements = (type, isVisible = true) => {
     if (isMobile) return null;
-    return null; // Particles were already simplified out earlier
+    return null;
   };
 
   return (
-    <div className={`min-h-screen pt-[200px] md:pt-[225px] ${products.length === 0 && !isLoading ? "bg-white" : "bg-[#F5F7F8]"}`}>
+    <div className={`min-h-screen pt-[200px] md:pt-[152px] ${products.length === 0 && !isLoading && isAllTab ? "bg-white" : "bg-[#F5F7F8]"}`}>
       <div className={cn("contents", isProductDetailOpen && "hidden md:contents")}>
         <MainLocationHeader categories={categories} activeCategory={activeCategory} onCategorySelect={setActiveCategory} />
       </div>
 
-      {products.length === 0 && !isLoading ? (
+      {products.length === 0 && !isLoading && isAllTab ? (
         <div className="flex flex-col items-center justify-center pt-24 pb-48">
           <div className="w-64 h-64 md:w-96 md:h-96 mb-8">{noServiceData && <Lottie animationData={noServiceData} loop={true} />}</div>
           <h3 className="text-3xl md:text-5xl font-black text-slate-800 text-center uppercase">Service <span className="text-primary">Unavailable</span></h3>
@@ -434,9 +585,10 @@ const Home = () => {
         </div>
       ) : (
         <>
-          <motion.div ref={heroRef} className="block md:hidden will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
+          {/* Banners */}
+          <motion.div ref={heroRef} className="block will-change-transform max-w-7xl mx-auto" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
             {heroConfig?.banners?.items?.length > 0 ? (
-              <div className="mt-4 mb-2">
+              <div className="mt-2 md:mt-1 mb-2">
                 <ExperienceBannerCarousel items={heroConfig.banners.items} />
               </div>
             ) : (
@@ -458,29 +610,94 @@ const Home = () => {
             )}
           </motion.div>
 
+          {/* Shop by Category */}
           <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
+
+          {/* Lowest Price Ever Section */}
           {lowestPriceSection ? (
-            lowestPriceSection.isActive !== false && (
+            lowestPriceSection.isActive !== false && effectiveLowestPriceProducts.length > 0 && (
               <LowestPriceSection
                 title={lowestPriceSection.title || "Lowest Price ever"}
                 subtitle={lowestPriceSection.subtitle || "Unbeatable Savings • Updated hourly"}
-                products={
-                  lowestPriceSection.products?.length > 0
-                    ? lowestPriceSection.products
-                    : products
-                }
+                products={effectiveLowestPriceProducts}
                 onSeeAll={() => navigate("/lowest-price")}
               />
             )
           ) : (
-            <LowestPriceSection products={products} onSeeAll={() => navigate("/lowest-price")} />
+            effectiveLowestPriceProducts.length > 0 && (
+              <LowestPriceSection products={effectiveLowestPriceProducts} onSeeAll={() => navigate("/lowest-price")} />
+            )
           )}
-          <OfferSections sections={offerSections} noServiceData={noServiceData} />
 
-          {sectionsForRenderer.length > 0 && (
-            <div className="container mx-auto px-4 md:px-8 lg:px-[50px] py-10 md:py-16">
-              <SectionRenderer sections={sectionsForRenderer} productsById={productsById} categoriesById={categoryMap} subcategoriesById={subcategoryMap} />
-            </div>
+          {/* ALL Tab specific sections */}
+          {isAllTab && (
+            <>
+              <OfferSections sections={offerSections} noServiceData={noServiceData} />
+              {sectionsForRenderer.length > 0 && (
+                <div className="w-full px-4 md:px-6 lg:px-8 py-6 md:py-10">
+                  <SectionRenderer sections={sectionsForRenderer} productsById={productsById} categoriesById={categoryMap} />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Specific Header Category Tab (e.g. Grocery, Beauty, Electronics) */}
+          {!isAllTab && (
+            <>
+              {/* Header Experience Sections (if any configured for this category) */}
+              {headerSections.length > 0 && (
+                <div className="w-full px-4 md:px-6 lg:px-8 py-4 md:py-6">
+                  <SectionRenderer sections={headerSections} productsById={productsById} categoriesById={categoryMap} />
+                </div>
+              )}
+
+              {/* ALL Products Section for this Header Category */}
+              <div className="w-full px-4 md:px-6 lg:px-8 mt-6 mb-16">
+                <div className="flex justify-between items-end mb-4 px-1 md:px-0">
+                  <div>
+                    <h2 className="text-[18px] sm:text-[20px] font-bold tracking-tight text-[#1A4516] leading-none uppercase">
+                      All Products
+                    </h2>
+                    <p className="text-[11px] sm:text-[12px] text-slate-500 font-medium mt-1">
+                      Explore all items in {activeCategory?.name || "this category"}
+                    </p>
+                  </div>
+                  {!isHeaderLoading && (
+                    <span className="text-[11px] sm:text-[12px] font-bold text-[#1A4516] bg-[#1A4516]/10 px-3 py-1 rounded-full">
+                      {headerProducts.length} {headerProducts.length === 1 ? "Product" : "Products"}
+                    </span>
+                  )}
+                </div>
+
+                {isHeaderLoading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="h-64 bg-slate-100 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : headerProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    {headerProducts.map((product) => (
+                      <ProductCard
+                        key={product.id || product._id}
+                        product={product}
+                        className="bg-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.08)] hover:shadow-md transition-shadow"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-2xl border border-slate-100 shadow-sm my-4">
+                    <div className="w-12 h-12 rounded-full bg-[#1A4516]/10 flex items-center justify-center text-[#1A4516] mb-3 font-bold text-lg">
+                      🛍️
+                    </div>
+                    <h4 className="text-base font-bold text-slate-800">No products available</h4>
+                    <p className="text-xs text-slate-500 max-w-xs mt-1">
+                      We couldn't find any products in {activeCategory?.name || "this category"} right now.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </>
       )}

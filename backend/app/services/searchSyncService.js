@@ -186,6 +186,10 @@ export async function startSearchIndexWorker() {
   
   try {
     const queue = getSearchIndexQueue();
+    if (!queue) {
+      logger.info("[SearchSync] Redis not available, search index worker not started");
+      return;
+    }
     
     // Process jobs
     queue.process("index", 5, processSearchIndexJob); // 5 concurrent index jobs

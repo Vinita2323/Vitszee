@@ -9,35 +9,52 @@ import React, {
 import { customerApi } from "../services/customerApi";
 import { hasValidStoredAuthToken } from "@core/utils/authStorage";
 import { getJSON, setJSON, STORAGE_KEYS } from "@core/utils/storage";
+import {
+  reverseGeocodeLatLng,
+  getCurrentPosition,
+} from "@/core/utils/addressUtils";
 
 const LocationContext = createContext(undefined);
 const STORAGE_KEY = STORAGE_KEYS.LOCATION;
-// 30 days — refresh the cached coordinates if a user comes back to a stale tab
-// after roughly a month so we don't keep serving locations from a previous
-// address indefinitely.
-const LOCATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const LOCATION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export const LocationProvider = ({ children }) => {
-  // Default location (used until we can resolve a better one)
-  const [currentLocation, setCurrentLocation] = useState({
-    name: "169, 507, Corporate House, RNT Marg, Near Central Mall, Flim Colony, South Tukoganj, Indore, Madhya Pradesh 452001, India",
-    time: "12-15 mins",
-    city: "Indore",
-    state: "Madhya Pradesh",
-    pincode: "452001",
-    latitude: 22.71760605465747,
-    longitude: 75.87197264240304,
+  // Initialize with cached location from storage if available
+  const [currentLocation, setCurrentLocation] = useState(() => {
+    const cached = getJSON(STORAGE_KEY);
+    if (
+      cached &&
+      (cached.address || cached.name) &&
+      typeof cached.latitude === "number" &&
+      typeof cached.longitude === "number"
+    ) {
+      return {
+        name: cached.address || cached.name,
+        time: cached.time || "12-15 mins",
+        city: cached.city || "Indore",
+        state: cached.state || "Madhya Pradesh",
+        pincode: cached.pincode || "452001",
+        latitude: cached.latitude,
+        longitude: cached.longitude,
+      };
+    }
+    return {
+      name: "169, 507, Corporate House, RNT Marg, Near Central Mall, Film Colony, South Tukoganj, Indore, Madhya Pradesh 452001, India",
+      time: "12-15 mins",
+      city: "Indore",
+      state: "Madhya Pradesh",
+      pincode: "452001",
+      latitude: 22.71760605465747,
+      longitude: 75.87197264240304,
+    };
   });
 
-  // Address list for drawer UI – will be hydrated from profile API.
+  // Address list for drawer UI – hydrated from profile API
   const [savedAddresses, setSavedAddresses] = useState([]);
-
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
 
-  // Update the current location.
-  // By default this does NOT change saved addresses; only explicit
-  // address actions should touch the saved list.
+  // Update the current location and persist to storage
   const updateLocation = (
     newLoc,
     { persist = true, updateSavedHome = false } = {},
@@ -60,8 +77,7 @@ export const LocationProvider = ({ children }) => {
         pincode: newLoc.pincode,
         latitude: newLoc.latitude,
         longitude: newLoc.longitude,
-        // Internal app properties
-        time: newLoc.time,
+        time: newLoc.time || "12-15 mins",
       };
       setJSON(STORAGE_KEY, payload, { ttlMs: LOCATION_TTL_MS });
     }
@@ -80,174 +96,58 @@ export const LocationProvider = ({ children }) => {
     ]);
   };
 
-  // Resolve location once using browser geolocation + Google Maps Geocoding.
-  // Must be called directly from a user gesture (click/tap) for the browser to show the permission prompt.
-  const fetchAndCacheLocation = () =>
-    new Promise((resolve) => {
-      if (
-        typeof window === "undefined" ||
-        !("navigator" in window) ||
-        !navigator.geolocation
-      ) {
-        resolve({
-          ok: false,
-          error: "Geolocation is not supported on this device",
-        });
-        return;
+  // Resolve location once using browser geolocation + reverse-geocoding
+  const fetchAndCacheLocation = useCallback(async () => {
+    setIsFetchingLocation(true);
+    setLocationError(null);
+
+    try {
+      // High-accuracy GPS detect
+      const pos = await getCurrentPosition();
+      const latitude = pos.latitude;
+      const longitude = pos.longitude;
+
+      try {
+        const normalized = await reverseGeocodeLatLng(latitude, longitude);
+        const liveLocation = {
+          name: normalized.formattedAddress || `Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}`,
+          time: "12-15 mins",
+          city: normalized.city || "Indore",
+          state: normalized.state || "Madhya Pradesh",
+          pincode: normalized.pincode || "452001",
+          latitude,
+          longitude,
+        };
+        updateLocation(liveLocation, { persist: true, updateSavedHome: false });
+        return { ok: true, location: liveLocation };
+      } catch (geocodeErr) {
+        // Fallback to coordinates
+        const fallbackLocation = {
+          name: `Lat ${Number(latitude).toFixed(5)}, Lng ${Number(longitude).toFixed(5)}`,
+          time: "12-15 mins",
+          city: currentLocation?.city || "Indore",
+          state: currentLocation?.state || "Madhya Pradesh",
+          pincode: currentLocation?.pincode || "452001",
+          latitude,
+          longitude,
+        };
+        updateLocation(fallbackLocation, { persist: true, updateSavedHome: false });
+        return {
+          ok: true,
+          location: fallbackLocation,
+          warning: geocodeErr?.message || "Address geocoding unavailable",
+        };
       }
-
-      setIsFetchingLocation(true);
-      setLocationError(null);
-
-      const fallbackFromCoords = (latitude, longitude) => ({
-        name: `Lat ${Number(latitude).toFixed(5)}, Lng ${Number(longitude).toFixed(5)}`,
-        time: "12-15 mins",
-        city: currentLocation?.city || "Indore",
-        state: currentLocation?.state || "Madhya Pradesh",
-        pincode: currentLocation?.pincode || "452018",
-        latitude,
-        longitude,
-      });
-
-      const handleLocationSuccess = async (latitude, longitude) => {
-        try {
-          // Always succeed with coordinates (needed for delivery fee calculation),
-          // even if reverse geocoding fails (key missing / quota / restrictions).
-          let liveLocation = fallbackFromCoords(latitude, longitude);
-
-          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-          if (apiKey) {
-            const params = new URLSearchParams({
-              latlng: `${latitude},${longitude}`,
-              key: apiKey,
-            });
-
-            const response = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`,
-            );
-
-            if (!response.ok) {
-              throw new Error("Failed to fetch address from Google Maps");
-            }
-
-            const data = await response.json();
-
-            // Handle Google Geocoding API error responses
-            if (data.status === "REQUEST_DENIED") {
-              const msg =
-                data.error_message ||
-                "Geocoding API rejected (check API key restrictions)";
-              throw new Error(msg);
-            }
-            if (data.status === "OVER_QUERY_LIMIT") {
-              throw new Error("Geocoding API quota exceeded");
-            }
-            if (!data.results || data.results.length === 0) {
-              throw new Error(
-                data.error_message || "No address found for current location",
-              );
-            }
-
-            const components = data.results[0].address_components || [];
-
-            const getComponent = (types) =>
-              components.find((c) => types.every((t) => c.types.includes(t)))
-                ?.long_name;
-
-            // Build address from components to match: "214, Rajshri Palace Colony, Pipliyahana, Indore, Madhya Pradesh 452018, India"
-            const premise = getComponent(["premise"]);
-            const neighborhood = getComponent(["neighborhood"]);
-            const sublocality = getComponent([
-              "sublocality_level_1",
-              "sublocality",
-            ]);
-            const locality = getComponent(["locality"]);
-            const state = getComponent(["administrative_area_level_1"]);
-            const pincode = getComponent(["postal_code"]);
-            const country = getComponent(["country"]);
-
-            const displayParts = [];
-            if (premise) displayParts.push(premise);
-            if (neighborhood) displayParts.push(neighborhood);
-            if (sublocality && sublocality !== neighborhood)
-              displayParts.push(sublocality);
-            if (locality) displayParts.push(locality);
-
-            let statePincode = "";
-            if (state) statePincode += state;
-            if (pincode) statePincode += (statePincode ? " " : "") + pincode;
-            if (statePincode) displayParts.push(statePincode);
-
-            if (country) displayParts.push(country);
-
-            const friendlyName =
-              displayParts.join(", ") || data.results[0].formatted_address;
-
-            liveLocation = {
-              name: friendlyName,
-              time: "12-15 mins",
-              city: locality || liveLocation.city,
-              state: state || liveLocation.state,
-              pincode: pincode || liveLocation.pincode,
-              latitude: latitude,
-              longitude: longitude,
-            };
-          }
-
-          updateLocation(liveLocation, {
-            persist: true,
-            updateSavedHome: false,
-          });
-          resolve({ ok: true, location: liveLocation });
-        } catch (err) {
-          const loc = fallbackFromCoords(latitude, longitude);
-          updateLocation(loc, { persist: true, updateSavedHome: false });
-          resolve({
-            ok: true,
-            location: loc,
-            warning: err?.message || "Unable to fetch address",
-          });
-        } finally {
-          setIsFetchingLocation(false);
-        }
-      };
-
-      const handleLocationError = (error) => {
-        const message = typeof error === 'string' ? error : (error.message || "Location permission denied");
-        setLocationError(message);
-        setIsFetchingLocation(false);
-        resolve({ ok: false, error: message });
-      };
-
-      // Native Flutter Bridge
-      if (window.Flutter) {
-        import("../../../lib/appZetoBridge").then(async (m) => {
-          const AppZetoBridge = m.default;
-          const coords = await AppZetoBridge.getLocation();
-          if (coords && coords.lat && coords.lng) {
-            handleLocationSuccess(coords.lat, coords.lng);
-          } else {
-            handleLocationError("Native location failed");
-          }
-        }).catch(() => handleLocationError("Bridge not found"));
-        return;
-      }
-
-      // Standard Browser Geolocation
-      navigator.geolocation.getCurrentPosition(
-        (position) => handleLocationSuccess(position.coords.latitude, position.coords.longitude),
-        handleLocationError,
-        {
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 0,
-        },
-      );
-    });
+    } catch (err) {
+      const msg = err.message || "Unable to retrieve your location";
+      setLocationError(msg);
+      return { ok: false, error: msg };
+    } finally {
+      setIsFetchingLocation(false);
+    }
+  }, [currentLocation?.city, currentLocation?.pincode, currentLocation?.state]);
 
   const refreshAddresses = useCallback(async () => {
-    // Skip if user is not logged in – getProfile would 401 and trigger axios reload loop
     if (!hasValidStoredAuthToken("auth_customer")) return;
     try {
       const { data } = await customerApi.getProfile();
@@ -283,40 +183,31 @@ export const LocationProvider = ({ children }) => {
     }
   }, []);
 
-  // On mount: hydrate saved addresses from profile (only when customer is logged in)
+  // Hydrate saved addresses from profile on mount
   useEffect(() => {
     refreshAddresses();
   }, [refreshAddresses]);
 
-  // On mount: force static location to match seller location
-  useEffect(() => {
-    const staticSellerLocation = {
-      name: "169, 507, Corporate House, RNT Marg, Near Central Mall, Flim Colony, South Tukoganj, Indore, Madhya Pradesh 452001, India",
-      time: "12-15 mins",
-      city: "Indore",
-      state: "Madhya Pradesh",
-      pincode: "452001",
-      latitude: 22.71760605465747,
-      longitude: 75.87197264240304,
-    };
-    updateLocation(staticSellerLocation, {
-      persist: true,
-      updateSavedHome: false,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const locationValue = useMemo(() => ({
-    currentLocation,
-    savedAddresses,
-    updateLocation,
-    addAddress,
-    refreshAddresses,
-    isFetchingLocation,
-    locationError,
-    refreshLocation: fetchAndCacheLocation,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [currentLocation, savedAddresses, isFetchingLocation, locationError, refreshAddresses]);
+  const locationValue = useMemo(
+    () => ({
+      currentLocation,
+      savedAddresses,
+      updateLocation,
+      addAddress,
+      refreshAddresses,
+      isFetchingLocation,
+      locationError,
+      refreshLocation: fetchAndCacheLocation,
+    }),
+    [
+      currentLocation,
+      savedAddresses,
+      isFetchingLocation,
+      locationError,
+      refreshAddresses,
+      fetchAndCacheLocation,
+    ],
+  );
 
   return (
     <LocationContext.Provider value={locationValue}>

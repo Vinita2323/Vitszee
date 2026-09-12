@@ -180,14 +180,6 @@ async function seedCoreData() {
     status: "active",
   });
 
-  const subcategory = await Category.create({
-    name: `Subcategory ${suffix}`,
-    slug: `subcategory-${suffix}`,
-    type: "subcategory",
-    parentId: category._id,
-    status: "active",
-  });
-
   const product = await Product.create({
     name: "E2E Apple Box",
     slug: `e2e-apple-${suffix}`,
@@ -198,7 +190,6 @@ async function seedCoreData() {
     stock: 50,
     headerId: header._id,
     categoryId: category._id,
-    subcategoryId: subcategory._id,
     sellerId: seller._id,
     status: "active",
   });

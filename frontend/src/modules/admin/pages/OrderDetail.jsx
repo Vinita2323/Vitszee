@@ -38,8 +38,21 @@ const OrderDetail = () => {
     const { showToast } = useToast();
     const { settings } = useSettings();
     const [order, setOrder] = useState(null);
+    const [shipment, setShipment] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isShipmentActionLoading, setIsShipmentActionLoading] = useState(false);
     const invoiceRef = useRef(null);
+
+    const fetchShipment = async () => {
+        try {
+            const res = await adminApi.getShadowfaxShipmentDetail(orderId);
+            if (res.data?.success && res.data?.result) {
+                setShipment(res.data.result);
+            }
+        } catch {
+            setShipment(null);
+        }
+    };
 
     const fetchDetail = async () => {
         setIsLoading(true);
@@ -48,10 +61,51 @@ const OrderDetail = () => {
             if (response.data.success) {
                 setOrder(response.data.result);
             }
+            await fetchShipment();
         } catch (error) {
             showToast("Failed to load order details", "error");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCreateShadowfaxShipment = async () => {
+        setIsShipmentActionLoading(true);
+        try {
+            await adminApi.createShadowfaxForwardOrder(orderId);
+            showToast("Shadowfax shipment created successfully!", "success");
+            await fetchShipment();
+            await fetchDetail();
+        } catch (err) {
+            showToast(err.response?.data?.message || err.message || "Failed to create Shadowfax shipment", "error");
+        } finally {
+            setIsShipmentActionLoading(false);
+        }
+    };
+
+    const handleMarkDispatchReady = async () => {
+        setIsShipmentActionLoading(true);
+        try {
+            await adminApi.markShadowfaxDispatchReady(orderId);
+            showToast("Order marked Ready for Dispatch with Shadowfax", "success");
+            await fetchShipment();
+        } catch (err) {
+            showToast(err.response?.data?.message || "Failed to mark dispatch ready", "error");
+        } finally {
+            setIsShipmentActionLoading(false);
+        }
+    };
+
+    const handleRefreshTracking = async () => {
+        setIsShipmentActionLoading(true);
+        try {
+            await adminApi.trackShadowfaxShipment(orderId);
+            showToast("Tracking status synced with Shadowfax", "success");
+            await fetchShipment();
+        } catch (err) {
+            showToast(err.response?.data?.message || "Failed to refresh tracking", "error");
+        } finally {
+            setIsShipmentActionLoading(false);
         }
     };
 
@@ -302,6 +356,81 @@ const OrderDetail = () => {
                                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">OWNER: {order.seller?.name}</p>
                             </div>
                         </div>
+                    </Card>
+
+                    {/* Shadowfax Logistics Card */}
+                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+                                <Truck className="h-4 w-4 text-primary" />
+                                Delivery Provider: {shipment?.deliveryProvider === 'shadowfax' ? 'Shadowfax' : 'Internal Captain'}
+                            </h3>
+                            {shipment?.awbNumber && (
+                                <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700">
+                                    AWB: {shipment.awbNumber}
+                                </Badge>
+                            )}
+                        </div>
+
+                        {shipment ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl text-left">
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Provider Status</p>
+                                        <p className="text-xs font-black text-slate-800 capitalize mt-0.5">{shipment.providerStatus || shipment.shipmentStatus}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Internal Status</p>
+                                        <p className="text-xs font-black text-primary capitalize mt-0.5">{shipment.shipmentStatus}</p>
+                                    </div>
+                                    {shipment.rider?.name && (
+                                        <div className="col-span-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                                            <div>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Assigned Rider</p>
+                                                <p className="text-xs font-black text-slate-800">{shipment.rider.name}</p>
+                                            </div>
+                                            {shipment.rider.phone && (
+                                                <span className="text-xs font-bold text-slate-600">{shipment.rider.phone}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        disabled={isShipmentActionLoading}
+                                        onClick={handleRefreshTracking}
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        Refresh Tracking
+                                    </button>
+                                    {shipment.shipmentStatus === 'ORDER_CREATED' && (
+                                        <button
+                                            type="button"
+                                            disabled={isShipmentActionLoading}
+                                            onClick={handleMarkDispatchReady}
+                                            className="px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                                        >
+                                            Mark Ready for Dispatch
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-slate-50 rounded-xl text-left space-y-3">
+                                <p className="text-xs text-slate-500">No Shadowfax shipment registered for this order yet.</p>
+                                <button
+                                    type="button"
+                                    disabled={isShipmentActionLoading}
+                                    onClick={handleCreateShadowfaxShipment}
+                                    className="px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    <Truck className="h-3.5 w-3.5" />
+                                    Dispatch with Shadowfax
+                                </button>
+                            </div>
+                        )}
                     </Card>
 
                     {/* Logistical Nodes */}

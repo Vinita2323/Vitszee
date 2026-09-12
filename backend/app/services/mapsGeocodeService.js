@@ -262,3 +262,120 @@ export async function geocodePlaceId(placeId) {
 
   return result;
 }
+
+function cacheKeyLatLng(lat, lng) {
+  const rLat = Number(lat).toFixed(5);
+  const rLng = Number(lng).toFixed(5);
+  const raw = `geocode:v2:latlng:${rLat}:${rLng}`;
+  const h = crypto.createHash("sha1").update(raw).digest("hex");
+  return `geocode:v2:${h}`;
+}
+
+export async function reverseGeocode(lat, lng) {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (isNaN(nLat) || isNaN(nLng) || nLat < -90 || nLat > 90 || nLng < -180 || nLng > 180) {
+    const err = new Error("Valid lat and lng are required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    const err = new Error("Google Maps API key missing.");
+    err.statusCode = 500;
+    err.code = "MAPS_KEY_MISSING";
+    throw err;
+  }
+
+  const key = cacheKeyLatLng(nLat, nLng);
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      const cached = await redis.get(key);
+      if (cached) return JSON.parse(cached);
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const doc = await GeocodeCache.findOne({ key }).lean();
+    if (doc && doc.expiresAt && doc.expiresAt > new Date()) {
+      return {
+        lat: doc.lat,
+        lng: doc.lng,
+        formattedAddress: doc.formattedAddress || "",
+        placeId: doc.placeId || "",
+        types: Array.isArray(doc.types) ? doc.types : [],
+        addressComponents: doc.addressComponents || [],
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  const resp = await client.geocode({
+    params: { latlng: `${nLat},${nLng}`, key: apiKey },
+    timeout: 10000,
+  });
+
+  const status = resp.data?.status;
+  if (status && status !== "OK") {
+    const msg = resp.data?.error_message || status;
+    const err = new Error(`Reverse geocoding failed: ${msg}`);
+    err.statusCode = status === "ZERO_RESULTS" ? 404 : 502;
+    err.code = status;
+    throw err;
+  }
+
+  const results = resp.data?.results || [];
+  const first = results.find((r) => !r.types?.includes("plus_code")) || results[0];
+  if (!first) {
+    const err = new Error("Reverse geocoding returned no address");
+    err.statusCode = 404;
+    err.code = "ZERO_RESULTS";
+    throw err;
+  }
+
+  const result = {
+    lat: nLat,
+    lng: nLng,
+    formattedAddress: first.formatted_address || "",
+    placeId: first.place_id || "",
+    types: Array.isArray(first.types) ? first.types : [],
+    addressComponents: first.address_components || [],
+  };
+
+  const expiresAt = new Date(Date.now() + GEOCODE_CACHE_TTL_SEC() * 1000);
+
+  if (redis) {
+    try {
+      await redis.set(key, JSON.stringify(result), "EX", GEOCODE_CACHE_TTL_SEC());
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    await GeocodeCache.updateOne(
+      { key },
+      {
+        $set: {
+          lat: result.lat,
+          lng: result.lng,
+          formattedAddress: result.formattedAddress,
+          placeId: result.placeId,
+          types: result.types,
+          expiresAt,
+        },
+      },
+      { upsert: true },
+    );
+  } catch {
+    // ignore
+  }
+
+  return result;
+}

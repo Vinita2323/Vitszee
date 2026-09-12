@@ -44,6 +44,8 @@ import "../models/review.js";
 import "../models/seller.js";
 import "../models/ticket.js";
 import "../models/wishlist.js";
+import "../models/shipment.js";
+import "../models/webhookEventLog.js";
 
 // Finance models
 import "../models/financeAuditLog.js";
@@ -107,6 +109,8 @@ export const REQUIRED_MODELS = Object.freeze([
   "Cart",
   "Wishlist",
   "DeliveryAssignment",
+  "Shipment",
+  "WebhookEventLog",
   "Review",
 
   // Payments & ledger

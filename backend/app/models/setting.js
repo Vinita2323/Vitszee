@@ -178,6 +178,61 @@ const settingSchema = new mongoose.Schema(
                 default: false,
             },
         },
+        shadowfax: {
+            forwardEnabled: {
+                type: Boolean,
+                default: false,
+            },
+            reverseEnabled: {
+                type: Boolean,
+                default: false,
+            },
+            environment: {
+                type: String,
+                enum: ["sandbox", "production"],
+                default: "sandbox",
+            },
+            forwardBaseUrl: {
+                type: String,
+                default: "https://dale.staging.shadowfax.in",
+            },
+            reverseBaseUrl: {
+                type: String,
+                default: "https://dale.staging.shadowfax.in",
+            },
+            clientCode: {
+                type: String,
+                default: "",
+            },
+            forwardToken: {
+                type: String,
+                default: "",
+            },
+            reverseToken: {
+                type: String,
+                default: "",
+            },
+            autoServiceabilityCheck: {
+                type: Boolean,
+                default: true,
+            },
+            autoShipmentCreation: {
+                type: Boolean,
+                default: true,
+            },
+            autoDispatchReady: {
+                type: Boolean,
+                default: true,
+            },
+            qcEnabled: {
+                type: Boolean,
+                default: true,
+            },
+            reconciliationIntervalMinutes: {
+                type: Number,
+                default: 15,
+            },
+        },
     },
     {
         timestamps: true,

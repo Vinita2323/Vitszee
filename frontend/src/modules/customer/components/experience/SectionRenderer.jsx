@@ -4,7 +4,7 @@ import ProductCard from "../shared/ProductCard";
 import { cn } from "@/lib/utils";
 import ExperienceBannerCarousel from "./ExperienceBannerCarousel";
 import { setJSON, STORAGE_KEYS } from "@core/utils/storage";
-import { handleImageError, DEFAULT_CATEGORY_IMAGE } from "@/core/utils/imageUtils";
+import { handleImageError, DEFAULT_CATEGORY_IMAGE, applyCloudinaryTransform } from "@/core/utils/imageUtils";
 
 const rememberExperienceReturn = (headerId, sectionId) =>
   setJSON(
@@ -24,50 +24,43 @@ const LazyLoadTrigger = ({ enabled, onVisible }) => {
     const node = ref.current;
     if (!node) return undefined;
 
-    if (typeof IntersectionObserver === "undefined") {
-      onVisible();
-      return undefined;
-    }
-
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) onVisible();
-        });
+      ([entry]) => {
+        if (entry?.isIntersecting) onVisible();
       },
-      { root: null, rootMargin: LAZY_ROOT_MARGIN, threshold: 0.01 }
+      { rootMargin: LAZY_ROOT_MARGIN },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
   }, [enabled, onVisible]);
 
-  return <div ref={ref} className="h-2 w-full" aria-hidden="true" />;
+  return <div ref={ref} className="h-4 w-full" aria-hidden="true" />;
 };
 
-const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}, subcategoriesById = {} }) => {
+const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {} }) => {
   const navigate = useNavigate();
-  const [sectionVisibleCounts, setSectionVisibleCounts] = React.useState({});
-
-  const loadMoreForSection = React.useCallback((sectionKey, totalCount) => {
-    if (!sectionKey || totalCount <= 0) return;
-    setSectionVisibleCounts((prev) => {
-      const current = prev[sectionKey] ?? LAZY_CHUNK_SIZE;
-      if (current >= totalCount) return prev;
-      return {
-        ...prev,
-        [sectionKey]: Math.min(totalCount, current + LAZY_CHUNK_SIZE),
-      };
-    });
-  }, []);
+  const [visibleCounts, setVisibleCounts] = React.useState({});
 
   const resolveVisibleCount = React.useCallback(
-    (sectionKey, totalCount) => {
-      const current = sectionVisibleCounts[sectionKey] ?? LAZY_CHUNK_SIZE;
-      return Math.min(totalCount, current);
-    },
-    [sectionVisibleCounts]
+    (key, total) => visibleCounts[key] || Math.min(total, LAZY_CHUNK_SIZE),
+    [visibleCounts],
   );
+
+  const loadMoreForSection = React.useCallback(
+    (key, total) => {
+      setVisibleCounts((prev) => {
+        const current = prev[key] || Math.min(total, LAZY_CHUNK_SIZE);
+        return {
+          ...prev,
+          [key]: Math.min(total, current + LAZY_CHUNK_SIZE),
+        };
+      });
+    },
+    [],
+  );
+
+  if (!sections.length) return null;
 
   return (
     <div className="space-y-8">
@@ -89,12 +82,9 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
 
         if (section.displayType === "categories") {
           const ids = section.config?.categories?.categoryIds || [];
-          const rows = section.config?.categories?.rows || 1;
-          const visibleCount = rows * 4;
           const allItems = ids
             .map((id) => categoriesById[id])
-            .filter(Boolean)
-            .slice(0, visibleCount);
+            .filter(Boolean);
           const visibleItems = allItems.slice(
             0,
             resolveVisibleCount(sectionKey, allItems.length)
@@ -107,126 +97,43 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
             <div
               key={section._id || sectionKey}
               id={`section-${section._id}`}
-              className="-mx-2 md:-mx-4 lg:-mx-6 px-2 md:px-4 lg:px-6"
+              className="w-full"
             >
               {heading && (
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-black text-[#1A1A1A]">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <h3 className="text-base md:text-lg font-bold text-[#1A1A1A]">
                     {heading}
                   </h3>
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-[11px] md:text-[12px] font-semibold text-slate-400">
                     {allItems.length} categories
                   </span>
                 </div>
               )}
-              <div className="rounded-3xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] border border-slate-100 px-3.5 py-3">
-                <div className="grid grid-cols-4 gap-3">
+              <div className="rounded-2xl md:rounded-3xl bg-white shadow-sm border border-slate-100 p-3 md:p-5">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 gap-2.5 sm:gap-3.5 md:gap-5">
                   {visibleItems.map((cat) => (
                     <button
                       key={cat._id}
-                      className="group flex flex-col items-center gap-1.5 focus:outline-none"
+                      className="group flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
                       onClick={() => {
                         // Remember the header & section so back navigation can restore context
                         rememberExperienceReturn(section.headerId, section._id);
                         navigate(`/category/${cat._id}`);
                       }}
                     >
-                      <div className="relative aspect-square w-full rounded-2xl bg-[#F8F9FA] border border-slate-100/80 flex items-center justify-center overflow-hidden p-1 transition-all duration-200 group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-[0_10px_25px_rgba(15,23,42,0.08)]">
+                      <div className="relative aspect-square w-full rounded-xl md:rounded-2xl bg-[#F8F9FA] border border-slate-100 flex items-center justify-center overflow-hidden p-1.5 md:p-2 transition-all duration-200 group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-md group-hover:scale-105">
                         {cat.image ? (
                           <img
-                            src={cat.image}
+                            src={applyCloudinaryTransform(cat.image, "f_auto,q_auto,w_200")}
                             alt={cat.name}
                             onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
-                            className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
+                            className="w-full h-full object-cover object-center transition-transform duration-200"
                           />
                         ) : (
                           <div className="h-6 w-6 rounded-full bg-slate-100" />
                         )}
                       </div>
-                      <div className="text-[11px] font-semibold text-slate-700 text-center leading-snug line-clamp-2 group-hover:text-primary">
-                        {cat.name}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <LazyLoadTrigger
-                enabled={hasMore}
-                onVisible={() => loadMoreForSection(sectionKey, allItems.length)}
-              />
-            </div>
-          );
-        }
-
-        if (section.displayType === "subcategories") {
-          const ids = section.config?.subcategories?.subcategoryIds || [];
-          const rows = section.config?.subcategories?.rows || 1;
-          const visibleCount = rows * 4;
-          const allItems = ids
-            .map((id) => subcategoriesById[id])
-            .filter(Boolean)
-            .slice(0, visibleCount);
-          const visibleItems = allItems.slice(
-            0,
-            resolveVisibleCount(sectionKey, allItems.length)
-          );
-          const hasMore = visibleItems.length < allItems.length;
-          if (!visibleItems.length) return null;
-
-          return (
-            <div
-              key={section._id || sectionKey}
-              id={`section-${section._id}`}
-              className="-mx-2 md:-mx-4 lg:-mx-6 px-2 md:px-4 lg:px-6"
-            >
-              {heading && (
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-black text-[#1A1A1A]">
-                    {heading}
-                  </h3>
-                  <span className="text-[11px] font-semibold text-slate-400">
-                    {allItems.length} picks
-                  </span>
-                </div>
-              )}
-              <div className="rounded-3xl bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)] border border-slate-100 px-3.5 py-3">
-                <div className="grid grid-cols-4 gap-3">
-                  {visibleItems.map((cat) => (
-                    <button
-                      key={cat._id}
-                      className="group flex flex-col items-center gap-1.5 focus:outline-none"
-                      onClick={() => {
-                        rememberExperienceReturn(section.headerId, section._id);
-                        const parentId =
-                          cat.parentId?._id ||
-                          cat.parentId ||
-                          cat.categoryId?._id ||
-                          cat.categoryId ||
-                          null;
-
-                        if (parentId) {
-                          navigate(`/category/${parentId}`, {
-                            state: { activeSubcategoryId: cat._id },
-                          });
-                        } else {
-                          // Fallback to previous behavior if we can't resolve parent
-                          navigate(`/category/${cat._id}`);
-                        }
-                      }}
-                    >
-                      <div className="relative aspect-square w-full rounded-2xl bg-[#F8F9FA] border border-slate-100/80 flex items-center justify-center overflow-hidden p-1 transition-all duration-200 group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-[0_10px_25px_rgba(15,23,42,0.08)]">
-                        {cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt={cat.name}
-                            onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
-                            className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="h-6 w-6 rounded-full bg-slate-100" />
-                        )}
-                      </div>
-                      <div className="text-[11px] font-semibold text-slate-700 text-center leading-snug line-clamp-2 group-hover:text-primary">
+                      <div className="text-[11px] md:text-[12px] font-semibold text-slate-700 text-center leading-snug line-clamp-2 group-hover:text-primary">
                         {cat.name}
                       </div>
                     </button>
@@ -255,23 +162,15 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
             allProducts = ids.map((id) => productsById[id]).filter(Boolean);
           } else {
             const categoryFilter = productConfig.categoryIds || [];
-            const subcategoryFilter = productConfig.subcategoryIds || [];
             const hasCategoryFilter = categoryFilter.length > 0;
-            const hasSubcategoryFilter = subcategoryFilter.length > 0;
 
             const all = Object.values(productsById);
             allProducts = all.filter((p) => {
               const catId = p.categoryId?._id || p.categoryId;
-              const subId = p.subcategoryId?._id || p.subcategoryId;
-
               const matchesCategory = hasCategoryFilter
                 ? categoryFilter.includes(catId)
                 : true;
-              const matchesSubcategory = hasSubcategoryFilter
-                ? subcategoryFilter.includes(subId)
-                : true;
-
-              return matchesCategory && matchesSubcategory;
+              return matchesCategory;
             });
           }
 

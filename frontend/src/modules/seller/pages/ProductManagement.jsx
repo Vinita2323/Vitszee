@@ -193,7 +193,6 @@ const ProductManagement = () => {
     lowStockAlert: 5,
     category: "",
     header: "",
-    subcategory: "",
     status: "active",
     tags: "",
     weight: "",
@@ -305,7 +304,7 @@ const ProductManagement = () => {
 
   const handleSave = async () => {
     try {
-      if (!formData.name || !formData.price || !formData.stock || !formData.header || !formData.category || !formData.subcategory) {
+      if (!formData.name || !formData.price || !formData.stock || !formData.header || !formData.category) {
         toast.error("Please fill all required fields, including categories");
         return;
       }
@@ -320,7 +319,6 @@ const ProductManagement = () => {
       data.append("stock", Number(formData.stock));
       data.append("headerId", formData.header);
       data.append("categoryId", formData.category);
-      data.append("subcategoryId", formData.subcategory);
       data.append("status", formData.status);
       data.append("brand", formData.brand);
       data.append("weight", formData.weight);
@@ -423,7 +421,6 @@ const ProductManagement = () => {
         lowStockAlert: item.lowStockAlert || 5,
         header: item.headerId?._id || item.headerId || "",
         category: item.categoryId?._id || item.categoryId || "",
-        subcategory: item.subcategoryId?._id || item.subcategoryId || "",
         status: item.status || "active",
         tags: Array.isArray(item.tags) ? item.tags.join(", ") : item.tags || "",
         weight: item.weight || "",
@@ -654,9 +651,6 @@ const ProductManagement = () => {
                 <th className="px-6 py-3 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-3 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
-                  Subcategory
-                </th>
                 <th className="px-6 py-3 text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
                   Variant
                 </th>
@@ -718,11 +712,6 @@ const ProductManagement = () => {
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium text-slate-900">
                       {p.categoryId?.name || "N/A"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-slate-900">
-                      {p.subcategoryId?.name || "N/A"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -1094,7 +1083,7 @@ const ProductManagement = () => {
                           <select
                             value={formData.header}
                             onChange={(e) =>
-                              setFormData({ ...formData, header: e.target.value, category: "", subcategory: "" })
+                              setFormData({ ...formData, header: e.target.value, category: "" })
                             }
                             className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-bold outline-none cursor-pointer">
                             <option value="">Select Main Group</option>
@@ -1112,7 +1101,7 @@ const ProductManagement = () => {
                           <select
                             value={formData.category}
                             onChange={(e) =>
-                              setFormData({ ...formData, category: e.target.value, subcategory: "" })
+                              setFormData({ ...formData, category: e.target.value })
                             }
                             disabled={!formData.header}
                             className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-bold outline-none cursor-pointer disabled:opacity-50">
@@ -1126,28 +1115,6 @@ const ProductManagement = () => {
                               ))}
                           </select>
                         </div>
-                      </div>
-                      <div className="space-y-1.5 flex flex-col">
-                        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                          Sub-Category <span className="text-rose-500">*</span>
-                        </label>
-                        <select
-                          value={formData.subcategory}
-                          onChange={(e) =>
-                            setFormData({ ...formData, subcategory: e.target.value })
-                          }
-                          disabled={!formData.category}
-                          className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-bold outline-none cursor-pointer disabled:opacity-50">
-                          <option value="">Select Sub-Category</option>
-                          {categories
-                            .find((h) => (h._id || h.id) === formData.header)
-                            ?.children?.find((c) => (c._id || c.id) === formData.category)
-                            ?.children?.map((sc) => (
-                              <option key={sc._id || sc.id} value={sc._id || sc.id}>
-                                {sc.name}
-                              </option>
-                            ))}
-                        </select>
                       </div>
                     </div>
                   )}
@@ -1248,12 +1215,12 @@ const ProductManagement = () => {
                               }} placeholder="e.g. 1kg, 1 pack, 1 liter..." className="w-full bg-white px-3 py-2 rounded-xl text-xs ring-1 ring-slate-100 outline-none" />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest ml-1">Price</label>
+                              <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest ml-1">MRP</label>
                               <input type="number" value={v.price} onChange={e => {
                                 const news = [...formData.variants];
                                 news[i].price = e.target.value;
                                 setFormData({ ...formData, variants: news });
-                              }} placeholder="Price" className="w-full bg-white px-3 py-2 rounded-xl text-xs ring-1 ring-slate-100 outline-none" />
+                              }} placeholder="MRP" className="w-full bg-white px-3 py-2 rounded-xl text-xs ring-1 ring-slate-100 outline-none" />
                             </div>
                             <div className="space-y-1">
                               <label className="text-[8px] font-bold text-brand-400 uppercase tracking-widest ml-1">Sale Price</label>
@@ -1394,7 +1361,7 @@ const ProductManagement = () => {
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="px-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Variant Specification</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest text-center">Unit Price</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest text-center">MRP</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest text-center">Available Stock</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest text-right">Variant SKU</th>
                 </tr>

@@ -7,7 +7,7 @@ const bannerItemSchema = new mongoose.Schema(
     subtitle: { type: String, trim: true },
     linkType: {
       type: String,
-      enum: ["none", "header", "category", "subcategory", "product", "url"],
+      enum: ["none", "header", "category", "product", "url"],
       default: "none",
     },
     linkValue: { type: String, trim: true },
@@ -32,20 +32,9 @@ const configSchema = new mongoose.Schema(
       categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
       rows: { type: Number, min: 1 },
     },
-    // Subcategory sections
-    subcategories: {
-      categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
-      subcategoryIds: [
-        { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-      ],
-      rows: { type: Number, min: 1 },
-    },
     // Product sections
     products: {
       categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
-      subcategoryIds: [
-        { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-      ],
       productIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
       rows: { type: Number, min: 1 },
       columns: { type: Number, min: 1 },
@@ -69,7 +58,7 @@ const experienceSectionSchema = new mongoose.Schema(
     },
     displayType: {
       type: String,
-      enum: ["banners", "categories", "subcategories", "products"],
+      enum: ["banners", "categories", "products"],
       required: true,
     },
     title: {

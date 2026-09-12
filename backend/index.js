@@ -50,6 +50,10 @@ import {
   getBirthdayRewardJobInterval,
   isBirthdayRewardJobEnabled,
 } from "./app/jobs/birthdayRewardJob.js";
+import {
+  getShadowfaxReconciliationJobHandler,
+  getShadowfaxReconciliationJobInterval,
+} from "./app/jobs/shadowfaxReconciliationJob.js";
 import logger from "./app/services/logger.js";
 import { stopScheduledJobs } from "./app/services/distributedScheduler.js";
 
@@ -363,11 +367,17 @@ async function startScheduler() {
     );
   }
 
+  registerScheduledJob(
+    'shadowfaxReconciliationJob',
+    getShadowfaxReconciliationJobInterval(),
+    getShadowfaxReconciliationJobHandler()
+  );
+
   // Start all registered jobs
   await startScheduledJobs();
   registerSchedulerStopper(stopScheduledJobs);
 
-  const scheduledJobs = ['orderAutoCancelJob', 'returnWindowReleaseJob'];
+  const scheduledJobs = ['orderAutoCancelJob', 'returnWindowReleaseJob', 'shadowfaxReconciliationJob'];
   if (isPayoutBatchJobEnabled()) scheduledJobs.push('payoutBatchJob');
   if (isWalletLedgerVerifierEnabled()) scheduledJobs.push('walletLedgerVerifierJob');
   if (isFirebaseTrackingCleanupJobEnabled()) scheduledJobs.push('firebaseTrackingCleanupJob');

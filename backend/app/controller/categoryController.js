@@ -37,9 +37,8 @@ async function validateParentForType(type, parentId) {
     const parent = await Category.findById(parentId).select("type").lean();
     if (!parent) return false;
     
-    // Strict hierarchy check
+    // Strict hierarchy check: Level 2 category must belong to a header
     if (type === "category" && parent.type !== "header") return false;
-    if (type === "subcategory" && parent.type !== "category") return false;
     
     return true;
   } catch (err) {
@@ -65,10 +64,6 @@ export const getCategories = async (req, res) => {
             .populate({
               path: "children",
               select: selectFields,
-              populate: {
-                path: "children",
-                select: selectFields,
-              },
             })
             .sort({ name: 1, _id: 1 })
             .lean();
@@ -86,7 +81,7 @@ export const getCategories = async (req, res) => {
         maxLimit: 100,
       });
       const query = {};
-      if (type === "header" || type === "category" || type === "subcategory") {
+      if (type === "header" || type === "category") {
         query.type = type;
       }
       const search = (req.query.search || "").trim();
@@ -119,7 +114,7 @@ export const getCategories = async (req, res) => {
     }
 
     const query = {};
-    if (type === "header" || type === "category" || type === "subcategory") {
+    if (type === "header" || type === "category") {
       query.type = type;
     }
     const cacheKey = categoryCacheKey({ tree: false, type: query.type || "all" });
@@ -185,14 +180,13 @@ export const createCategory = async (req, res) => {
     categoryData.parentId = normalizedParentId;
 
     const type = String(categoryData.type || "").trim();
-    if (!["header", "category", "subcategory"].includes(type)) {
+    if (!["header", "category"].includes(type)) {
       return handleResponse(res, 400, `The category type is invalid: ${type}`);
     }
 
     const parentOk = await validateParentForType(type, categoryData.parentId);
     if (!parentOk) {
       if (type === "category") return handleResponse(res, 400, "Level 2 Category must be linked to a Level 1 Header category");
-      if (type === "subcategory") return handleResponse(res, 400, "Level 3 Subcategory must be linked to a Level 2 Category");
     }
 
     // Final sanity check for unique slug to prevent catch block late failure
@@ -274,7 +268,6 @@ export const updateCategory = async (req, res) => {
     const parentOk = await validateParentForType(type, parentToValidate);
     if (!parentOk) {
       if (type === "category") return handleResponse(res, 400, "Level 2 Category must be linked to a Level 1 Header category");
-      if (type === "subcategory") return handleResponse(res, 400, "Level 3 Subcategory must be linked to a Level 2 Category");
     }
 
     const updatedCategory = await Category.findByIdAndUpdate(

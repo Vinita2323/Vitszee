@@ -15,7 +15,6 @@ export const createProductSchema = Joi.object({
   stock: Joi.number().integer().min(0).required(),
   unit: trimmedString.optional(),
   category: objectIdLike.required(),
-  subCategory: objectIdLike.optional(),
   mainImage: trimmedString.uri().optional(),
   images: Joi.array().items(trimmedString.uri()).max(10).optional(),
   isActive: Joi.boolean().optional(),

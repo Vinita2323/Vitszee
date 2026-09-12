@@ -37,7 +37,7 @@ const categorySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["header", "category", "subcategory"],
+      enum: ["header", "category"],
       required: [true, "Category type is required"],
     },
     parentId: {

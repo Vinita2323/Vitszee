@@ -5,63 +5,26 @@ import {
   Marker,
   Autocomplete,
 } from "@react-google-maps/api";
-import { Search, MapPin, Navigation, Loader2 } from "lucide-react";
+import { Search, MapPin, Navigation, Loader2, Check } from "lucide-react";
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
+import {
+  normalizeGeocodedAddress,
+  reverseGeocodeLatLng,
+  getCurrentPosition,
+} from "@/core/utils/addressUtils";
 
 const libraries = ["places", "geometry"];
 const mapContainerStyle = {
   width: "100%",
-  height: "340px",
+  height: "320px",
 };
 
+// Default center: Indore, MP (or India center if unspecified)
 const defaultCenter = {
-  lat: 20.5937, // India center
-  lng: 78.9629,
-};
-
-const ADDRESS_COMPONENT_PRIORITY = {
-  locality: [
-    "sublocality_level_1",
-    "sublocality",
-    "neighborhood",
-    "locality",
-    "administrative_area_level_3",
-  ],
-  city: [
-    "locality",
-    "administrative_area_level_3",
-    "administrative_area_level_2",
-  ],
-  state: ["administrative_area_level_1"],
-  pincode: ["postal_code"],
-};
-
-const getAddressComponent = (components = [], types = []) => {
-  const match = components.find((component) =>
-    types.some((type) => component.types?.includes(type)),
-  );
-  return match?.long_name || "";
-};
-
-const extractAddressDetails = (result) => {
-  const components = result?.address_components || [];
-  const locality =
-    getAddressComponent(components, ADDRESS_COMPONENT_PRIORITY.locality) || "";
-  const city =
-    getAddressComponent(components, ADDRESS_COMPONENT_PRIORITY.city) || "";
-  const state =
-    getAddressComponent(components, ADDRESS_COMPONENT_PRIORITY.state) || "";
-  const pincode =
-    getAddressComponent(components, ADDRESS_COMPONENT_PRIORITY.pincode) || "";
-
-  return {
-    locality,
-    city,
-    state,
-    pincode,
-  };
+  lat: 22.7176,
+  lng: 75.872,
 };
 
 const MapPicker = ({
@@ -70,17 +33,32 @@ const MapPicker = ({
   onConfirm,
   initialLocation = null,
   initialRadius = 5,
-  maxRadius = 20,
+  maxRadius = 50,
+  showRadius = true,
   preferCurrentLocationOnOpen = false,
+  title = "Select Location",
 }) => {
-  const [center, setCenter] = useState(initialLocation || defaultCenter);
-  const [marker, setMarker] = useState(initialLocation);
+  const [center, setCenter] = useState(
+    initialLocation?.lat ? { lat: initialLocation.lat, lng: initialLocation.lng } : defaultCenter,
+  );
+  const [marker, setMarker] = useState(
+    initialLocation?.lat ? { lat: initialLocation.lat, lng: initialLocation.lng } : null,
+  );
   const [radius, setRadius] = useState(initialRadius);
-  const [address, setAddress] = useState("");
+  const [normalizedAddress, setNormalizedAddress] = useState(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [searchInputValue, setSearchInputValue] = useState("");
+
   const mapRef = useRef(null);
   const autocompleteRef = useRef(null);
   const circleRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries,
+  });
 
   const clearCircleOverlay = useCallback(() => {
     if (circleRef.current) {
@@ -93,139 +71,137 @@ const MapPicker = ({
     mapRef.current = mapInstance;
   }, []);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
+  // Live reverse geocoding on position change
+  const triggerReverseGeocode = useCallback((pos) => {
+    if (!pos || typeof pos.lat !== "number" || typeof pos.lng !== "number") return;
 
-  useEffect(() => {
-    if (initialLocation) {
-      setCenter(initialLocation);
-      setMarker(initialLocation);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  }, [initialLocation]);
+
+    setIsGeocoding(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await reverseGeocodeLatLng(pos.lat, pos.lng);
+        setNormalizedAddress(result);
+        if (result.formattedAddress) {
+          setSearchInputValue(result.formattedAddress);
+        }
+      } catch (err) {
+        console.warn("[MapPicker] Reverse geocode error:", err);
+      } finally {
+        setIsGeocoding(false);
+      }
+    }, 250);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
 
     setRadius(initialRadius);
 
-    if (preferCurrentLocationOnOpen) {
-      getCurrentLocation({ silent: true, fallbackToInitial: true });
-      return;
-    }
-
-    if (initialLocation) {
-      setCenter(initialLocation);
-      setMarker(initialLocation);
+    if (initialLocation?.lat && initialLocation?.lng) {
+      const pos = { lat: Number(initialLocation.lat), lng: Number(initialLocation.lng) };
+      setCenter(pos);
+      setMarker(pos);
+      triggerReverseGeocode(pos);
+    } else if (preferCurrentLocationOnOpen) {
+      handleCurrentLocation();
     } else {
       setCenter(defaultCenter);
       setMarker(null);
+      setNormalizedAddress(null);
+      setSearchInputValue("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialLocation, initialRadius, preferCurrentLocationOnOpen]);
 
   const onMapClick = useCallback((e) => {
-    clearCircleOverlay();
+    if (!e.latLng) return;
     const newPos = {
       lat: e.latLng.lat(),
       lng: e.latLng.lng(),
     };
     setMarker(newPos);
-  }, [clearCircleOverlay]);
+    triggerReverseGeocode(newPos);
+  }, [triggerReverseGeocode]);
 
   const onMarkerDragEnd = useCallback((e) => {
-    clearCircleOverlay();
+    if (!e.latLng) return;
     const newPos = {
       lat: e.latLng.lat(),
       lng: e.latLng.lng(),
     };
     setMarker(newPos);
-  }, [clearCircleOverlay]);
+    triggerReverseGeocode(newPos);
+  }, [triggerReverseGeocode]);
 
   const handlePlaceChanged = () => {
     if (autocompleteRef.current) {
       const place = autocompleteRef.current.getPlace();
-      if (place.geometry) {
-        clearCircleOverlay();
+      if (place && place.geometry?.location) {
         const newPos = {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
         };
         setCenter(newPos);
         setMarker(newPos);
-        setAddress(place.formatted_address || "");
+        if (mapRef.current) {
+          mapRef.current.panTo(newPos);
+          mapRef.current.setZoom(16);
+        }
+
+        const normalized = normalizeGeocodedAddress(place);
+        if (normalized) {
+          normalized.latitude = newPos.lat;
+          normalized.longitude = newPos.lng;
+          setNormalizedAddress(normalized);
+          setSearchInputValue(normalized.formattedAddress);
+        } else {
+          triggerReverseGeocode(newPos);
+        }
       }
     }
   };
 
-  const getCurrentLocation = ({
-    silent = false,
-    fallbackToInitial = false,
-  } = {}) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          clearCircleOverlay();
-          const newPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setCenter(newPos);
-          setMarker(newPos);
-        },
-        () => {
-          if (fallbackToInitial && initialLocation) {
-            setCenter(initialLocation);
-            setMarker(initialLocation);
-            return;
-          }
-
-          if (!silent) {
-            alert("Unable to retrieve your location. Please select manually.");
-          }
-        },
-      );
-      return;
-    }
-
-    if (fallbackToInitial && initialLocation) {
-      setCenter(initialLocation);
-      setMarker(initialLocation);
-      return;
-    }
-
-    if (!silent) {
-      alert("Unable to retrieve your location. Please select manually.");
+  const handleCurrentLocation = async () => {
+    setIsGeocoding(true);
+    try {
+      const pos = await getCurrentPosition();
+      const coords = { lat: pos.latitude, lng: pos.longitude };
+      setCenter(coords);
+      setMarker(coords);
+      if (mapRef.current) {
+        mapRef.current.panTo(coords);
+        mapRef.current.setZoom(17);
+      }
+      triggerReverseGeocode(coords);
+    } catch (err) {
+      alert(err.message || "Unable to retrieve your location.");
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
+  // Draw service radius circle on map if showRadius is enabled
   useEffect(() => {
-    return () => {
+    if (!isLoaded || !mapRef.current || !window.google?.maps || !showRadius) {
       clearCircleOverlay();
-      mapRef.current = null;
-    };
-  }, [clearCircleOverlay]);
-
-  useEffect(() => {
-    if (!isLoaded || !mapRef.current || !window.google?.maps) {
       return;
     }
 
     clearCircleOverlay();
 
-    if (!marker) {
-      return;
-    }
+    if (!marker) return;
 
     circleRef.current = new window.google.maps.Circle({
       map: mapRef.current,
       center: marker,
       radius: radius * 1000,
-      fillColor: "var(--primary)",
-      fillOpacity: 0.1,
-      strokeColor: "var(--primary)",
-      strokeOpacity: 0.5,
+      fillColor: "#1A8CFF",
+      fillOpacity: 0.12,
+      strokeColor: "#1A8CFF",
+      strokeOpacity: 0.6,
       strokeWeight: 2,
       clickable: false,
       editable: false,
@@ -235,49 +211,48 @@ const MapPicker = ({
     return () => {
       clearCircleOverlay();
     };
-  }, [isLoaded, marker, radius, clearCircleOverlay]);
+  }, [isLoaded, marker, radius, showRadius, clearCircleOverlay]);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (!marker) {
       alert("Please select a location on the map.");
       return;
     }
 
-    setIsGeocoding(true);
-    try {
-      // Reverse geocode only on confirmation to save costs
-      const geocoder = new window.google.maps.Geocoder();
-      const result = await new Promise((resolve, reject) => {
-        geocoder.geocode({ location: marker }, (results, status) => {
-          if (status === "OK") resolve(results[0]);
-          else reject(status);
-        });
-      });
+    const payload = {
+      lat: marker.lat,
+      lng: marker.lng,
+      latitude: marker.lat,
+      longitude: marker.lng,
+      radius: showRadius ? radius : undefined,
+      address: normalizedAddress?.formattedAddress || searchInputValue || `Location (${marker.lat.toFixed(5)}, ${marker.lng.toFixed(5)})`,
+      formattedAddress: normalizedAddress?.formattedAddress || searchInputValue || "",
+      building: normalizedAddress?.building || "",
+      houseNumber: normalizedAddress?.houseNumber || "",
+      buildingName: normalizedAddress?.buildingName || "",
+      street: normalizedAddress?.street || "",
+      road: normalizedAddress?.road || "",
+      area: normalizedAddress?.area || "",
+      locality: normalizedAddress?.locality || "",
+      subLocality: normalizedAddress?.subLocality || "",
+      landmark: normalizedAddress?.landmark || "",
+      city: normalizedAddress?.city || "Indore",
+      district: normalizedAddress?.district || "Indore",
+      state: normalizedAddress?.state || "Madhya Pradesh",
+      stateCode: normalizedAddress?.stateCode || "MP",
+      country: normalizedAddress?.country || "India",
+      countryCode: normalizedAddress?.countryCode || "IN",
+      pincode: normalizedAddress?.pincode || "",
+      placeId: normalizedAddress?.placeId || "",
+    };
 
-      onConfirm({
-        ...marker,
-        radius,
-        address: result.formatted_address,
-        ...extractAddressDetails(result),
-      });
-      onClose();
-    } catch (error) {
-      console.error("Geocoding failed:", error);
-      // Fallback: confirm without address
-      onConfirm({
-        ...marker,
-        radius,
-        address: address || "Custom Location",
-      });
-      onClose();
-    } finally {
-      setIsGeocoding(false);
-    }
+    onConfirm(payload);
+    onClose();
   };
 
   if (loadError) {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Select Location">
+      <Modal isOpen={isOpen} onClose={onClose} title={title}>
         <div className="p-8 text-center text-red-500">
           Failed to load Google Maps. Please check your API key and connection.
         </div>
@@ -289,29 +264,38 @@ const MapPicker = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Select Shop Location"
+      title={title}
       size="md"
       footer={
         <div className="flex justify-between w-full items-center">
-          <div className="text-sm text-gray-500">
+          <div className="text-xs text-slate-500 font-mono">
             {marker
-              ? `${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}`
-              : "No location selected"}
+              ? `📍 ${marker.lat.toFixed(5)}, ${marker.lng.toFixed(5)}`
+              : "Click on map to place pin"}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={onClose} className="h-8 text-xs">
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={!marker || isGeocoding}>
+            <Button
+              size="sm"
+              onClick={handleConfirm}
+              disabled={!marker || isGeocoding}
+              className="h-8 text-xs bg-[#1A4516] hover:bg-[#0a3000] text-white flex items-center gap-1.5 px-4"
+            >
               {isGeocoding ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
+              )}
               Confirm Location
             </Button>
           </div>
         </div>
-      }>
-      <div className="space-y-4">
+      }
+    >
+      <div className="space-y-3">
+        {/* Search Bar & GPS Button */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             {isLoaded && (
@@ -320,31 +304,38 @@ const MapPicker = ({
                 onPlaceChanged={handlePlaceChanged}
                 options={{
                   componentRestrictions: { country: "IN" },
-                  fields: ["geometry", "formatted_address"],
-                }}>
+                  fields: ["geometry", "formatted_address", "address_components", "name"],
+                }}
+              >
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
-                    placeholder="Search for your shop area..."
-                    className="pl-10"
+                    placeholder="Search area, landmark, street name..."
+                    value={searchInputValue}
+                    onChange={(e) => setSearchInputValue(e.target.value)}
+                    className="pl-9 h-9 text-xs"
                   />
                 </div>
               </Autocomplete>
             )}
           </div>
           <Button
+            type="button"
             variant="outline"
             size="icon"
-            onClick={getCurrentLocation}
-            title="Use current location">
+            onClick={handleCurrentLocation}
+            title="Use current GPS location"
+            className="h-9 w-9 shrink-0 text-[#1A4516] border-[#1A4516]/30 hover:bg-[#F5FBF5]"
+          >
             <Navigation className="w-4 h-4" />
           </Button>
         </div>
 
-        <div className="rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
+        {/* Interactive Google Map Container */}
+        <div className="rounded-xl overflow-hidden border border-slate-200 shadow-inner relative">
           {!isLoaded ? (
-            <div className="h-[340px] flex items-center justify-center bg-gray-50">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="h-[320px] flex items-center justify-center bg-slate-50">
+              <Loader2 className="w-7 h-7 animate-spin text-[#1A4516]" />
             </div>
           ) : (
             <GoogleMap
@@ -359,50 +350,76 @@ const MapPicker = ({
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: false,
-              }}>
+              }}
+            >
               {marker && (
                 <Marker
                   key={`${marker.lat.toFixed(6)}-${marker.lng.toFixed(6)}`}
                   position={marker}
                   draggable={true}
                   onDragEnd={onMarkerDragEnd}
-                  animation={window.google.maps.Animation.DROP}
                 />
               )}
             </GoogleMap>
           )}
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-gray-700">
-              Service Radius (km)
-            </label>
-            <span className="text-sm font-bold text-primary">{radius} km</span>
+        {/* Selected Address Preview */}
+        {marker && (
+          <div className="p-2.5 bg-[#F8FAFC] rounded-xl border border-slate-200/80 space-y-1 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wide">
+                <MapPin size={13} className="text-[#1A4516]" /> Detected Address
+              </span>
+              {isGeocoding && (
+                <span className="text-[10px] text-[#1A4516] font-semibold animate-pulse">
+                  Detecting details...
+                </span>
+              )}
+            </div>
+            <p className="text-slate-600 text-[11px] leading-relaxed line-clamp-2">
+              {normalizedAddress?.formattedAddress || "Coordinates selected. Confirm to apply."}
+            </p>
+            {normalizedAddress && (
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400 font-medium pt-1 border-t border-slate-200/60">
+                {normalizedAddress.area && <span>Area: <strong className="text-slate-600">{normalizedAddress.area}</strong></span>}
+                {normalizedAddress.city && <span>City: <strong className="text-slate-600">{normalizedAddress.city}</strong></span>}
+                {normalizedAddress.state && <span>State: <strong className="text-slate-600">{normalizedAddress.state}</strong></span>}
+                {normalizedAddress.pincode && <span>PIN: <strong className="text-slate-600">{normalizedAddress.pincode}</strong></span>}
+              </div>
+            )}
           </div>
-          <input
-            type="range"
-            min="1"
-            max={maxRadius}
-            step="1"
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-          <div className="flex justify-between text-[10px] text-gray-400">
-            <span>1 km</span>
-            <span>{maxRadius} km</span>
+        )}
+
+        {/* Service Radius Slider (if showRadius enabled) */}
+        {showRadius && (
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <label className="font-semibold text-slate-700">
+                Active Service Coverage Radius
+              </label>
+              <span className="font-bold text-[#1A8CFF] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                {radius} km
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max={maxRadius}
+              step="1"
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#1A8CFF]"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400">
+              <span>1 km</span>
+              <span>{maxRadius} km</span>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 flex items-start gap-1">
-            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            Customers within this radius from your shop will be able to see and
-            order from you.
-          </p>
-        </div>
+        )}
       </div>
     </Modal>
   );
 };
 
 export default MapPicker;
-

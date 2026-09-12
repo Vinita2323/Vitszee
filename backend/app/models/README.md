@@ -38,7 +38,7 @@ customerId: { type: ObjectId, ref: "User", required: true, index: true }
 ```
 
 Used in: `Cart.customerId`, `Wishlist.customerId`,
-`Product.{categoryId, subcategoryId, sellerId}`, `Notification.userId`,
+`Product.{categoryId, sellerId}`, `Notification.userId`,
 `Wallet.ownerId`, `LedgerEntry.actorId`.
 
 ### 1c. Decision matrix

@@ -7,6 +7,10 @@ import { loadGoogleMaps } from "../../../../core/services/googleMapsLoader";
 import { customerApi } from "../../services/customerApi";
 import { getCachedGeocode, setCachedGeocode } from "@/core/utils/geocodeCache";
 
+import {
+  normalizeGeocodedAddress,
+} from "@/core/utils/addressUtils";
+
 const LocationDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const {
@@ -23,9 +27,9 @@ const LocationDrawer = ({ isOpen, onClose }) => {
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
 
-  const MIN_QUERY_LENGTH = 4;
-  const SEARCH_DEBOUNCE_MS = 450;
-  const MAX_SUGGESTIONS = 5;
+  const MIN_QUERY_LENGTH = 3;
+  const SEARCH_DEBOUNCE_MS = 350;
+  const MAX_SUGGESTIONS = 6;
   const CACHE_TTL_MS = 3 * 60 * 1000;
 
   const mapsReadyRef = React.useRef(false);
@@ -48,11 +52,6 @@ const LocationDrawer = ({ isOpen, onClose }) => {
         new window.google.maps.places.AutocompleteSessionToken();
     }
     return autocompleteSessionTokenRef.current;
-  }, []);
-
-  const getComponent = React.useCallback((components, types) => {
-    return components?.find((c) => types.every((t) => c.types.includes(t)))
-      ?.long_name;
   }, []);
 
   const initGooglePlaces = React.useCallback(async () => {
@@ -120,7 +119,6 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     e.preventDefault();
     e.stopPropagation();
     refreshLocation();
-    // Keep drawer open so user sees "Detecting..."
   };
 
   const handleSelectAddress = (address) => {
@@ -188,27 +186,22 @@ const LocationDrawer = ({ isOpen, onClose }) => {
         }
 
         const result = results[0];
-        const geometry = result.geometry?.location;
-        const components = result.address_components || [];
+        const normalized = normalizeGeocodedAddress(result);
 
-        if (!geometry) {
+        if (!normalized?.latitude || !normalized?.longitude) {
           setPlacesError("Location coordinates not available");
           return;
         }
 
-        const city = getComponent(components, ["locality"]);
-        const state = getComponent(components, ["administrative_area_level_1"]);
-        const pincode = getComponent(components, ["postal_code"]);
-
         updateLocation(
           {
-            name: result.formatted_address || prediction.description,
+            name: normalized.formattedAddress || prediction.description,
             time: "12-15 mins",
-            city: city || currentLocation.city,
-            state: state || currentLocation.state,
-            pincode: pincode || currentLocation.pincode,
-            latitude: geometry.lat(),
-            longitude: geometry.lng(),
+            city: normalized.city || currentLocation.city,
+            state: normalized.state || currentLocation.state,
+            pincode: normalized.pincode || currentLocation.pincode,
+            latitude: normalized.latitude,
+            longitude: normalized.longitude,
           },
           { persist: true, updateSavedHome: false },
         );
@@ -225,7 +218,6 @@ const LocationDrawer = ({ isOpen, onClose }) => {
       currentLocation.city,
       currentLocation.pincode,
       currentLocation.state,
-      getComponent,
       onClose,
       resetAutocompleteSession,
       updateLocation,
@@ -266,7 +258,6 @@ const LocationDrawer = ({ isOpen, onClose }) => {
 
       const request = {
         input: query,
-        types: ["geocode"],
         componentRestrictions: { country: "in" },
         sessionToken: getAutocompleteSessionToken(),
       };
@@ -275,7 +266,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
       const lng = Number(currentLocation?.longitude);
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         request.location = new window.google.maps.LatLng(lat, lng);
-        request.radius = 30000;
+        request.radius = 50000;
       }
 
       autocompleteServiceRef.current.getPlacePredictions(
@@ -328,6 +319,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     searchQuery,
   ]);
 
+
   // Saved addresses should remain static and not be part of Google search.
   const visibleSavedAddresses = savedAddresses;
 
@@ -348,26 +340,26 @@ const LocationDrawer = ({ isOpen, onClose }) => {
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             data-lenis-prevent
             style={{ overscrollBehavior: "contain" }}
-            className="fixed bottom-0 left-0 right-0 bg-[#F3F4F6] rounded-t-[32px] z-[610] max-h-[90vh] overflow-y-auto outline-none shadow-2xl pb-8">
+            className="fixed bottom-0 left-0 right-0 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-md bg-[#F8FAFC] rounded-t-[24px] sm:rounded-t-[28px] z-[610] max-h-[85vh] overflow-y-auto outline-none shadow-2xl pb-6 no-scrollbar">
             {/* Header */}
-            <div className="sticky top-0 bg-[#F3F4F6] px-6 pt-6 pb-4 flex flex-col gap-4 z-20">
+            <div className="sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md px-4 pt-4 pb-2.5 flex flex-col gap-2.5 z-20 border-b border-slate-200/60">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-extrabold text-[#1A1A1A]">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
                   Select delivery location
                 </h2>
                 <button
                   onClick={onClose}
-                  className="h-10 w-10 bg-black/5 hover:bg-black/10 rounded-full flex items-center justify-center transition-colors">
-                  <X size={20} className="text-[#1A1A1A]" />
+                  className="h-8 w-8 bg-slate-200/70 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors">
+                  <X size={16} className="text-slate-700" />
                 </button>
               </div>
 
               {/* Search Bar */}
               <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
                   <Search
-                    size={20}
-                    className="text-[#1A1A1A]/40 group-focus-within:text-primary transition-colors"
+                    size={16}
+                    className="text-slate-400 group-focus-within:text-[#1A4516] transition-colors"
                   />
                 </div>
                 <input
@@ -382,20 +374,20 @@ const LocationDrawer = ({ isOpen, onClose }) => {
                   onBlur={() => {
                     window.setTimeout(() => setIsSearchFocused(false), 120);
                   }}
-                  className="w-full bg-white border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-semibold placeholder:text-[#1A1A1A]/40 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                  className="w-full bg-white border border-slate-200/90 rounded-xl py-2 pl-9 pr-3 text-xs font-medium placeholder:text-slate-400 shadow-2xs focus:ring-2 focus:ring-[#1A4516]/20 focus:border-[#1A4516] transition-all outline-none"
                 />
               </div>
-              <p className="text-[11px] font-semibold text-slate-400 px-1">
+              <p className="text-[10px] font-medium text-slate-400 px-1 -mt-1">
                 Type at least 4 characters
               </p>
             </div>
 
             {/* Options List */}
-            <div className="px-4 flex flex-col gap-3">
+            <div className="px-4 pt-2.5 flex flex-col gap-2">
               {searchQuery.trim().length >= MIN_QUERY_LENGTH && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 overflow-hidden">
                   {isSearchingPlaces && placePredictions.length === 0 && (
-                    <div className="px-4 py-3 text-sm font-semibold text-slate-500">
+                    <div className="px-3.5 py-2.5 text-xs font-medium text-slate-500">
                       Searching with Google...
                     </div>
                   )}
@@ -406,18 +398,18 @@ const LocationDrawer = ({ isOpen, onClose }) => {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleSelectPlace(prediction)}
-                      className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b last:border-b-0 border-slate-100">
-                      <div className="flex items-start gap-3">
+                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 border-b last:border-b-0 border-slate-100 transition-colors">
+                      <div className="flex items-start gap-2.5">
                         <MapPin
-                          size={16}
-                          className="text-primary mt-0.5 flex-shrink-0"
+                          size={14}
+                          className="text-[#1A4516] mt-0.5 shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="text-[13px] font-bold text-slate-800 truncate">
+                          <p className="text-xs font-bold text-slate-800 truncate">
                             {prediction.structured_formatting?.main_text ||
                               prediction.description}
                           </p>
-                          <p className="text-xs text-slate-500 truncate">
+                          <p className="text-[11px] text-slate-500 truncate">
                             {prediction.structured_formatting?.secondary_text ||
                               prediction.description}
                           </p>
@@ -429,121 +421,125 @@ const LocationDrawer = ({ isOpen, onClose }) => {
                   {!isSearchingPlaces &&
                     placePredictions.length === 0 &&
                     !placesError && (
-                      <div className="px-4 py-3 text-sm font-semibold text-slate-500">
+                      <div className="px-3.5 py-2.5 text-xs font-medium text-slate-500">
                         No locations found
                       </div>
                     )}
 
                   {placesError && (
-                    <div className="px-4 py-3 text-sm font-semibold text-amber-700 bg-amber-50">
+                    <div className="px-3.5 py-2.5 text-xs font-medium text-amber-700 bg-amber-50">
                       {placesError}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Current Location - single onClick to avoid duplicate API calls (was 2x from onPointerDown + onClick) */}
+              {/* Current Location */}
               <button
                 type="button"
                 data-lenis-prevent
                 data-lenis-prevent-touch
                 onClick={handleSelectCurrentLocation}
-                className="flex items-center gap-4 bg-white p-3 rounded-2xl hover:bg-slate-50 transition-colors group text-left shadow-sm w-full">
-                <div className="h-10 w-10 flex items-center justify-center text-primary">
+                className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/80 hover:bg-[#F5FBF5] hover:border-[#1A4516]/40 transition-colors group text-left shadow-2xs w-full">
+                <div className="h-7 w-7 rounded-lg bg-[#F5FBF5] text-[#1A4516] flex items-center justify-center shrink-0 border border-[#1A4516]/10">
                   <MapPin
-                    size={24}
+                    size={15}
                     className="group-hover:scale-110 transition-transform"
                   />
                 </div>
-                <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <h3 className="font-bold text-primary text-[14px] whitespace-nowrap">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-[#1A4516] text-xs leading-none">
                     {isFetchingLocation
                       ? "Detecting..."
                       : "Use current location"}
                   </h3>
-                  <p className="text-[12px] text-slate-400 font-medium truncate opacity-60">
-                    ({currentLocation.name})
+                  <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                    {currentLocation.name}
                   </p>
                 </div>
-                <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+                <ChevronRight size={14} className="text-slate-300 shrink-0" />
               </button>
 
               {/* Add Address */}
               <button
                 onClick={handleAddAddress}
-                className="flex items-center gap-4 bg-white p-3 rounded-2xl hover:bg-slate-50 transition-colors group text-left shadow-sm">
-                <div className="h-10 w-10 flex items-center justify-center text-primary">
+                className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/80 hover:bg-[#F5FBF5] hover:border-[#1A4516]/40 transition-colors group text-left shadow-2xs">
+                <div className="h-7 w-7 rounded-lg bg-[#F5FBF5] text-[#1A4516] flex items-center justify-center shrink-0 border border-[#1A4516]/10">
                   <Plus
-                    size={24}
+                    size={15}
                     className="group-hover:rotate-90 transition-transform"
                   />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-primary text-[15px]">
+                  <h3 className="font-bold text-[#1A4516] text-xs">
                     Add new address
                   </h3>
                 </div>
-                <ChevronRight size={20} className="text-slate-300" />
+                <ChevronRight size={14} className="text-slate-300 shrink-0" />
               </button>
 
               {/* Saved Addresses Section */}
-              <div className="mt-4 px-2">
-                <h4 className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-4">
-                  Your saved addresses
-                </h4>
+              {visibleSavedAddresses.length > 0 && (
+                <div className="mt-2">
+                  <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                    Your saved addresses
+                  </h4>
 
-                <div className="flex flex-col gap-4">
-                  {visibleSavedAddresses.map((addr) => (
-                    <div
-                      key={addr.id}
-                      onClick={() => handleSelectAddress(addr)}
-                      className="bg-white p-3 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden group cursor-pointer hover:bg-slate-50 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <div className="h-12 w-12 bg-slate-50 rounded-xl flex items-center justify-center text-yellow-500 flex-shrink-0">
-                          {addr.label === "Home" ? (
-                            <Home
-                              size={26}
-                              fill="currentColor"
-                              className="opacity-80"
-                            />
-                          ) : (
-                            <MapPin
-                              size={26}
-                              fill="currentColor"
-                              className="opacity-80"
-                            />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-bold text-[#1A1A1A] text-lg">
-                              {addr.label}
-                            </h3>
-                            {(addr.address === currentLocation.name ||
-                              addr.isCurrent) && (
-                              <span className="text-[10px] bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight border border-teal-100">
-                                You are here
-                              </span>
+                  <div className="flex flex-col gap-2">
+                    {visibleSavedAddresses.map((addr) => (
+                      <div
+                        key={addr.id}
+                        onClick={() => handleSelectAddress(addr)}
+                        className="bg-white p-2.5 rounded-xl shadow-2xs border border-slate-200/80 relative overflow-hidden group cursor-pointer hover:border-[#1A4516]/40 hover:shadow-xs transition-all">
+                        <div className="flex items-start gap-2.5">
+                          <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center shrink-0 mt-0.5 border border-amber-100">
+                            {addr.label === "Home" ? (
+                              <Home
+                                size={14}
+                                fill="currentColor"
+                                className="opacity-90"
+                              />
+                            ) : (
+                              <MapPin
+                                size={14}
+                                fill="currentColor"
+                                className="opacity-90"
+                              />
                             )}
                           </div>
-                          <p className="text-[13px] text-slate-500 font-medium leading-relaxed mb-3">
-                            {addr.address}
-                          </p>
-                          <p className="text-[12px] text-slate-400 font-bold">
-                            Phone number: {addr.phone}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wide">
+                                {addr.label}
+                              </h3>
+                              {(addr.address === currentLocation.name ||
+                                addr.isCurrent) && (
+                                <span className="text-[9px] bg-teal-50 text-teal-700 px-1.5 py-0.2 rounded font-bold uppercase tracking-tight border border-teal-100">
+                                  You are here
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 font-medium leading-snug line-clamp-2">
+                              {addr.address}
+                            </p>
+                            {addr.phone && (
+                              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                Phone: {addr.phone}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Selection Glow */}
-                      {(addr.address === currentLocation.name ||
-                        addr.isCurrent) && (
-                        <div className="absolute top-0 right-0 h-1 w-24 bg-gradient-to-l from-primary to-transparent opacity-50" />
-                      )}
-                    </div>
-                  ))}
+                        {/* Selection Glow */}
+                        {(addr.address === currentLocation.name ||
+                          addr.isCurrent) && (
+                          <div className="absolute top-0 right-0 h-0.5 w-16 bg-gradient-to-l from-[#1A4516] to-transparent opacity-60" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </motion.div>
         </>

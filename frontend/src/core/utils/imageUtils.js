@@ -8,6 +8,7 @@ export const DEFAULT_BANNER_IMAGE = "https://images.unsplash.com/photo-157891617
 export function handleImageError(e, fallbackUrl = DEFAULT_CATEGORY_IMAGE) {
   if (e?.target && e.target.src !== fallbackUrl) {
     e.target.onerror = null;
+    e.target.srcset = "";
     e.target.src = fallbackUrl;
   }
 }

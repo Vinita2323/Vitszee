@@ -38,9 +38,6 @@ const HeaderMenuConfig = React.lazy(
 const Level2Categories = React.lazy(
   () => import("../pages/categories/Level2Categories"),
 );
-const SubCategories = React.lazy(
-  () => import("../pages/categories/SubCategories"),
-);
 const CategoryHierarchy = React.lazy(
   () => import("../pages/categories/CategoryHierarchy"),
 );
@@ -119,7 +116,6 @@ const navItems = [
       { label: "Header Menu Config", path: "/admin/categories/header-menu" },
       { label: "Header Categories", path: "/admin/categories/header" },
       { label: "Main Categories", path: "/admin/categories/level2" },
-      { label: "Sub-Categories", path: "/admin/categories/sub" },
     ],
   },
   { label: "Products", path: "/admin/products", icon: Box, color: "amber" },
@@ -260,7 +256,6 @@ const AdminRoutes = () => {
         <Route path="/categories/header" element={<HeaderCategories />} />
         <Route path="/categories/header-menu" element={<HeaderMenuConfig />} />
         <Route path="/categories/level2" element={<Level2Categories />} />
-        <Route path="/categories/sub" element={<SubCategories />} />
         <Route path="/categories/hierarchy" element={<CategoryHierarchy />} />
         <Route path="/products" element={<ProductManagement />} />
         <Route path="/sellers/active" element={<ActiveSellers />} />

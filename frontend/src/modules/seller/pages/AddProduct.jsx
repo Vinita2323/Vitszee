@@ -48,7 +48,6 @@ const AddProduct = () => {
     stock: "",
     lowStockAlert: 5,
     category: "",
-    subcategory: "",
     header: "",
     status: "active",
     tags: "",
@@ -122,15 +121,15 @@ const AddProduct = () => {
       return;
     }
 
-    // Validate all three category levels are selected
-    if (!formData.header || !formData.category || !formData.subcategory) {
-      toast.error("Please select all three category levels: Main Group, Specific Category, and Sub-Category");
+    // Validate both category levels are selected
+    if (!formData.header || !formData.category) {
+      toast.error("Please select both category levels: Main Group and Specific Category");
       return;
     }
 
     const firstVariant = formData.variants[0] || {};
     if (!firstVariant.price || !firstVariant.stock) {
-      toast.error("Main variant must have price and stock");
+      toast.error("Main variant must have MRP and stock");
       return;
     }
 
@@ -155,7 +154,6 @@ const AddProduct = () => {
       // Category IDs
       data.append("headerId", formData.header);
       data.append("categoryId", formData.category);
-      data.append("subcategoryId", formData.subcategory);
 
       // Tags
       data.append("tags", formData.tags);
@@ -428,7 +426,7 @@ const AddProduct = () => {
                     </div>
                     <div className="col-span-6 md:col-span-2 space-y-1">
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                        Price
+                        MRP
                       </label>
                       <input
                         type="number"
@@ -553,7 +551,7 @@ const AddProduct = () => {
                   <select
                     value={formData.header}
                     onChange={(e) =>
-                      setFormData({ ...formData, header: e.target.value, category: "", subcategory: "" })
+                      setFormData({ ...formData, header: e.target.value, category: "" })
                     }
                     className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-bold outline-none cursor-pointer focus:ring-2 focus:ring-primary/5 transition-all">
                     <option value="">Select Main Group</option>
@@ -571,7 +569,7 @@ const AddProduct = () => {
                   <select
                     value={formData.category}
                     onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value, subcategory: "" })
+                      setFormData({ ...formData, category: e.target.value })
                     }
                     disabled={!formData.header}
                     className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-bold outline-none cursor-pointer focus:ring-2 focus:ring-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -581,30 +579,6 @@ const AddProduct = () => {
                       ?.children?.map((c) => (
                         <option key={c._id || c.id} value={c._id || c.id}>
                           {c.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-1.5 flex flex-col">
-                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                    Sub-Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formData.subcategory}
-                    onChange={(e) =>
-                      setFormData({ ...formData, subcategory: e.target.value })
-                    }
-                    disabled={!formData.category}
-                    className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-bold outline-none cursor-pointer focus:ring-2 focus:ring-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    <option value="">Select Sub-Category</option>
-                    {categories
-                      .find((h) => (h._id || h.id) === formData.header)
-                      ?.children?.find((c) => (c._id || c.id) === formData.category)
-                      ?.children?.map((sc) => (
-                        <option key={sc._id || sc.id} value={sc._id || sc.id}>
-                          {sc.name}
                         </option>
                       ))}
                   </select>

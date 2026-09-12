@@ -70,11 +70,6 @@ const productSchema = new mongoose.Schema(
             ref: "Category",
             required: true,
         },
-        subcategoryId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Category",
-            required: true,
-        },
         sellerId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Seller",
@@ -136,7 +131,6 @@ productSchema.index({ status: 1, createdAt: -1, _id: -1 });
 productSchema.index({ approvalStatus: 1, status: 1, createdAt: -1 });
 productSchema.index({ headerId: 1, status: 1 });
 productSchema.index({ categoryId: 1, status: 1 });
-productSchema.index({ subcategoryId: 1, status: 1 });
 productSchema.index({ sellerId: 1, status: 1 });
 productSchema.index({ sellerId: 1, approvalStatus: 1, createdAt: -1 });
 productSchema.index({ sellerId: 1, createdAt: -1, _id: -1 });

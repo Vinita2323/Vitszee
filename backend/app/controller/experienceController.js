@@ -25,7 +25,7 @@ const validateBasePayload = async (body) => {
     throw new Error("Invalid pageType");
   }
 
-  if (!["banners", "categories", "subcategories", "products"].includes(displayType)) {
+  if (!["banners", "categories", "products"].includes(displayType)) {
     throw new Error("Invalid displayType");
   }
 
@@ -39,7 +39,7 @@ const validateBasePayload = async (body) => {
     }
   }
 
-  if (["categories", "subcategories", "products"].includes(displayType)) {
+  if (["categories", "products"].includes(displayType)) {
     if (!title || !title.trim()) {
       throw new Error("Title is required for this displayType");
     }
@@ -120,40 +120,6 @@ const validateAndNormalizeConfig = async (displayType, config = {}) => {
     return normalized;
   }
 
-  if (displayType === "subcategories") {
-    const rows = Number(config.rows) || 1;
-    const categoryIds = Array.isArray(config.categoryIds)
-      ? config.categoryIds.filter(Boolean)
-      : [];
-    const subcategoryIds = Array.isArray(config.subcategoryIds)
-      ? config.subcategoryIds.filter(Boolean)
-      : [];
-
-    if (!categoryIds.length || !subcategoryIds.length) {
-      throw new Error("categoryIds and subcategoryIds are required");
-    }
-
-    const categories = await Category.find({
-      _id: { $in: categoryIds },
-      type: "category",
-    }).select("_id");
-    const subcategories = await Category.find({
-      _id: { $in: subcategoryIds },
-      type: "subcategory",
-    }).select("_id");
-
-    if (!categories.length || !subcategories.length) {
-      throw new Error("Provided categoryIds or subcategoryIds are invalid");
-    }
-
-    normalized.subcategories = {
-      categoryIds: categories.map((c) => c._id),
-      subcategoryIds: subcategories.map((s) => s._id),
-      rows: rows < 1 ? 1 : rows,
-    };
-    return normalized;
-  }
-
   if (displayType === "products") {
     const rows = Number(config.rows) || 1;
     const columns = Number(config.columns) || 2;
@@ -161,9 +127,6 @@ const validateAndNormalizeConfig = async (displayType, config = {}) => {
 
     const categoryIds = Array.isArray(config.categoryIds)
       ? config.categoryIds.filter(Boolean)
-      : [];
-    const subcategoryIds = Array.isArray(config.subcategoryIds)
-      ? config.subcategoryIds.filter(Boolean)
       : [];
     const productIds = Array.isArray(config.productIds)
       ? config.productIds.filter(Boolean)
@@ -175,19 +138,12 @@ const validateAndNormalizeConfig = async (displayType, config = {}) => {
     const categories = categoryIds.length
       ? await Category.find({ _id: { $in: categoryIds }, type: "category" }).select("_id")
       : [];
-    const subcategories = subcategoryIds.length
-      ? await Category.find({
-          _id: { $in: subcategoryIds },
-          type: "subcategory",
-        }).select("_id")
-      : [];
     const products = productIds.length
       ? await Product.find({ _id: { $in: productIds } }).select("_id")
       : [];
 
     normalized.products = {
       categoryIds: categories.map((c) => c._id),
-      subcategoryIds: subcategories.map((s) => s._id),
       productIds: products.map((p) => p._id),
       rows: normalizedRows,
       columns: normalizedColumns,

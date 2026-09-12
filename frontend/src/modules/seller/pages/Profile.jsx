@@ -35,6 +35,7 @@ import { useSellerEarnings } from "../context/SellerEarningsContext";
 import Card from "@shared/components/ui/Card";
 import Button from "@shared/components/ui/Button";
 import MapPicker from "../../../shared/components/MapPicker";
+import { GoogleMap, Marker, Circle, useJsApiLoader } from "@react-google-maps/api";
 import {
   AreaChart,
   Area,
@@ -44,6 +45,8 @@ import {
   ResponsiveContainer,
   CartesianGrid
 } from "recharts";
+
+const mapLibraries = ["places", "geometry"];
 
 const SellerProfile = () => {
   const { refreshEarnings } = useSellerEarnings();
@@ -61,6 +64,10 @@ const SellerProfile = () => {
     lng: null,
     radius: 5,
     address: "",
+    locality: "",
+    city: "",
+    state: "",
+    pincode: "",
     dob: "",
     bankDetails: {
       bankName: "",
@@ -68,6 +75,12 @@ const SellerProfile = () => {
       ifscCode: "",
       accountHolderName: "",
     }
+  });
+
+  const { isLoaded: isMapLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries: mapLibraries,
   });
 
   // Simulated metrics & data to fulfill requirements
@@ -90,14 +103,18 @@ const SellerProfile = () => {
       const data = response.data.result;
       setProfile(data);
       setFormData({
-        name: data.name,
-        shopName: data.shopName,
-        phone: data.phone,
-        email: data.email,
-        lat: data.location?.coordinates[1] || null,
-        lng: data.location?.coordinates[0] || null,
+        name: data.name || "",
+        shopName: data.shopName || "",
+        phone: data.phone || "",
+        email: data.email || "",
+        lat: data.location?.coordinates ? data.location.coordinates[1] : null,
+        lng: data.location?.coordinates ? data.location.coordinates[0] : null,
         radius: data.serviceRadius || 5,
         address: data.address || "",
+        locality: data.locality || "",
+        city: data.city || "",
+        state: data.state || "",
+        pincode: data.pincode || "",
         dob: data.dob || "",
         bankDetails: data.bankDetails || {
           bankName: "",
@@ -116,10 +133,14 @@ const SellerProfile = () => {
   const handleLocationSelect = (location) => {
     setFormData((prev) => ({
       ...prev,
-      lat: location.lat,
-      lng: location.lng,
-      radius: location.radius,
-      address: location.address,
+      lat: location.lat ?? location.latitude,
+      lng: location.lng ?? location.longitude,
+      radius: location.radius || prev.radius,
+      address: location.formattedAddress || location.address || prev.address,
+      locality: location.area || location.locality || prev.locality,
+      city: location.city || prev.city,
+      state: location.state || prev.state,
+      pincode: location.pincode || prev.pincode,
     }));
   };
 
@@ -641,15 +662,17 @@ const SellerProfile = () => {
             <MapPin size={18} className="text-[#1A8CFF]" />
             Location & Service Area
           </h3>
-          {isEditing && (
-            <Button
-              type="button"
-              onClick={() => setIsMapOpen(true)}
-              className="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg px-4 py-1.5 text-[10px] font-bold tracking-wider uppercase transition-all"
-            >
-              Manage Location
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={() => {
+              setIsMapOpen(true);
+              setIsEditing(true);
+            }}
+            className="bg-blue-50 hover:bg-blue-100 text-[#1A8CFF] border border-blue-200 rounded-lg px-3.5 py-1.5 text-[10px] font-bold tracking-wider uppercase transition-all flex items-center gap-1.5"
+          >
+            <MapPin size={13} />
+            Manage Location
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -662,20 +685,20 @@ const SellerProfile = () => {
                 <div>
                   <h4 className="text-xs font-bold text-slate-700">Store Address</h4>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1">
-                    {formData.address || "Please set your location on the map to define the address."}
+                    {formData.address || profile?.address || "Please set your location on the map to define the address."}
                   </p>
                 </div>
               </div>
 
-              {formData.lat && (
+              {formData.lat && formData.lng && (
                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200/50">
                   <div>
                     <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block">Latitude</span>
-                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{formData.lat.toFixed(6)}</span>
+                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{Number(formData.lat).toFixed(6)}</span>
                   </div>
                   <div>
                     <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block">Longitude</span>
-                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{formData.lng.toFixed(6)}</span>
+                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{Number(formData.lng).toFixed(6)}</span>
                   </div>
                 </div>
               )}
@@ -684,40 +707,85 @@ const SellerProfile = () => {
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
                 <span className="text-[9px] font-semibold text-slate-400 uppercase block">Pin Code</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">452001</span>
+                <span className="text-xs font-bold text-slate-700 mt-1 block">
+                  {formData.pincode || profile?.pincode || "452001"}
+                </span>
               </div>
               <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
                 <span className="text-[9px] font-semibold text-slate-400 uppercase block">State</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">MP</span>
+                <span className="text-xs font-bold text-slate-700 mt-1 block">
+                  {formData.state || profile?.state || "MP"}
+                </span>
               </div>
               <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
                 <span className="text-[9px] font-semibold text-slate-400 uppercase block">City</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">Indore</span>
+                <span className="text-xs font-bold text-slate-700 mt-1 block">
+                  {formData.city || profile?.city || "Indore"}
+                </span>
               </div>
             </div>
 
             <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100/50 flex items-start gap-2">
               <span className="bg-blue-100 text-[#1A8CFF] rounded-full p-0.5 text-[8px] mt-0.5">✔</span>
               <p className="text-[10px] text-blue-800 font-medium leading-relaxed">
-                Active Service Coverage: <span className="font-bold">{formData.radius} KM</span> radius around Indore, MP.
+                Active Service Coverage: <span className="font-bold">{formData.radius || profile?.serviceRadius || 5} KM</span> radius around {formData.city || profile?.city || "Indore"}{formData.state || profile?.state ? `, ${formData.state || profile?.state}` : ""}.
               </p>
             </div>
           </div>
 
-          <div className="h-48 lg:h-auto rounded-xl border border-slate-100 overflow-hidden relative shadow-inner bg-slate-50">
-            {formData.lat ? (
-              <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col text-slate-400">
-                {/* Simulated map placeholder style */}
-                <div className="h-10 w-10 bg-[#1A8CFF] rounded-full flex items-center justify-center text-white mb-2 shadow-md">
-                  <MapPin size={20} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">Map Pin Set</span>
-                <span className="text-[10px] text-slate-500 font-semibold mt-0.5">Indore coordinates active</span>
+          <div className="h-56 lg:h-auto rounded-xl border border-slate-200 overflow-hidden relative shadow-inner bg-slate-50 min-h-[220px]">
+            {isMapLoaded && formData.lat && formData.lng ? (
+              <div className="w-full h-full min-h-[220px] relative">
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "100%", minHeight: "220px" }}
+                  center={{ lat: Number(formData.lat), lng: Number(formData.lng) }}
+                  zoom={14}
+                  options={{
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                    fullscreenControl: false,
+                  }}
+                >
+                  <Marker position={{ lat: Number(formData.lat), lng: Number(formData.lng) }} />
+                  <Circle
+                    center={{ lat: Number(formData.lat), lng: Number(formData.lng) }}
+                    radius={(Number(formData.radius) || 5) * 1000}
+                    options={{
+                      fillColor: "#1A8CFF",
+                      fillOpacity: 0.12,
+                      strokeColor: "#1A8CFF",
+                      strokeOpacity: 0.6,
+                      strokeWeight: 2,
+                      clickable: false,
+                    }}
+                  />
+                </GoogleMap>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMapOpen(true);
+                    setIsEditing(true);
+                  }}
+                  className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm shadow-md hover:bg-white text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md border border-slate-200 transition-all flex items-center gap-1 z-10"
+                >
+                  <Edit2 size={11} /> Edit on Map
+                </button>
               </div>
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                <MapPin size={32} className="stroke-[1.5] mb-2" />
-                <span className="text-xs font-bold">No Location Pin Defined</span>
+              <div
+                onClick={() => {
+                  setIsMapOpen(true);
+                  setIsEditing(true);
+                }}
+                className="w-full h-full min-h-[220px] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-all p-6 text-center group"
+              >
+                <div className="h-11 w-11 rounded-full bg-blue-50 text-[#1A8CFF] group-hover:bg-[#1A8CFF] group-hover:text-white flex items-center justify-center transition-all mb-2 shadow-sm">
+                  <MapPin size={22} />
+                </div>
+                <span className="text-xs font-bold text-slate-700">Set Store Location</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Click to choose coordinates & service radius on map</span>
               </div>
             )}
           </div>
@@ -871,9 +939,13 @@ const SellerProfile = () => {
           onClose={() => setIsMapOpen(false)}
           onConfirm={handleLocationSelect}
           initialLocation={
-            formData.lat ? { lat: formData.lat, lng: formData.lng } : null
+            formData.lat && formData.lng
+              ? { lat: Number(formData.lat), lng: Number(formData.lng) }
+              : null
           }
-          initialRadius={formData.radius}
+          initialRadius={Number(formData.radius) || 5}
+          showRadius={true}
+          title="Set Store Location & Service Radius"
         />
       )}
     </motion.div>

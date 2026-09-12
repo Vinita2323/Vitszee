@@ -18,7 +18,12 @@ import {
     Linkedin,
     Youtube,
     Loader2,
-    X
+    X,
+    Truck,
+    ShieldCheck,
+    Key,
+    RefreshCw,
+    CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -77,7 +82,45 @@ const AdminSettings = () => {
             sellerCreateRequiresApproval: false,
             sellerEditRequiresApproval: false,
         },
+        shadowfax: {
+            forwardEnabled: false,
+            reverseEnabled: false,
+            environment: 'sandbox',
+            forwardBaseUrl: 'https://dale.staging.shadowfax.in',
+            reverseBaseUrl: 'https://dale.staging.shadowfax.in',
+            clientCode: '',
+            forwardToken: '',
+            reverseToken: '',
+            autoServiceabilityCheck: true,
+            autoShipmentCreation: true,
+            autoDispatchReady: true,
+            qcEnabled: true,
+            reconciliationIntervalMinutes: 15,
+        },
     });
+
+    const [isTestingConnection, setIsTestingConnection] = useState(false);
+    const [testResult, setTestResult] = useState(null);
+
+    const handleTestConnection = async (type = 'forward') => {
+        setIsTestingConnection(true);
+        setTestResult(null);
+        try {
+            const res = await adminApi.testShadowfaxConnection({ type });
+            const data = res.data?.result || res.data;
+            setTestResult(data);
+            if (data?.serviceable) {
+                showToast(`Shadowfax ${type} connection verified & serviceable!`, 'success');
+            } else {
+                showToast(data?.reason || `Shadowfax ${type} test completed.`, 'warning');
+            }
+        } catch (err) {
+            console.error('Shadowfax test failed', err);
+            showToast(err.response?.data?.message || err.message || 'Connection test failed', 'error');
+        } finally {
+            setIsTestingConnection(false);
+        }
+    };
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -89,6 +132,21 @@ const AdminSettings = () => {
                         ...prev,
                         ...data,
                         productApproval: normalizeProductApprovalConfig(data || {}),
+                        shadowfax: {
+                            forwardEnabled: Boolean(data.shadowfax?.forwardEnabled),
+                            reverseEnabled: Boolean(data.shadowfax?.reverseEnabled),
+                            environment: data.shadowfax?.environment || 'sandbox',
+                            forwardBaseUrl: data.shadowfax?.forwardBaseUrl || 'https://dale.staging.shadowfax.in',
+                            reverseBaseUrl: data.shadowfax?.reverseBaseUrl || 'https://dale.staging.shadowfax.in',
+                            clientCode: data.shadowfax?.clientCode || '',
+                            forwardToken: data.shadowfax?.forwardToken || '',
+                            reverseToken: data.shadowfax?.reverseToken || '',
+                            autoServiceabilityCheck: data.shadowfax?.autoServiceabilityCheck !== undefined ? Boolean(data.shadowfax?.autoServiceabilityCheck) : true,
+                            autoShipmentCreation: data.shadowfax?.autoShipmentCreation !== undefined ? Boolean(data.shadowfax?.autoShipmentCreation) : true,
+                            autoDispatchReady: data.shadowfax?.autoDispatchReady !== undefined ? Boolean(data.shadowfax?.autoDispatchReady) : true,
+                            qcEnabled: data.shadowfax?.qcEnabled !== undefined ? Boolean(data.shadowfax?.qcEnabled) : true,
+                            reconciliationIntervalMinutes: Number(data.shadowfax?.reconciliationIntervalMinutes) || 15,
+                        },
                         keywords: Array.isArray(data.keywords) ? data.keywords : (data.metaKeywords ? data.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
                         returnWindowMinutes: data.returnWindowMinutes ?? 2880,
                         returnEligibilityDelayMinutes: data.returnEligibilityDelayMinutes ?? 2,
@@ -198,11 +256,22 @@ const AdminSettings = () => {
         }
     };
 
+    const handleShadowfaxChange = (field, value) => {
+        setSettings(prev => ({
+            ...prev,
+            shadowfax: {
+                ...(prev.shadowfax || {}),
+                [field]: value,
+            },
+        }));
+    };
+
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'legal', label: 'Legal & Contact', icon: Building2 },
         { id: 'social', label: 'Social & Apps', icon: Share2 },
+        { id: 'shadowfax', label: 'Shadowfax Logistics', icon: Truck },
     ];
 
     return (
@@ -676,6 +745,238 @@ const AdminSettings = () => {
                                 </div>
                             </div>
                         </Card>
+                    )}
+
+                    {/* Shadowfax Logistics */}
+                    {activeTab === 'shadowfax' && (
+                        <div className="space-y-6">
+                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                                <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                                            <Truck className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                                                Shadowfax Forward Integration
+                                            </h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">Automated customer order dispatch & tracking</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            disabled={isTestingConnection}
+                                            onClick={() => handleTestConnection('forward')}
+                                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isTestingConnection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-primary" />}
+                                            Test Connection
+                                        </button>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(settings.shadowfax?.forwardEnabled)}
+                                                onChange={(e) => handleShadowfaxChange('forwardEnabled', e.target.checked)}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="p-8 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Environment</label>
+                                            <select
+                                                value={settings.shadowfax?.environment || 'sandbox'}
+                                                onChange={(e) => handleShadowfaxChange('environment', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            >
+                                                <option value="sandbox">Sandbox / Staging (dale.staging.shadowfax.in)</option>
+                                                <option value="production">Production (dale.shadowfax.in)</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Code</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. CLIENT_CODE"
+                                                value={settings.shadowfax?.clientCode || ''}
+                                                onChange={(e) => handleShadowfaxChange('clientCode', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Forward API Token</label>
+                                            <div className="relative group">
+                                                <Key className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <input
+                                                    type="password"
+                                                    placeholder="Enter Token (Leave blank to keep current)"
+                                                    value={settings.shadowfax?.forwardToken || ''}
+                                                    onChange={(e) => handleShadowfaxChange('forwardToken', e.target.value)}
+                                                    className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Forward Base URL</label>
+                                            <input
+                                                type="url"
+                                                value={settings.shadowfax?.forwardBaseUrl || ''}
+                                                onChange={(e) => handleShadowfaxChange('forwardBaseUrl', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Reverse Integration Card */}
+                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                                <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                                            <RefreshCw className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                                                Shadowfax Reverse Pickup Integration
+                                            </h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">Return logistics & Doorstep QC verification</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            disabled={isTestingConnection}
+                                            onClick={() => handleTestConnection('reverse')}
+                                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isTestingConnection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />}
+                                            Test Reverse
+                                        </button>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(settings.shadowfax?.reverseEnabled)}
+                                                onChange={(e) => handleShadowfaxChange('reverseEnabled', e.target.checked)}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="p-8 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reverse API Token (Optional if same as forward)</label>
+                                            <div className="relative group">
+                                                <Key className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <input
+                                                    type="password"
+                                                    placeholder="Enter Reverse Token"
+                                                    value={settings.shadowfax?.reverseToken || ''}
+                                                    onChange={(e) => handleShadowfaxChange('reverseToken', e.target.value)}
+                                                    className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/10 transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reverse Base URL</label>
+                                            <input
+                                                type="url"
+                                                value={settings.shadowfax?.reverseBaseUrl || ''}
+                                                onChange={(e) => handleShadowfaxChange('reverseBaseUrl', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/10 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Doorstep Quality Check (QC)</h4>
+                                            <p className="text-xs text-slate-500 mt-0.5">Enforce return item inspection checklists during customer pickup</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(settings.shadowfax?.qcEnabled)}
+                                                onChange={(e) => handleShadowfaxChange('qcEnabled', e.target.checked)}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Automation & Reconciliation Card */}
+                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-8 space-y-6">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                                    Operational & Automation Settings
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                        <div>
+                                            <h5 className="text-xs font-black text-slate-900">Auto Serviceability Check</h5>
+                                            <p className="text-[11px] text-slate-500">Validate pincodes before shipment creation</p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(settings.shadowfax?.autoServiceabilityCheck)}
+                                            onChange={(e) => handleShadowfaxChange('autoServiceabilityCheck', e.target.checked)}
+                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                        <div>
+                                            <h5 className="text-xs font-black text-slate-900">Auto Shipment Creation</h5>
+                                            <p className="text-[11px] text-slate-500">Create Shadowfax order on seller acceptance</p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(settings.shadowfax?.autoShipmentCreation)}
+                                            onChange={(e) => handleShadowfaxChange('autoShipmentCreation', e.target.checked)}
+                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                        <div>
+                                            <h5 className="text-xs font-black text-slate-900">Auto Dispatch Ready</h5>
+                                            <p className="text-[11px] text-slate-500">Notify Shadowfax when seller packs order</p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(settings.shadowfax?.autoDispatchReady)}
+                                            onChange={(e) => handleShadowfaxChange('autoDispatchReady', e.target.checked)}
+                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                        <div>
+                                            <h5 className="text-xs font-black text-slate-900">Sync Interval (Minutes)</h5>
+                                            <p className="text-[11px] text-slate-500">Periodic status reconciliation</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={5}
+                                            max={60}
+                                            value={settings.shadowfax?.reconciliationIntervalMinutes || 15}
+                                            onChange={(e) => handleShadowfaxChange('reconciliationIntervalMinutes', parseInt(e.target.value, 10))}
+                                            className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center"
+                                        />
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
                     )}
                 </div>
             </div>

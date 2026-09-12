@@ -12,12 +12,15 @@ const queueSettings = {
   maxStalledCount: 2,
 };
 
-function createNoopQueue() {
+function createNoopQueue(name = "noop-queue") {
   return {
+    name,
     add: async () => ({}),
     getJob: async () => null,
     process: () => {},
     on: () => {},
+    pause: async () => {},
+    getActive: async () => [],
     close: async () => {},
   };
 }
@@ -28,7 +31,7 @@ export const sellerTimeoutQueue = isRedisEnabled()
       createClient: createBullRedisClient,
       settings: queueSettings,
     })
-  : createNoopQueue();
+  : createNoopQueue("seller-timeout");
 
 export const deliveryTimeoutQueue = isRedisEnabled()
   ? new Bull("delivery-timeout", {
@@ -36,7 +39,7 @@ export const deliveryTimeoutQueue = isRedisEnabled()
       createClient: createBullRedisClient,
       settings: queueSettings,
     })
-  : createNoopQueue();
+  : createNoopQueue("delivery-timeout");
 
 export const returnPickupTimeoutQueue = isRedisEnabled()
   ? new Bull("return-pickup-timeout", {
@@ -44,7 +47,7 @@ export const returnPickupTimeoutQueue = isRedisEnabled()
       createClient: createBullRedisClient,
       settings: queueSettings,
     })
-  : createNoopQueue();
+  : createNoopQueue("return-pickup-timeout");
 
 export const JOB_NAMES = {
   SELLER_TIMEOUT: "seller-timeout",

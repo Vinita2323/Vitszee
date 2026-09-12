@@ -5,7 +5,7 @@ import { getApprovedOrLegacyFilter } from "../services/productModerationService.
 import { getIO } from "../socket/socketManager.js";
 
 const CART_POPULATE_FIELDS =
-  "name slug price salePrice mainImage stock status headerId categoryId subcategoryId sellerId variants";
+  "name slug price salePrice mainImage stock status headerId categoryId sellerId variants";
 
 const CUSTOMER_VISIBLE_PRODUCT_MATCH = {
   status: "active",

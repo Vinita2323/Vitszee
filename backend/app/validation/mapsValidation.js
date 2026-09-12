@@ -19,7 +19,9 @@ export const geocodeQuerySchema = Joi.object({
   address: trimmedString.min(3).max(500).optional(),
   placeId: trimmedString.min(3).max(200).optional(),
   country: trimmedString.length(2).uppercase().optional(),
-}).or("address", "placeId");
+  lat: latitude.optional(),
+  lng: longitude.optional(),
+}).or("address", "placeId", "lat");
 
 /** Query schema for `/maps/reverse-geocode`. */
 export const reverseGeocodeQuerySchema = Joi.object({
