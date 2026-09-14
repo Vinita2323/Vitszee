@@ -1,8 +1,39 @@
 import HeaderCategoryMapping from "../models/headerCategoryMapping.js";
+import Category from "../models/category.js";
+
+/**
+ * Ensures all active categories with type 'header' have a corresponding entry
+ * in HeaderCategoryMapping so they automatically appear in the header navigation.
+ */
+export const syncActiveHeaderCategories = async () => {
+  try {
+    const activeHeaders = await Category.find({ type: "header", status: "active" })
+      .sort({ createdAt: 1 })
+      .lean();
+    if (!activeHeaders.length) return;
+
+    for (const cat of activeHeaders) {
+      if (cat.slug === "all" || cat.name?.toLowerCase() === "all") continue;
+      const existing = await HeaderCategoryMapping.findOne({ categoryId: cat._id });
+      if (!existing) {
+        const last = await HeaderCategoryMapping.findOne().sort({ displayOrder: -1 }).lean();
+        const nextOrder = last ? (last.displayOrder ?? 0) + 1 : 0;
+        await HeaderCategoryMapping.create({
+          categoryId: cat._id,
+          isActive: true,
+          displayOrder: nextOrder,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error auto-syncing header categories:", error);
+  }
+};
 
 // Fetch all mappings (Admin)
 export const getAllAdmin = async (req, res) => {
   try {
+    await syncActiveHeaderCategories();
     const mappings = await HeaderCategoryMapping.find()
       .populate("categoryId")
       .sort({ displayOrder: 1, createdAt: -1 });
@@ -16,6 +47,7 @@ export const getAllAdmin = async (req, res) => {
 // Fetch active mappings (Customer)
 export const getAllActive = async (req, res) => {
   try {
+    await syncActiveHeaderCategories();
     let mappings = await HeaderCategoryMapping.find({ isActive: true })
       .populate("categoryId")
       .sort({ displayOrder: 1, createdAt: -1 });

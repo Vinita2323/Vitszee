@@ -146,7 +146,6 @@ export async function showSystemNotification({ title, body, data } = {}) {
 export async function ensureFcmTokenRegistered({
   role = "customer",
   platform = "web",
-  device = "",
 } = {}) {
   const support = describePushSupport();
   if (!support.supported) {
@@ -197,7 +196,6 @@ export async function ensureFcmTokenRegistered({
   await axiosInstance.post("/push/register", {
     token,
     platform,
-    device: device || navigator.userAgent,
   });
 
   persistStoredFcmToken(role, token);
@@ -207,7 +205,6 @@ export async function ensureFcmTokenRegistered({
 export function scheduleFcmRegistrationOnUserGesture({
   role = "customer",
   platform = "web",
-  device = "",
   onSuccess,
   onError,
 } = {}) {
@@ -233,7 +230,7 @@ export function scheduleFcmRegistrationOnUserGesture({
   const handler = async () => {
     remove();
     try {
-      const token = await ensureFcmTokenRegistered({ role: key, platform, device });
+      const token = await ensureFcmTokenRegistered({ role: key, platform });
       if (typeof onSuccess === "function") onSuccess(token);
     } catch (error) {
       if (typeof onError === "function") onError(error);

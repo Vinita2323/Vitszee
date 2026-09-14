@@ -104,7 +104,7 @@ const CategoryProductsPage = () => {
                 const formattedSidebarCats = allMainCats.map(cat => ({
                     id: cat._id,
                     name: cat.name,
-                    icon: cat.image || 'https://cdn-icons-png.flaticon.com/128/2321/2321831.png'
+                    icon: cat.image || DEFAULT_CATEGORY_IMAGE
                 }));
                 const uniqueSidebarCats = Array.from(new Map(formattedSidebarCats.map(item => [item.id, item])).values());
                 setSidebarCategories([{ id: 'all', name: 'All Categories', icon: 'https://cdn-icons-png.flaticon.com/128/6821/6821002.png' }, ...uniqueSidebarCats]);

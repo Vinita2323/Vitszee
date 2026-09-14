@@ -28,7 +28,7 @@ import ExperienceBannerCarousel from "../components/experience/ExperienceBannerC
 import { useLocation } from "../context/LocationContext";
 import { useSettings } from "@core/context/SettingsContext";
 import Lottie from "lottie-react";
-import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { applyCloudinaryTransform, DEFAULT_CATEGORY_IMAGE } from "@/core/utils/imageUtils";
 import { getJSON, remove as removeStorage, STORAGE_KEYS } from "@core/utils/storage";
 
 import {
@@ -313,7 +313,7 @@ const Home = () => {
         const mergedAllCategory = allHeaderFromAdmin ? { ...ALL_CATEGORY, headerColor: allHeaderFromAdmin.headerColor || ALL_CATEGORY.headerColor, headerFontColor: allHeaderFromAdmin.headerFontColor || ALL_CATEGORY.headerFontColor, headerIconColor: allHeaderFromAdmin.headerIconColor || ALL_CATEGORY.headerIconColor, icon: allHeaderFromAdmin.icon || ALL_CATEGORY.icon } : ALL_CATEGORY;
         nextHomeData.categories = [mergedAllCategory, ...formattedHeaders.filter((h) => !((h.slug?.toLowerCase() === "all") || (h.name?.toLowerCase() === "all")))];
         nextHomeData.activeCategory = mergedAllCategory;
-        nextHomeData.quickCategories = dbCats.filter((cat) => cat.type === "category" && cat.status === "active").map((cat) => ({ id: cat._id, name: cat.name, image: cat.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png" }));
+        nextHomeData.quickCategories = dbCats.filter((cat) => cat.type === "category" && cat.status === "active").map((cat) => ({ id: cat._id, name: cat.name, image: cat.image || DEFAULT_CATEGORY_IMAGE }));
       }
       if (prodRes.data.success) {
         const rawResult = prodRes.data.result;
@@ -482,23 +482,44 @@ const Home = () => {
   const isAllTab = !activeCategory || activeCategory._id === "all" || activeCategory.id === "all";
 
   const effectiveQuickCategories = useMemo(() => {
-    // 1. If heroConfig explicitly configured categoryIds for this header
-    const ids = heroConfig.categoryIds || [];
-    if (ids.length > 0) {
-      const resolved = ids
-        .map((id) => categoryMap[id])
-        .filter(Boolean)
-        .map((c) => ({
-          id: c._id,
-          name: c.name,
-          image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png",
+    // 1. If on "ALL" tab: show all active categories across all headers
+    if (isAllTab) {
+      return (allDbCategories || [])
+        .filter((cat) => cat.type === "category" && cat.status === "active")
+        .map((cat) => ({
+          id: cat._id,
+          name: cat.name,
+          image: cat.image || DEFAULT_CATEGORY_IMAGE,
         }));
-      if (resolved.length > 0) return resolved;
     }
 
-    // 2. If on a specific header category, find all categories belonging to this header
-    if (!isAllTab && activeCategory) {
-      const headerIdStr = String(activeCategory._id || activeCategory.id);
+    // 2. If on a specific header category: strictly show ONLY categories belonging to this header
+    if (activeCategory) {
+      const headerIdStr = String(activeCategory._id || activeCategory.id || "");
+
+      // Check if heroConfig explicitly configured categoryIds for this specific header
+      const ids = heroConfig.categoryIds || [];
+      if (ids.length > 0) {
+        const resolved = ids
+          .map((id) => categoryMap[id])
+          .filter(Boolean)
+          .filter(
+            (c) =>
+              c.status === "active" &&
+              (String(c.parentId) === headerIdStr ||
+                String(c.parentId?._id) === headerIdStr ||
+                String(c.headerId) === headerIdStr ||
+                String(c.headerId?._id) === headerIdStr)
+          )
+          .map((c) => ({
+            id: c._id,
+            name: c.name,
+            image: c.image || DEFAULT_CATEGORY_IMAGE,
+          }));
+        if (resolved.length > 0) return resolved;
+      }
+
+      // Find all categories belonging strictly to this header
       const childCategories = (allDbCategories || []).filter(
         (cat) =>
           cat.type === "category" &&
@@ -508,17 +529,16 @@ const Home = () => {
             String(cat.headerId) === headerIdStr ||
             String(cat.headerId?._id) === headerIdStr)
       );
-      if (childCategories.length > 0) {
-        return childCategories.map((cat) => ({
-          id: cat._id,
-          name: cat.name,
-          image: cat.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png",
-        }));
-      }
+
+      return childCategories.map((cat) => ({
+        id: cat._id,
+        name: cat.name,
+        image: cat.image || DEFAULT_CATEGORY_IMAGE,
+      }));
     }
 
-    return quickCategories;
-  }, [heroConfig.categoryIds, categoryMap, quickCategories, isAllTab, activeCategory, allDbCategories]);
+    return [];
+  }, [heroConfig.categoryIds, categoryMap, isAllTab, activeCategory, allDbCategories]);
 
   const effectiveLowestPriceProducts = useMemo(() => {
     if (isAllTab) {
@@ -611,7 +631,7 @@ const Home = () => {
           </motion.div>
 
           {/* Shop by Category */}
-          <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
+          <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => id === "all" ? navigate("/categories") : navigate(`/category/${id}`)} />
 
           {/* Lowest Price Ever Section */}
           {lowestPriceSection ? (

@@ -768,6 +768,19 @@ const CheckoutPage = () => {
   }, [cartProductIdKey, currentLocation?.latitude, currentLocation?.longitude]);
 
   const handlePlaceOrder = async () => {
+    if (cart.length === 0) {
+      showToast("Your cart is empty", "warning");
+      return;
+    }
+    if (previewError) {
+      showToast(previewError, "error");
+      return;
+    }
+    const orderAddress = buildAddressForOrder();
+    if (!orderAddress?.address) {
+      showToast("Please select a delivery address", "warning");
+      return;
+    }
     setIsPlacingOrder(true);
     try {
       const taxAmount = pricingPreview?.taxTotal || 0;
@@ -1090,14 +1103,14 @@ const CheckoutPage = () => {
               walletAmountToUse={walletAmountToUse}
             />
 
-            {/* Desktop Slide to Pay */}
+            {/* Desktop Proceed to Pay */}
             <div className="hidden lg:block">
               <SlideToPay
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder}
-                disabled={cart.length === 0 || isPlacingOrder || !!previewError}
-                text={finalAmountToPay === 0 && !previewError ? "Place Free Order" : "Order Now"}
+                disabled={cart.length === 0 || isPlacingOrder}
+                text={finalAmountToPay === 0 && !previewError ? "Place Free Order" : "Proceed to Pay"}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
                 🔒 SSL encrypted secure checkout
@@ -1114,8 +1127,8 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder}
-            disabled={cart.length === 0 || isPlacingOrder || !!previewError}
-            text={finalAmountToPay === 0 && !previewError ? "Place Free Order" : "Slide to Pay"}
+            disabled={cart.length === 0 || isPlacingOrder}
+            text={finalAmountToPay === 0 && !previewError ? "Place Free Order" : "Proceed to Pay"}
           />
         </div>
       </div>

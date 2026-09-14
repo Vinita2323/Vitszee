@@ -13,7 +13,7 @@ export const customerApi = {
   getCategories: (params) =>
     getWithDedupe("/categories", params, { ttl: 5000 }), // 5 seconds for categories to reflect admin changes fast
   getHeaderCategories: () =>
-    getWithDedupe("/header-categories", {}, { ttl: 60 * 1000 }),
+    getWithDedupe("/header-categories", {}, { ttl: 5000 }), // 5 seconds for header categories to reflect admin changes fast
   getProducts: (params) => getWithDedupe("/products", params),
   getProductById: (id, params) => getWithDedupe(`/products/${id}`, params),
 

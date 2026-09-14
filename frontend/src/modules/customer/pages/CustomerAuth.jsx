@@ -7,13 +7,12 @@ import {
   Phone,
   ShieldCheck,
   User,
-  ShoppingBag,
   ChevronLeft,
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { customerApi } from "../services/customerApi";
-import HeroFood from "@/assets/auth-hero-food.jpg";
+import HeroCleaning from "@/assets/auth-hero-cleaning.jpg";
 
 const CustomerAuth = () => {
   const location = useLocation();
@@ -115,35 +114,15 @@ const CustomerAuth = () => {
       <div className="w-full max-w-md mx-auto min-h-screen bg-white flex flex-col justify-between">
         {/* Top Content Section */}
         <div className="w-full">
-          {/* Top Hero Banner with Food Image & S-Curve Wave */}
-          <div className="relative h-[240px] sm:h-[260px] w-full overflow-hidden bg-slate-900">
+          {/* Top Hero Banner with Home Cleaning Image & S-Curve Wave */}
+          <div className="relative h-[230px] sm:h-[260px] w-full overflow-hidden bg-slate-50">
             <img
-              src={HeroFood}
-              alt="Food Inside"
-              className="w-full h-full object-cover object-center scale-105"
+              src={HeroCleaning}
+              alt="Home Cleaning Essentials"
+              className="w-full h-full object-cover object-center"
             />
-            {/* Dark Vignette Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75" />
-
-            {/* Top Bar: Bag Icon & "VITZEE MARKET" */}
-            <div className="absolute top-5 left-5 right-5 flex items-center gap-2.5 z-10">
-              <div className="h-9 w-9 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-sm">
-                <ShoppingBag size={18} strokeWidth={2.2} />
-              </div>
-              <span className="text-white font-black tracking-tight text-base sm:text-lg uppercase drop-shadow-md">
-                VITZEE MARKET
-              </span>
-            </div>
-
-            {/* Centered Big Hero Text: "FOOD INSIDE" */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pt-2 z-10 pointer-events-none">
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase leading-none drop-shadow-lg">
-                FOOD INSIDE
-              </h2>
-              <p className="text-[10px] sm:text-[11px] font-bold text-white/90 uppercase tracking-[3px] mt-2 drop-shadow-sm">
-                EVERYTHING DELIVERED FAST
-              </p>
-            </div>
+            {/* Soft Ambient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/20 pointer-events-none" />
 
             {/* Smooth S-Curve Wave Divider */}
             <div className="absolute -bottom-1 left-0 right-0 w-full leading-[0] z-10 pointer-events-none">

@@ -4,8 +4,8 @@ import { applyCloudinaryTransform, handleImageError, DEFAULT_CATEGORY_IMAGE } fr
 const QuickCategorySlider = ({ categories, onCategoryClick }) => {
   if (!categories || categories.length === 0) return null;
 
-  // Show up to 6 categories in the grid for a clean 3x2 on mobile and 1x6 on desktop
-  const displayCategories = categories.slice(0, 6);
+  // Show up to 12 categories in the grid (e.g. 4x3 on mobile, 2x6 on desktop)
+  const displayCategories = categories.length > 12 ? categories.slice(0, 12) : categories;
 
   return (
     <div className="w-full px-4 md:px-6 lg:px-8 mt-6 mb-10 z-20 relative">

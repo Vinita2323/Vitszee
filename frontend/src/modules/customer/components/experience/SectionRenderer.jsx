@@ -122,10 +122,10 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
                       }}
                     >
                       <div className="relative aspect-square w-full rounded-xl md:rounded-2xl bg-[#F8F9FA] border border-slate-100 flex items-center justify-center overflow-hidden p-1.5 md:p-2 transition-all duration-200 group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-md group-hover:scale-105">
-                        {cat.image ? (
+                        {cat.image && typeof cat.image === 'string' && cat.image.trim() ? (
                           <img
-                            src={applyCloudinaryTransform(cat.image, "f_auto,q_auto,w_200")}
-                            alt={cat.name}
+                            src={applyCloudinaryTransform(cat.image.trim(), "f_auto,q_auto,w_200") || DEFAULT_CATEGORY_IMAGE}
+                            alt={cat.name || "Category"}
                             onError={(e) => handleImageError(e, DEFAULT_CATEGORY_IMAGE)}
                             className="w-full h-full object-cover object-center transition-transform duration-200"
                           />

@@ -196,6 +196,24 @@ export const createCategory = async (req, res) => {
     }
 
     const category = await Category.create(categoryData);
+
+    if (category.type === "header" && category.status === "active" && category.slug !== "all" && category.name?.toLowerCase() !== "all") {
+      try {
+        const { default: HeaderCategoryMapping } = await import("../models/headerCategoryMapping.js");
+        const existing = await HeaderCategoryMapping.findOne({ categoryId: category._id });
+        if (!existing) {
+          const last = await HeaderCategoryMapping.findOne().sort({ displayOrder: -1 }).lean();
+          const nextOrder = last ? (last.displayOrder ?? 0) + 1 : 0;
+          await HeaderCategoryMapping.create({
+            categoryId: category._id,
+            isActive: true,
+            displayOrder: nextOrder,
+          });
+        }
+      } catch (mapErr) {
+        console.warn("[Category] Failed to sync header category mapping on create:", mapErr.message);
+      }
+    }
     
     invalidate("cache:catalog:categories:*").catch(err => {
       console.warn("[Category] Cache invalidation failed:", err.message);
@@ -277,6 +295,31 @@ export const updateCategory = async (req, res) => {
     );
 
     if (!updatedCategory) return handleResponse(res, 404, "Category not found");
+
+    if (updatedCategory.type === "header" && updatedCategory.slug !== "all" && updatedCategory.name?.toLowerCase() !== "all") {
+      try {
+        const { default: HeaderCategoryMapping } = await import("../models/headerCategoryMapping.js");
+        if (updatedCategory.status === "active") {
+          const existing = await HeaderCategoryMapping.findOne({ categoryId: updatedCategory._id });
+          if (!existing) {
+            const last = await HeaderCategoryMapping.findOne().sort({ displayOrder: -1 }).lean();
+            const nextOrder = last ? (last.displayOrder ?? 0) + 1 : 0;
+            await HeaderCategoryMapping.create({
+              categoryId: updatedCategory._id,
+              isActive: true,
+              displayOrder: nextOrder,
+            });
+          } else if (!existing.isActive) {
+            existing.isActive = true;
+            await existing.save();
+          }
+        } else if (updatedCategory.status === "inactive") {
+          await HeaderCategoryMapping.updateMany({ categoryId: updatedCategory._id }, { isActive: false });
+        }
+      } catch (mapErr) {
+        console.warn("[Category] Failed to sync header category mapping on update:", mapErr.message);
+      }
+    }
 
     invalidate("cache:catalog:categories:*").catch(err => {
       console.warn("[Category] Cache invalidation failed:", err.message);

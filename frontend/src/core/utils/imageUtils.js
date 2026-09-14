@@ -18,7 +18,13 @@ export function handleImageError(e, fallbackUrl = DEFAULT_CATEGORY_IMAGE) {
  * Safe to call on any URL — non-Cloudinary URLs are returned unchanged.
  */
 export function applyCloudinaryTransform(url, params = "f_auto,q_auto,w_400,dpr_auto") {
-  if (!url || !CLOUDINARY_REGEX.test(url)) return url;
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  if (url.includes('dv1l9sb4p')) {
+    if (url.includes('/categories/')) return DEFAULT_CATEGORY_IMAGE;
+    if (url.includes('/products/')) return DEFAULT_PRODUCT_IMAGE;
+    return DEFAULT_CATEGORY_IMAGE;
+  }
+  if (!CLOUDINARY_REGEX.test(url)) return url;
   const match = url.match(CLOUDINARY_UPLOAD_SEGMENT_REGEX);
   if (!match) return url;
 
