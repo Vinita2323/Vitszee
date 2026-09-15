@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import SellerOrdersContext from '@/modules/seller/context/SellerOrdersContext';
 import SellerEarningsContext, { defaultEarnings } from '@/modules/seller/context/SellerEarningsContext';
-import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onSellerPickupOtp, onSellerDeliveryArrived, onWithdrawalUpdated } from '@/core/services/orderSocket';
+import { getOrderSocket, onSellerOrderNew, onSellerOrderAutoAccepted, onReturnDropOtp, onSellerPickupOtp, onSellerDeliveryArrived, onWithdrawalUpdated } from '@/core/services/orderSocket';
 import { createSocketTokenReader } from '@core/utils/authStorage';
 import { STORAGE_KEYS } from '@core/utils/storage';
 import { showSystemNotification } from '@/core/firebase/pushClient';
@@ -20,11 +20,11 @@ import orderAlertSound from '@/assets/sounds/order_alert.mp3';
 
 const POLL_INTERVAL_MS = 15000;
 
-/** Match server `sellerPendingExpiresAt` — never reset to a full 60s when the modal opens late. */
+/** Match server `sellerResponseDeadline` or `sellerPendingExpiresAt` — default 20s response window */
 function secondsLeftUntilSellerExpiry(order) {
     if (!order) return 0;
-    const raw = order.sellerPendingExpiresAt ?? order.expiresAt;
-    if (!raw) return 60;
+    const raw = order.sellerResponseDeadline ?? order.sellerPendingExpiresAt ?? order.expiresAt;
+    if (!raw) return 20;
     const ms = new Date(raw).getTime() - Date.now();
     return Math.max(0, Math.ceil(ms / 1000));
 }
@@ -52,7 +52,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const [shownReturnOrderIds, setShownReturnOrderIds] = useState(() => new Set());
     const [timeLeft, setTimeLeft] = useState(0);
     /** Total seconds in this acceptance window (for progress bar), set when modal opens */
-    const acceptWindowTotalRef = useRef(60);
+    const acceptWindowTotalRef = useRef(20);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [returnDropOtpAlert, setReturnDropOtpAlert] = useState(null); // { orderId, otp, expiresAt }
     const [sellerPickupOtpAlert, setSellerPickupOtpAlert] = useState(null); // { orderId, otp, expiresAt }
@@ -270,6 +270,16 @@ const DashboardLayout = ({ children, navItems, title }) => {
             if (fetchOrdersRef.current) fetchOrdersRef.current();
         });
 
+        const unsubscribeAutoAccepted = onSellerOrderAutoAccepted(getToken, (payload) => {
+            console.log("[DashboardLayout] Order auto-accepted via socket:", payload);
+            if (newOrderAlertRef.current && (newOrderAlertRef.current.orderId === payload?.orderId || newOrderAlertRef.current._id === payload?.orderId)) {
+                stopOrderRingtone();
+                setNewOrderAlert(null);
+            }
+            toast.info(payload?.message || `Order #${payload?.orderId} was automatically accepted by system`);
+            if (fetchOrdersRef.current) fetchOrdersRef.current();
+        });
+
         const unsubscribeDrop = onReturnDropOtp(getToken, (payload) => {
             console.log("[DashboardLayout] Received return drop OTP:", payload);
             setReturnDropOtpAlert(payload);
@@ -311,6 +321,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
         return () => {
             unsubscribeSellerNew();
+            unsubscribeAutoAccepted();
             unsubscribeDrop();
             unsubscribeSellerPickup();
             unsubscribeDeliveryArrived();
@@ -374,18 +385,20 @@ const DashboardLayout = ({ children, navItems, title }) => {
         setIsSidebarOpen(false);
     }, [location.pathname]);
 
-    // Timer: driven by server expiry (sellerPendingExpiresAt), not a local 60s from modal open
+    // Timer: driven by server expiry (sellerResponseDeadline / sellerPendingExpiresAt), 20s window
     useEffect(() => {
         if (!newOrderAlert) return undefined;
 
         const left = secondsLeftUntilSellerExpiry(newOrderAlert);
         if (left <= 0) {
+            stopOrderRingtone();
             setNewOrderAlert(null);
-            toast.error("This order has already expired — you can no longer accept it.");
+            toast.info(`Order #${newOrderAlert.orderId} was automatically accepted by system`);
+            if (fetchOrdersRef.current) fetchOrdersRef.current();
             return undefined;
         }
 
-        acceptWindowTotalRef.current = left;
+        acceptWindowTotalRef.current = left > 0 ? left : 20;
         setTimeLeft(left);
 
         const timer = setInterval(() => {
@@ -393,8 +406,13 @@ const DashboardLayout = ({ children, navItems, title }) => {
             setTimeLeft(next);
             if (next <= 0) {
                 clearInterval(timer);
+                const expiredOrderId = newOrderAlertRef.current?.orderId;
+                stopOrderRingtone();
                 setNewOrderAlert(null);
-                toast.error("Order timed out!");
+                if (expiredOrderId) {
+                    toast.info(`Order #${expiredOrderId} was automatically accepted by system`);
+                }
+                if (fetchOrdersRef.current) fetchOrdersRef.current();
             }
         }, 1000);
 
@@ -498,7 +516,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
                                     <div
                                         className={cn(
                                             "h-full transition-[width] duration-1000 ease-linear",
-                                            timeLeft < 15 ? "bg-rose-500" : "bg-primary",
+                                            timeLeft < 8 ? "bg-rose-500" : "bg-primary",
                                         )}
                                         style={{
                                             width: `${acceptWindowTotalRef.current > 0 ? (timeLeft / acceptWindowTotalRef.current) * 100 : 0}%`,
@@ -507,9 +525,9 @@ const DashboardLayout = ({ children, navItems, title }) => {
                                 </div>
 
                                 <div className="flex items-center gap-4 text-sm font-bold mb-8">
-                                    <Clock className={cn("h-4 w-4", timeLeft < 15 ? "text-rose-500 animate-pulse" : "text-slate-600")} />
-                                    <span className={timeLeft < 15 ? "text-rose-500" : "text-slate-600"}>
-                                        Accept within {timeLeft} {timeLeft === 1 ? "second" : "seconds"}
+                                    <Clock className={cn("h-4 w-4", timeLeft < 8 ? "text-rose-500 animate-pulse" : "text-slate-600")} />
+                                    <span className={timeLeft < 8 ? "text-rose-500" : "text-slate-600"}>
+                                        {timeLeft <= 0 ? "Automatically accepted" : `Accept or Reject within ${timeLeft}s`}
                                     </span>
                                 </div>
 

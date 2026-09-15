@@ -530,6 +530,8 @@ export async function placeOrderAtomic({
           ? WORKFLOW_STATUS.SELLER_PENDING
           : WORKFLOW_STATUS.CREATED,
         sellerPendingExpiresAt: sellerPendingUntil,
+        sellerResponseDeadline: sellerPendingUntil,
+        sellerResponseStatus: shouldStartSellerWorkflow ? "PENDING" : undefined,
         expiresAt: orderExpiresAt,
         stockReservation: orderReservation,
         checkoutGroupId,

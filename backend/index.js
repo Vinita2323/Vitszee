@@ -453,6 +453,14 @@ async function main() {
     
     // Run startup sequence (validates dependencies, connects to DB/Redis)
     await startup();
+
+    // Recover any pending seller orders that expired or were pending across restart
+    try {
+      const { recoverPendingSellerOrdersOnStartup } = await import('./app/services/orderWorkflowService.js');
+      await recoverPendingSellerOrdersOnStartup();
+    } catch (e) {
+      logger.warn('Failed to recover pending seller orders on startup', { error: e.message });
+    }
     
     const role = getProcessRole();
     

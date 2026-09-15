@@ -95,18 +95,52 @@ export function resolveWorkflowStatus(order) {
   return workflowFromLegacyStatus(order.status);
 }
 
+const inMemorySellerTimers = new Map();
+
+export function clearInMemorySellerTimer(orderId) {
+  if (inMemorySellerTimers.has(orderId)) {
+    clearTimeout(inMemorySellerTimers.get(orderId));
+    inMemorySellerTimers.delete(orderId);
+  }
+}
+
+export function setInMemorySellerTimer(orderId, delayMs) {
+  clearInMemorySellerTimer(orderId);
+  const timer = setTimeout(async () => {
+    try {
+      inMemorySellerTimers.delete(orderId);
+      await processSellerTimeoutJob({ orderId });
+    } catch (err) {
+      logger.error("In-memory seller timeout job failed", { orderId, error: err.message });
+    }
+  }, delayMs);
+  if (typeof timer.unref === "function") {
+    timer.unref();
+  }
+  inMemorySellerTimers.set(orderId, timer);
+}
+
 /**
  * After creating a new order document (v2), schedule seller timeout and emit.
  */
 export async function afterPlaceOrderV2(orderDoc) {
   const orderId = orderDoc.orderId;
-  await scheduleSellerTimeoutJob(orderId);
+  const deadline = orderDoc.sellerResponseDeadline || orderDoc.sellerPendingExpiresAt;
+  const delayMs = deadline
+    ? Math.max(0, new Date(deadline).getTime() - Date.now())
+    : DEFAULT_SELLER_TIMEOUT_MS();
+
+  logger.info(`Order #${orderId} assigned to seller #${orderDoc.seller}`);
+  logger.info(`Seller response deadline: ${deadline ? new Date(deadline).toISOString() : new Date(Date.now() + delayMs).toISOString()}`);
+
+  await scheduleSellerTimeoutJob(orderId, delayMs);
   emitToSeller(orderDoc.seller?.toString(), {
     event: "order:new",
     payload: {
       orderId,
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
       sellerPendingExpiresAt: orderDoc.sellerPendingExpiresAt,
+      sellerResponseDeadline: deadline,
     },
   });
 }
@@ -114,11 +148,14 @@ export async function afterPlaceOrderV2(orderDoc) {
 // Workflow timeout scheduling delegates to the jobSchedulerPort (P2.6).
 // The function names below remain for in-file callers; the implementation
 // lives in services/workflow/bullJobScheduler.js behind the port.
-export async function scheduleSellerTimeoutJob(orderId) {
+export async function scheduleSellerTimeoutJob(orderId, delayMs = null) {
+  const ms = delayMs ?? DEFAULT_SELLER_TIMEOUT_MS();
+  setInMemorySellerTimer(orderId, ms);
   return scheduleSellerTimeout(orderId);
 }
 
 export async function removeSellerTimeoutJob(orderId) {
+  clearInMemorySellerTimer(orderId);
   return removeSellerTimeout(orderId);
 }
 
@@ -141,26 +178,32 @@ export async function removeReturnPickupTimeoutJob(orderId, attempt = 1) {
 import Setting from "../models/setting.js";
 
 /**
- * Seller accepts: SELLER_PENDING -> SELLER_ACCEPTED (if pending payment) or DELIVERY_SEARCH (atomic).
+ * Shared atomic execution for order acceptance (manual by SELLER or automatic by SYSTEM).
  */
-export async function sellerAcceptAtomic(sellerId, orderId) {
+export async function executeOrderAcceptance({
+  orderId,
+  sellerId = null,
+  acceptedBy = "SELLER",
+  isAutoAccepted = false,
+}) {
   orderId = await requireCanonicalOrderId(orderId);
   const now = new Date();
-  const sellerMs = DEFAULT_SELLER_TIMEOUT_MS();
   const deliveryMs = DEFAULT_DELIVERY_TIMEOUT_MS();
 
-  const orderForCheck = await Order.findOne({
+  const query = {
     orderId,
-    seller: sellerId,
     workflowVersion: { $gte: 2 },
     workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-    sellerPendingExpiresAt: { $gt: now },
-  });
+    sellerResponseStatus: "PENDING",
+  };
 
+  if (sellerId) {
+    query.seller = sellerId;
+  }
+
+  const orderForCheck = await Order.findOne(query);
   if (!orderForCheck) {
-    const err = new Error("Order not available for acceptance or expired");
-    err.statusCode = 409;
-    throw err;
+    return null;
   }
 
   let paymentTimeoutMinutes = 10;
@@ -173,9 +216,16 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     logger.warn("Could not fetch paymentTimeoutMinutes from settings", { error: e });
   }
 
-  const isPaymentPending = (orderForCheck.paymentMode === "PENDING" || orderForCheck.paymentStatus === "AWAITING_PAYMENT_METHOD") && orderForCheck.paymentStatus !== "PAID";
+  const isPaymentPending =
+    (orderForCheck.paymentMode === "PENDING" ||
+      orderForCheck.paymentStatus === "AWAITING_PAYMENT_METHOD") &&
+    orderForCheck.paymentStatus !== "PAID";
 
-  const paymentTimeoutDate = new Date(now.getTime() + paymentTimeoutMinutes * 60000);
+  const paymentTimeoutDate = new Date(
+    now.getTime() + paymentTimeoutMinutes * 60000,
+  );
+
+  const responseStatus = isAutoAccepted ? "AUTO_ACCEPTED" : "ACCEPTED";
 
   const updatePayload = isPaymentPending
     ? {
@@ -183,6 +233,10 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
           workflowStatus: WORKFLOW_STATUS.SELLER_ACCEPTED,
           status: legacyStatusFromWorkflow(WORKFLOW_STATUS.SELLER_ACCEPTED),
           sellerAcceptedAt: now,
+          acceptedAt: now,
+          acceptedBy,
+          autoAccepted: isAutoAccepted,
+          sellerResponseStatus: responseStatus,
           customerPaymentPendingExpiresAt: paymentTimeoutDate,
           expiresAt: paymentTimeoutDate,
         },
@@ -192,6 +246,10 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
           workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
           status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
           sellerAcceptedAt: now,
+          acceptedAt: now,
+          acceptedBy,
+          autoAccepted: isAutoAccepted,
+          sellerResponseStatus: responseStatus,
           deliverySearchExpiresAt: new Date(now.getTime() + deliveryMs),
           deliverySearchMeta: {
             radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
@@ -203,7 +261,11 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
       };
 
   const updated = await Order.findOneAndUpdate(
-    { _id: orderForCheck._id },
+    {
+      _id: orderForCheck._id,
+      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+      sellerResponseStatus: "PENDING",
+    },
     updatePayload,
     { new: true },
   )
@@ -211,9 +273,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     .populate("seller", "shopName address name location serviceRadius");
 
   if (!updated) {
-    const err = new Error("Order not available for acceptance or expired");
-    err.statusCode = 409;
-    throw err;
+    return null;
   }
 
   await removeSellerTimeoutJob(orderId);
@@ -235,6 +295,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
       {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
         deliverySearchExpiresAt: updated.deliverySearchExpiresAt,
+        autoAccepted: isAutoAccepted,
       },
       updated.customer?._id || updated.customer,
     );
@@ -249,6 +310,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
       {
         workflowStatus: WORKFLOW_STATUS.SELLER_ACCEPTED,
         customerPaymentPendingExpiresAt: updated.customerPaymentPendingExpiresAt,
+        autoAccepted: isAutoAccepted,
       },
       updated.customer?._id || updated.customer,
     );
@@ -261,6 +323,49 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     sellerId: updated.seller?._id || updated.seller,
     isPaymentPending: isPaymentPending,
   });
+
+  return updated;
+}
+
+/**
+ * Seller accepts: SELLER_PENDING -> SELLER_ACCEPTED (if pending payment) or DELIVERY_SEARCH (atomic).
+ */
+export async function sellerAcceptAtomic(sellerId, orderId) {
+  orderId = await requireCanonicalOrderId(orderId);
+  const now = new Date();
+
+  const orderForCheck = await Order.findOne({
+    orderId,
+    seller: sellerId,
+    workflowVersion: { $gte: 2 },
+    workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+    sellerResponseStatus: "PENDING",
+    $or: [
+      { sellerResponseDeadline: { $gt: now } },
+      { sellerPendingExpiresAt: { $gt: now } },
+    ],
+  });
+
+  if (!orderForCheck) {
+    const err = new Error("Order not available for acceptance or expired");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const updated = await executeOrderAcceptance({
+    orderId,
+    sellerId,
+    acceptedBy: "SELLER",
+    isAutoAccepted: false,
+  });
+
+  if (!updated) {
+    const err = new Error("Order not available for acceptance or expired");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  logger.info(`Order #${orderId} manually accepted by seller #${sellerId}`);
 
   return updated;
 }
@@ -337,12 +442,17 @@ export async function sellerRejectAtomic(sellerId, orderId) {
       seller: sellerId,
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-      sellerPendingExpiresAt: { $gt: now },
+      sellerResponseStatus: "PENDING",
+      $or: [
+        { sellerResponseDeadline: { $gt: now } },
+        { sellerPendingExpiresAt: { $gt: now } },
+      ],
     },
     {
       $set: {
         workflowStatus: WORKFLOW_STATUS.CANCELLED,
         status: "cancelled",
+        sellerResponseStatus: "REJECTED",
         cancelledBy: "seller",
         cancelReason: "Rejected by seller",
       },
@@ -351,16 +461,19 @@ export async function sellerRejectAtomic(sellerId, orderId) {
   );
 
   if (!order) {
-    const err = new Error("Order not available to reject");
+    const err = new Error("Order not available to reject or already expired/accepted");
     err.statusCode = 409;
     throw err;
   }
+
+  logger.info(`Order #${orderId} manually rejected by seller #${sellerId}`);
 
   await removeSellerTimeoutJob(orderId);
   await compensateOrderCancellation(order, orderId);
 
   emitOrderStatusUpdate(order.orderId, {
     workflowStatus: WORKFLOW_STATUS.CANCELLED,
+    sellerResponseStatus: "REJECTED",
   }, order.customer);
   emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
     orderId: order.orderId,
@@ -368,7 +481,7 @@ export async function sellerRejectAtomic(sellerId, orderId) {
     userId: order.customer,
     sellerId: order.seller,
     customerMessage: "Your order was cancelled by the seller.",
-    sellerMessage: `Order #${order.orderId} was cancelled.`,
+    sellerMessage: `Order #${order.orderId} was rejected by you.`,
   });
   return order;
 }
@@ -511,44 +624,99 @@ export async function deliveryAcceptAtomic(deliveryId, orderId, idempotencyKey) 
 }
 
 export async function processSellerTimeoutJob({ orderId }) {
+  orderId = await requireCanonicalOrderId(orderId);
   const now = new Date();
-  const order = await Order.findOne({ orderId, workflowVersion: { $gte: 2 } });
-  if (!order || order.workflowStatus !== WORKFLOW_STATUS.SELLER_PENDING) return;
+  const order = await Order.findOne({
+    orderId,
+    workflowVersion: { $gte: 2 },
+    workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+    sellerResponseStatus: "PENDING",
+  });
+  if (!order) return null;
 
-  if (order.sellerPendingExpiresAt && order.sellerPendingExpiresAt > now) {
-    return;
+  const deadline = order.sellerResponseDeadline || order.sellerPendingExpiresAt;
+  if (deadline && deadline > now) {
+    return null;
   }
 
-  const updated = await Order.findOneAndUpdate(
-    {
-      orderId,
+  const updated = await executeOrderAcceptance({
+    orderId,
+    sellerId: order.seller,
+    acceptedBy: "SYSTEM",
+    isAutoAccepted: true,
+  });
+
+  if (!updated) {
+    logger.info(`Order #${orderId} was already handled before auto-accept`);
+    return null;
+  }
+
+  const timeoutSec = Math.round(DEFAULT_SELLER_TIMEOUT_MS() / 1000);
+  logger.info(`Order #${orderId} automatically accepted after ${timeoutSec} seconds`);
+
+  const sellerUid = updated.seller?._id
+    ? updated.seller._id.toString()
+    : updated.seller?.toString();
+  const autoAcceptMsg = `Order #${updated.orderId} was automatically accepted because no response was received within ${timeoutSec} seconds.`;
+
+  if (sellerUid) {
+    emitToSeller(sellerUid, {
+      event: "order:auto_accepted",
+      payload: {
+        orderId: updated.orderId,
+        workflowStatus: updated.workflowStatus,
+        status: updated.status,
+        autoAccepted: true,
+        acceptedBy: "SYSTEM",
+        message: autoAcceptMsg,
+      },
+    });
+  }
+
+  emitToOrder(updated.orderId, {
+    event: "order:auto_accepted",
+    payload: {
+      orderId: updated.orderId,
+      workflowStatus: updated.workflowStatus,
+      status: updated.status,
+      autoAccepted: true,
+      acceptedBy: "SYSTEM",
+      message: autoAcceptMsg,
+    },
+  });
+
+  return updated;
+}
+
+/**
+ * Startup recovery: find any v2 orders in SELLER_PENDING and process them or reschedule timer.
+ */
+export async function recoverPendingSellerOrdersOnStartup() {
+  try {
+    const now = new Date();
+    const pendingOrders = await Order.find({
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-    },
-    {
-      $set: {
-        workflowStatus: WORKFLOW_STATUS.CANCELLED,
-        status: "cancelled",
-        cancelledBy: "system",
-        cancelReason: "Seller timeout (60s)",
-      },
-    },
-    { new: true },
-  );
+      sellerResponseStatus: "PENDING",
+    }).select("orderId sellerResponseDeadline sellerPendingExpiresAt");
 
-  if (!updated) return;
+    if (!pendingOrders.length) return;
+    logger.info(`Found ${pendingOrders.length} pending seller orders during startup check`);
 
-  await compensateOrderCancellation(updated, orderId);
-
-  emitOrderStatusUpdate(orderId, { workflowStatus: WORKFLOW_STATUS.CANCELLED }, updated.customer);
-  emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
-    orderId: updated.orderId,
-    customerId: updated.customer,
-    userId: updated.customer,
-    sellerId: updated.seller,
-    customerMessage: "Your order was cancelled because seller did not accept in time.",
-    sellerMessage: `Order #${updated.orderId} was cancelled due to timeout.`,
-  });
+    for (const order of pendingOrders) {
+      const deadline = order.sellerResponseDeadline || order.sellerPendingExpiresAt;
+      if (!deadline || deadline <= now) {
+        logger.info(`Startup auto-accepting expired order #${order.orderId}`);
+        await processSellerTimeoutJob({ orderId: order.orderId });
+      } else {
+        const remainingMs = deadline.getTime() - now.getTime();
+        logger.info(`Rescheduling auto-accept for order #${order.orderId} in ${Math.round(remainingMs / 1000)}s`);
+        await scheduleSellerTimeoutJob(order.orderId, remainingMs);
+      }
+    }
+  } catch (err) {
+    logger.error("Startup seller order recovery failed", { error: err.message });
+  }
 }
 
 export async function processDeliveryTimeoutJob({ orderId, attempt }) {

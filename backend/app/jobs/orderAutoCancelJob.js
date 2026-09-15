@@ -13,7 +13,7 @@ import logger from "../services/logger.js";
 
 dotenv.config();
 
-const DEFAULT_INTERVAL_MS = 10000;
+const DEFAULT_INTERVAL_MS = 3000;
 const AUTO_CANCEL_INTERVAL_MS = parseInt(
   process.env.AUTO_CANCEL_INTERVAL_MS || `${DEFAULT_INTERVAL_MS}`,
   10,
@@ -21,7 +21,7 @@ const AUTO_CANCEL_INTERVAL_MS = parseInt(
 
 /**
  * Fallback when Bull/Redis is unavailable: reconciles expired seller-pending orders (v2)
- * by delegating to the same handler as the queue worker.
+ * by delegating to the same handler as the queue worker (auto-accepting).
  * Legacy v1 orders use status + expiresAt only.
  */
 const autoCancelExpiredOrders = async () => {
@@ -33,7 +33,11 @@ const autoCancelExpiredOrders = async () => {
     const v2Expired = await Order.find({
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-      sellerPendingExpiresAt: { $lte: now },
+      sellerResponseStatus: "PENDING",
+      $or: [
+        { sellerResponseDeadline: { $lte: now } },
+        { sellerPendingExpiresAt: { $lte: now } },
+      ],
     })
       .select("orderId")
       .lean();

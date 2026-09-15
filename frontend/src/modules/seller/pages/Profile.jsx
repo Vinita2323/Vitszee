@@ -27,7 +27,14 @@ import {
   ChevronRight,
   HelpCircle,
   BarChart3,
-  Wallet
+  Wallet,
+  Sliders,
+  Navigation,
+  Compass,
+  RotateCcw,
+  Check,
+  Plus,
+  Minus
 } from "lucide-react";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
@@ -54,6 +61,7 @@ const SellerProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingRadius, setIsSavingRadius] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -135,13 +143,73 @@ const SellerProfile = () => {
       ...prev,
       lat: location.lat ?? location.latitude,
       lng: location.lng ?? location.longitude,
-      radius: location.radius || prev.radius,
+      radius: location.radius ? Number(location.radius) : prev.radius,
       address: location.formattedAddress || location.address || prev.address,
       locality: location.area || location.locality || prev.locality,
       city: location.city || prev.city,
       state: location.state || prev.state,
       pincode: location.pincode || prev.pincode,
     }));
+  };
+
+  const handleRadiusChange = (newRadius) => {
+    const val = Math.max(1, Math.min(100, Number(newRadius) || 1));
+    setFormData((prev) => ({ ...prev, radius: val }));
+  };
+
+  const handleQuickSaveRadius = async () => {
+    const r = Number(formData.radius);
+    if (!r || r < 1 || r > 100) {
+      toast.error("Service radius must be between 1 and 100 km.");
+      return;
+    }
+    setIsSavingRadius(true);
+    try {
+      await sellerApi.updateProfile({ radius: r, serviceRadius: r });
+      setProfile((prev) => ({ ...prev, serviceRadius: r }));
+      toast.success(`Service radius successfully updated to ${r} KM!`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update service radius");
+    } finally {
+      setIsSavingRadius(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    if (profile) {
+      setFormData({
+        name: profile.name || "",
+        shopName: profile.shopName || "",
+        phone: profile.phone || "",
+        email: profile.email || "",
+        lat: profile.location?.coordinates ? profile.location.coordinates[1] : null,
+        lng: profile.location?.coordinates ? profile.location.coordinates[0] : null,
+        radius: profile.serviceRadius || 5,
+        address: profile.address || "",
+        locality: profile.locality || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        pincode: profile.pincode || "",
+        dob: profile.dob || "",
+        bankDetails: profile.bankDetails || {
+          bankName: "",
+          accountNumber: "",
+          ifscCode: "",
+          accountHolderName: "",
+        },
+      });
+    }
+  };
+
+  const getMapZoom = (radiusKm) => {
+    const r = Number(radiusKm) || 5;
+    if (r <= 3) return 14;
+    if (r <= 7) return 13;
+    if (r <= 15) return 12;
+    if (r <= 30) return 11;
+    if (r <= 60) return 10;
+    return 9;
   };
 
   const handleChange = (e) => {
@@ -161,12 +229,12 @@ const SellerProfile = () => {
 
   const handleBankDetailsChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       bankDetails: {
         ...prev.bankDetails,
-        [name]: value
-      }
+        [name]: value,
+      },
     }));
   };
 
@@ -186,7 +254,8 @@ const SellerProfile = () => {
         ...formData,
         lat: formData.lat,
         lng: formData.lng,
-        radius: formData.radius,
+        radius: Number(formData.radius),
+        serviceRadius: Number(formData.radius),
       };
       await sellerApi.updateProfile(payload);
       toast.success("Profile updated successfully");
@@ -329,7 +398,7 @@ const SellerProfile = () => {
             ) : (
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleCancel}
                   className="flex-1 sm:flex-none bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all rounded-xl px-4 py-3 text-xs font-bold flex items-center justify-center"
                 >
                   Cancel
@@ -657,33 +726,49 @@ const SellerProfile = () => {
 
       {/* ==================== THIRD ROW ==================== */}
       <Card className="p-6 md:p-8 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] rounded-[20px] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
-        <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-3">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <MapPin size={18} className="text-[#1A8CFF]" />
-            Location & Service Area
-          </h3>
-          <Button
-            type="button"
-            onClick={() => {
-              setIsMapOpen(true);
-              setIsEditing(true);
-            }}
-            className="bg-blue-50 hover:bg-blue-100 text-[#1A8CFF] border border-blue-200 rounded-lg px-3.5 py-1.5 text-[10px] font-bold tracking-wider uppercase transition-all flex items-center gap-1.5"
-          >
-            <MapPin size={13} />
-            Manage Location
-          </Button>
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6 border-b border-slate-50 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <MapPin size={18} className="text-[#1A8CFF]" />
+              Location & Service Area
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Configure your store GPS coordinates and customer delivery perimeter
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                setIsMapOpen(true);
+              }}
+              className="bg-blue-50 hover:bg-blue-100 text-[#1A8CFF] border border-blue-200 rounded-xl px-3.5 py-2 text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 active:scale-95"
+            >
+              <MapPin size={14} />
+              Set Pin on Map
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8">
+          {/* Left Column: Address + Service Radius Controller */}
+          <div className="space-y-5">
+            {/* Store Address Box */}
+            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
               <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-blue-50 text-[#1A8CFF] flex items-center justify-center shrink-0 border border-blue-100">
+                <div className="h-8 w-8 rounded-xl bg-blue-100/70 text-[#1A8CFF] flex items-center justify-center shrink-0 border border-blue-200/50 mt-0.5">
                   <MapPin size={16} />
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-700">Store Address</h4>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-700">Store Address</h4>
+                    {formData.lat && formData.lng && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        GPS Pin Active
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1">
                     {formData.address || profile?.address || "Please set your location on the map to define the address."}
                   </p>
@@ -691,103 +776,291 @@ const SellerProfile = () => {
               </div>
 
               {formData.lat && formData.lng && (
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200/50">
-                  <div>
-                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block">Latitude</span>
-                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{Number(formData.lat).toFixed(6)}</span>
+                <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-slate-200/60">
+                  <div className="bg-white/70 px-3 py-1.5 rounded-lg border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Latitude</span>
+                    <span className="text-xs font-semibold text-slate-700 tabular-nums">{Number(formData.lat).toFixed(6)}</span>
                   </div>
-                  <div>
-                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block">Longitude</span>
-                    <span className="text-xs font-semibold text-slate-600 tabular-nums">{Number(formData.lng).toFixed(6)}</span>
+                  <div className="bg-white/70 px-3 py-1.5 rounded-lg border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Longitude</span>
+                    <span className="text-xs font-semibold text-slate-700 tabular-nums">{Number(formData.lng).toFixed(6)}</span>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* City / State / Pincode Row */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
-                <span className="text-[9px] font-semibold text-slate-400 uppercase block">Pin Code</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">
+              <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-100 text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Pin Code</span>
+                <span className="text-xs font-bold text-slate-700 mt-0.5 block">
                   {formData.pincode || profile?.pincode || "452001"}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
-                <span className="text-[9px] font-semibold text-slate-400 uppercase block">State</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">
-                  {formData.state || profile?.state || "MP"}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
-                <span className="text-[9px] font-semibold text-slate-400 uppercase block">City</span>
-                <span className="text-xs font-bold text-slate-700 mt-1 block">
+              <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-100 text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">City</span>
+                <span className="text-xs font-bold text-slate-700 mt-0.5 block">
                   {formData.city || profile?.city || "Indore"}
                 </span>
               </div>
+              <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-100 text-center">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">State</span>
+                <span className="text-xs font-bold text-slate-700 mt-0.5 block">
+                  {formData.state || profile?.state || "MP"}
+                </span>
+              </div>
             </div>
 
-            <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100/50 flex items-start gap-2">
-              <span className="bg-blue-100 text-[#1A8CFF] rounded-full p-0.5 text-[8px] mt-0.5">✔</span>
-              <p className="text-[10px] text-blue-800 font-medium leading-relaxed">
-                Active Service Coverage: <span className="font-bold">{formData.radius || profile?.serviceRadius || 5} KM</span> radius around {formData.city || profile?.city || "Indore"}{formData.state || profile?.state ? `, ${formData.state || profile?.state}` : ""}.
-              </p>
+            {/* ================= SERVICE RADIUS CONTROLLER ================= */}
+            <div className="p-5 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-slate-50 rounded-2xl border border-blue-100/80 shadow-[0_2px_12px_rgba(26,140,255,0.04)] space-y-4">
+              {/* Header & Live Badges */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-[#1A8CFF] text-white flex items-center justify-center shadow-sm shadow-blue-500/20">
+                    <Sliders size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Delivery Service Radius</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Covers approx <span className="font-semibold text-slate-700">~{Math.round(Math.PI * Math.pow(Number(formData.radius) || 5, 2))} km²</span> area
+                    </p>
+                  </div>
+                </div>
+
+                {/* Live Distance Pill */}
+                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-blue-200/70 shadow-sm">
+                  <Compass size={14} className="text-[#1A8CFF]" />
+                  <span className="text-base font-extrabold text-[#1A8CFF] tabular-nums">
+                    {formData.radius || 5}
+                  </span>
+                  <span className="text-xs font-bold text-slate-500">KM</span>
+                </div>
+              </div>
+
+              {/* Slider Track */}
+              <div className="space-y-1.5 pt-1">
+                <div className="relative flex items-center">
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={formData.radius || 5}
+                    onChange={(e) => handleRadiusChange(e.target.value)}
+                    className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#1A8CFF] transition-all"
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-semibold text-slate-400 px-0.5">
+                  <span>1 KM (Local)</span>
+                  <span>25 KM</span>
+                  <span>50 KM</span>
+                  <span>75 KM</span>
+                  <span>100 KM (Max)</span>
+                </div>
+              </div>
+
+              {/* Stepper & Direct Number Input */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRadiusChange((Number(formData.radius) || 5) - 1)}
+                    disabled={(Number(formData.radius) || 5) <= 1}
+                    className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-[#1A8CFF] hover:text-[#1A8CFF] disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition-all flex items-center justify-center font-bold text-sm shadow-sm"
+                    title="Decrease 1 km"
+                  >
+                    <Minus size={13} />
+                  </button>
+
+                  <div className="relative flex items-center">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.radius || ""}
+                      onChange={(e) => handleRadiusChange(e.target.value)}
+                      className="w-16 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-[#1A8CFF] transition-all shadow-sm tabular-nums"
+                    />
+                    <span className="text-[11px] font-bold text-slate-400 ml-1.5">KM</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRadiusChange((Number(formData.radius) || 5) + 1)}
+                    disabled={(Number(formData.radius) || 5) >= 100}
+                    className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-[#1A8CFF] hover:text-[#1A8CFF] disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition-all flex items-center justify-center font-bold text-sm shadow-sm"
+                    title="Increase 1 km"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+
+                {/* Quick Save Button */}
+                <Button
+                  type="button"
+                  onClick={handleQuickSaveRadius}
+                  disabled={isSavingRadius}
+                  className={`h-8 px-3.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                    Number(formData.radius) !== Number(profile?.serviceRadius || 5)
+                      ? "bg-[#1A8CFF] text-white hover:bg-[#1177db] shadow-blue-500/25"
+                      : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {isSavingRadius ? (
+                    "Saving..."
+                  ) : Number(formData.radius) !== Number(profile?.serviceRadius || 5) ? (
+                    <>
+                      <Check size={13} />
+                      Save Radius ({formData.radius} KM)
+                    </>
+                  ) : (
+                    <>
+                      <Check size={13} className="text-emerald-500" />
+                      Saved ({profile?.serviceRadius || 5} KM)
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Quick Presets
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "3 KM", sub: "Hyperlocal", value: 3 },
+                    { label: "5 KM", sub: "Standard", value: 5 },
+                    { label: "10 KM", sub: "City", value: 10 },
+                    { label: "15 KM", sub: "Extended", value: 15 },
+                    { label: "25 KM", sub: "Metro", value: 25 },
+                    { label: "50 KM", sub: "Regional", value: 50 },
+                  ].map((preset) => {
+                    const isSelected = Number(formData.radius) === preset.value;
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => handleRadiusChange(preset.value)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-[#1A8CFF] text-white border-[#1A8CFF] shadow-sm shadow-blue-500/20 scale-105"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-[#1A8CFF]/50 hover:bg-blue-50/50"
+                        }`}
+                      >
+                        <span>{preset.label}</span>
+                        <span className={`text-[9px] ${isSelected ? "text-blue-100" : "text-slate-400"}`}>
+                          {preset.sub}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Coverage Category Info */}
+              <div className="p-3 bg-white/80 rounded-xl border border-blue-100/60 flex items-center gap-2.5 text-xs">
+                <span className="text-base">
+                  {Number(formData.radius) <= 5 ? "🛵" : Number(formData.radius) <= 15 ? "🚚" : "🚛"}
+                </span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {Number(formData.radius) <= 5 ? (
+                    <>
+                      <strong className="text-slate-800">Hyperlocal Delivery Reach:</strong> Ideal for rapid grocery, perishable goods, and quick commerce delivery within minutes.
+                    </>
+                  ) : Number(formData.radius) <= 15 ? (
+                    <>
+                      <strong className="text-slate-800">City-Wide Coverage:</strong> Standard perimeter covering the majority of urban customers and neighborhood sectors.
+                    </>
+                  ) : (
+                    <>
+                      <strong className="text-slate-800">Regional / Metro Reach:</strong> Extended logistics perimeter suited for specialized, bulk, or long-distance courier shipping.
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="h-56 lg:h-auto rounded-xl border border-slate-200 overflow-hidden relative shadow-inner bg-slate-50 min-h-[220px]">
-            {isMapLoaded && formData.lat && formData.lng ? (
-              <div className="w-full h-full min-h-[220px] relative">
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "100%", minHeight: "220px" }}
-                  center={{ lat: Number(formData.lat), lng: Number(formData.lng) }}
-                  zoom={14}
-                  options={{
-                    disableDefaultUI: true,
-                    zoomControl: true,
-                    streetViewControl: false,
-                    mapTypeControl: false,
-                    fullscreenControl: false,
-                  }}
-                >
-                  <Marker position={{ lat: Number(formData.lat), lng: Number(formData.lng) }} />
-                  <Circle
+          {/* Right Column: Dynamic Google Map Preview */}
+          <div className="flex flex-col h-full min-h-[360px]">
+            <div className="flex items-center justify-between pb-2 mb-2">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Navigation size={14} className="text-[#1A8CFF]" />
+                Live Map Perimeter Preview
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400">
+                Center: {formData.city || profile?.city || "Indore"}
+              </span>
+            </div>
+
+            <div className="flex-1 rounded-2xl border border-slate-200 overflow-hidden relative shadow-inner bg-slate-50 min-h-[320px]">
+              {isMapLoaded && formData.lat && formData.lng ? (
+                <div className="w-full h-full min-h-[320px] relative">
+                  <GoogleMap
+                    mapContainerStyle={{ width: "100%", height: "100%", minHeight: "320px" }}
                     center={{ lat: Number(formData.lat), lng: Number(formData.lng) }}
-                    radius={(Number(formData.radius) || 5) * 1000}
+                    zoom={getMapZoom(formData.radius)}
                     options={{
-                      fillColor: "#1A8CFF",
-                      fillOpacity: 0.12,
-                      strokeColor: "#1A8CFF",
-                      strokeOpacity: 0.6,
-                      strokeWeight: 2,
-                      clickable: false,
+                      disableDefaultUI: true,
+                      zoomControl: true,
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false,
                     }}
-                  />
-                </GoogleMap>
-                <button
-                  type="button"
+                  >
+                    <Marker position={{ lat: Number(formData.lat), lng: Number(formData.lng) }} />
+                    <Circle
+                      center={{ lat: Number(formData.lat), lng: Number(formData.lng) }}
+                      radius={(Number(formData.radius) || 5) * 1000}
+                      options={{
+                        fillColor: "#1A8CFF",
+                        fillOpacity: 0.16,
+                        strokeColor: "#1A8CFF",
+                        strokeOpacity: 0.75,
+                        strokeWeight: 2,
+                        clickable: false,
+                      }}
+                    />
+                  </GoogleMap>
+
+                  {/* Top-Left Coverage Badge */}
+                  <div className="absolute top-2.5 left-2.5 bg-white/95 backdrop-blur-md shadow-md text-slate-800 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-200/80 flex items-center gap-2 z-10">
+                    <span className="w-2 h-2 rounded-full bg-[#1A8CFF] animate-pulse" />
+                    <span>Coverage: {formData.radius || 5} KM Radius</span>
+                  </div>
+
+                  {/* Top-Right Edit on Map Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMapOpen(true);
+                    }}
+                    className="absolute top-2.5 right-2.5 bg-white/95 backdrop-blur-md shadow-md hover:bg-white text-slate-700 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-200/80 transition-all flex items-center gap-1.5 z-10 hover:scale-105 active:scale-95"
+                  >
+                    <Edit2 size={12} className="text-[#1A8CFF]" /> Re-pin Location
+                  </button>
+                </div>
+              ) : (
+                <div
                   onClick={() => {
                     setIsMapOpen(true);
-                    setIsEditing(true);
                   }}
-                  className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm shadow-md hover:bg-white text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md border border-slate-200 transition-all flex items-center gap-1 z-10"
+                  className="w-full h-full min-h-[320px] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-all p-6 text-center group"
                 >
-                  <Edit2 size={11} /> Edit on Map
-                </button>
-              </div>
-            ) : (
-              <div
-                onClick={() => {
-                  setIsMapOpen(true);
-                  setIsEditing(true);
-                }}
-                className="w-full h-full min-h-[220px] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-all p-6 text-center group"
-              >
-                <div className="h-11 w-11 rounded-full bg-blue-50 text-[#1A8CFF] group-hover:bg-[#1A8CFF] group-hover:text-white flex items-center justify-center transition-all mb-2 shadow-sm">
-                  <MapPin size={22} />
+                  <div className="h-12 w-12 rounded-2xl bg-blue-50 text-[#1A8CFF] group-hover:bg-[#1A8CFF] group-hover:text-white flex items-center justify-center transition-all mb-3 shadow-sm">
+                    <MapPin size={24} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-700">Pin Store Location on Map</span>
+                  <span className="text-xs text-slate-400 mt-1 max-w-[240px]">
+                    Click here to pinpoint your shop coordinates and visualize your {formData.radius || 5} KM coverage circle
+                  </span>
+                  <div className="mt-4 px-4 py-2 bg-blue-50 text-[#1A8CFF] font-bold text-xs rounded-xl border border-blue-100 group-hover:bg-[#1A8CFF] group-hover:text-white transition-all">
+                    Open Map Picker
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-slate-700">Set Store Location</span>
-                <span className="text-[10px] text-slate-400 mt-0.5">Click to choose coordinates & service radius on map</span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </Card>
@@ -944,6 +1217,7 @@ const SellerProfile = () => {
               : null
           }
           initialRadius={Number(formData.radius) || 5}
+          maxRadius={100}
           showRadius={true}
           title="Set Store Location & Service Radius"
         />

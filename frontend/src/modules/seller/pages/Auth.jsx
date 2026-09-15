@@ -25,7 +25,6 @@ import {
   Eye,
   EyeOff,
   Calendar,
-  Droplets,
 } from "lucide-react";
 import { toast } from "sonner";
 import Lottie from "lottie-react";
@@ -44,7 +43,6 @@ const createInitialVerificationState = () => ({
 });
 
 const REQUIRED_DOCUMENT_CONFIG = [
-  { id: "tradeLicense", label: "Trade License" },
   { id: "gstCertificate", label: "GST Certificate" },
   { id: "idProof", label: "ID Proof" },
 ];
@@ -82,7 +80,6 @@ const Auth = () => {
     radius: 5,
     address: "",
     dob: "",
-    bloodGroup: "",
   });
 
   React.useEffect(() => {
@@ -119,7 +116,6 @@ const Auth = () => {
   };
 
   const [documents, setDocuments] = useState({
-    tradeLicense: null,
     gstCertificate: null,
     idProof: null,
   });
@@ -394,7 +390,6 @@ const Auth = () => {
         setIsLogin(true);
         setSignupStep(1);
         setDocuments({
-          tradeLicense: null,
           gstCertificate: null,
           idProof: null,
         });
@@ -665,39 +660,16 @@ const Auth = () => {
                     </div>
                     
                     {!isLogin && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 ml-0.5">Date of Birth</label>
-                          <div className="relative group">
-                            <input
-                              type="date"
-                              name="dob"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
-                              value={formData.dob}
-                              onChange={handleChange}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 ml-0.5">Blood Group</label>
-                          <div className="relative group">
-                            <select
-                              name="bloodGroup"
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all appearance-none"
-                              value={formData.bloodGroup}
-                              onChange={handleChange}
-                            >
-                              <option value="" disabled>Select Blood Group</option>
-                              <option value="A+">A+</option>
-                              <option value="A-">A-</option>
-                              <option value="B+">B+</option>
-                              <option value="B-">B-</option>
-                              <option value="O+">O+</option>
-                              <option value="O-">O-</option>
-                              <option value="AB+">AB+</option>
-                              <option value="AB-">AB-</option>
-                            </select>
-                          </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 ml-0.5">Date of Birth</label>
+                        <div className="relative group">
+                          <input
+                            type="date"
+                            name="dob"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-[#1A8CFF] focus:ring-2 focus:ring-[#1A8CFF]/10 transition-all placeholder:text-slate-300"
+                            value={formData.dob}
+                            onChange={handleChange}
+                          />
                         </div>
                       </div>
                     )}

@@ -20,12 +20,16 @@ const generateToken = (seller) =>
     });
 
 const SELLER_DOCUMENT_FIELDS = {
-    tradeLicense: "Trade License",
     gstCertificate: "GST Certificate",
     idProof: "ID Proof",
 };
 
 const REQUIRED_SELLER_DOCUMENT_FIELDS = Object.keys(SELLER_DOCUMENT_FIELDS);
+const ALLOWED_SELLER_DOCUMENT_FIELDS = [
+    "tradeLicense",
+    "gstCertificate",
+    "idProof",
+];
 
 const parseDocumentsPayload = (documents) => {
     if (!documents) {
@@ -112,7 +116,7 @@ export const signupSeller = async (req, res) => {
             for (const file of documentFiles) {
                 try {
                     const fieldName = file.fieldname;
-                    if (fieldName && REQUIRED_SELLER_DOCUMENT_FIELDS.includes(fieldName)) {
+                    if (fieldName && ALLOWED_SELLER_DOCUMENT_FIELDS.includes(fieldName)) {
                         const url = await uploadToCloudinary(file.buffer, "docs", {
                             mimeType: file.mimetype,
                         });

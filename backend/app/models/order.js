@@ -340,6 +340,25 @@ const orderSchema = new mongoose.Schema(
       default: 1,
     },
     sellerPendingExpiresAt: Date,
+    sellerResponseDeadline: {
+      type: Date,
+      index: true,
+    },
+    sellerResponseStatus: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REJECTED", "AUTO_ACCEPTED"],
+      default: "PENDING",
+      index: true,
+    },
+    acceptedBy: {
+      type: String,
+      enum: ["SELLER", "SYSTEM"],
+      default: null,
+    },
+    autoAccepted: {
+      type: Boolean,
+      default: false,
+    },
     deliverySearchExpiresAt: Date,
     sellerAcceptedAt: Date,
     customerPaymentPendingExpiresAt: Date,
@@ -553,6 +572,8 @@ orderSchema.index({ customer: 1, status: 1, createdAt: -1 });
 orderSchema.index({ status: 1, expiresAt: 1 });
 orderSchema.index({ seller: 1, returnStatus: 1, returnRequestedAt: -1 });
 orderSchema.index({ workflowStatus: 1, sellerPendingExpiresAt: 1 });
+orderSchema.index({ workflowStatus: 1, sellerResponseDeadline: 1 });
+orderSchema.index({ workflowStatus: 1, sellerResponseStatus: 1 });
 orderSchema.index({ workflowStatus: 1, deliverySearchExpiresAt: 1 });
 orderSchema.index({ returnStatus: 1, returnSearchExpiresAt: 1 });
 orderSchema.index({ deliveryBoy: 1, workflowStatus: 1 });

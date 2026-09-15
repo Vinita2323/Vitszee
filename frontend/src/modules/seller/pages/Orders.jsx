@@ -39,6 +39,41 @@ import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
 import { getOrderStatusVariant } from '../components/orders';
 
+function OrderAutoAcceptTimer({ deadline, onExpired }) {
+    const [secondsLeft, setSecondsLeft] = useState(() => {
+        if (!deadline) return 0;
+        const diff = new Date(deadline).getTime() - Date.now();
+        return Math.max(0, Math.ceil(diff / 1000));
+    });
+
+    useEffect(() => {
+        if (!deadline) return;
+        const timer = setInterval(() => {
+            const diff = new Date(deadline).getTime() - Date.now();
+            const left = Math.max(0, Math.ceil(diff / 1000));
+            setSecondsLeft(left);
+            if (left <= 0) {
+                clearInterval(timer);
+                if (typeof onExpired === 'function') onExpired();
+            }
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [deadline, onExpired]);
+
+    if (secondsLeft <= 0) {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                <HiOutlineClock className="w-3 h-3 text-amber-600" /> Auto-accepting...
+            </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm animate-pulse">
+            <HiOutlineClock className="w-3 h-3 text-amber-600" /> Auto-accepts in {secondsLeft}s
+        </span>
+    );
+}
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
@@ -134,6 +169,11 @@ const Orders = () => {
                     ? 'Cash on Delivery'
                     : 'Online Paid',
                 activeSellerOtp: order.activeSellerOtp,
+                sellerPendingExpiresAt: order.sellerPendingExpiresAt,
+                sellerResponseDeadline: order.sellerResponseDeadline,
+                sellerResponseStatus: order.sellerResponseStatus,
+                acceptedBy: order.acceptedBy,
+                autoAccepted: Boolean(order.autoAccepted || order.acceptedBy === 'SYSTEM'),
             }));
 
             setOrders(formattedOrders);
@@ -509,9 +549,19 @@ const Orders = () => {
                                                     <p className="text-sm font-black text-slate-900 mt-2">₹{order.total.toLocaleString()}</p>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 shrink-0">
-                                                    <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
-                                                        {order.status}
-                                                    </Badge>
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
+                                                            {order.status}
+                                                        </Badge>
+                                                        {order.status === 'pending' && (order.sellerResponseDeadline || order.sellerPendingExpiresAt) && (
+                                                            <OrderAutoAcceptTimer deadline={order.sellerResponseDeadline || order.sellerPendingExpiresAt} onExpired={() => fetchOrders(page, false)} />
+                                                        )}
+                                                        {order.autoAccepted && (
+                                                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                                                                Auto-Accepted
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <select
                                                         value={order.status}
                                                         onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
@@ -578,6 +628,18 @@ const Orders = () => {
                                                                 <HiOutlineCalendarDays className="h-3 w-3" />
                                                                 {order.date} • {order.time}
                                                             </div>
+                                                            {order.status === 'pending' && (order.sellerResponseDeadline || order.sellerPendingExpiresAt) && (
+                                                                <div className="mt-1.5">
+                                                                    <OrderAutoAcceptTimer deadline={order.sellerResponseDeadline || order.sellerPendingExpiresAt} onExpired={() => fetchOrders(page, false)} />
+                                                                </div>
+                                                            )}
+                                                            {order.autoAccepted && (
+                                                                <div className="mt-1">
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                                                                        <HiOutlineCheck className="w-3 h-3 text-emerald-600" /> Auto-Accepted
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                             {order.activeSellerOtp && (
                                                                 <div className="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm inline-flex">
                                                                     <div className="flex items-center gap-1.5 mr-3">
