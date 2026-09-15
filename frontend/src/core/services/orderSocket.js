@@ -207,6 +207,13 @@ export function onSellerOrderNew(getToken, handler) {
   return () => s.off("order:new", handler);
 }
 
+export function onSellerOrderAutoAccepted(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("order:auto_accepted", handler);
+  return () => s.off("order:auto_accepted", handler);
+}
+
 export function onSellerDeliveryArrived(getToken, handler) {
   const s = getOrderSocket(getToken);
   if (!s || typeof handler !== "function") return () => {};

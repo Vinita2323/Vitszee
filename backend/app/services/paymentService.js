@@ -283,6 +283,8 @@ async function moveOrderToSellerPendingAfterPayment(orderId) {
       $set: {
         workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
         sellerPendingExpiresAt: sellerPendingUntil,
+        sellerResponseDeadline: sellerPendingUntil,
+        sellerResponseStatus: "PENDING",
         expiresAt: sellerPendingUntil,
       },
     },

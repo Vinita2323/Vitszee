@@ -14,9 +14,17 @@ export const WORKFLOW_STATUS = {
   CANCELLED: "CANCELLED",
 };
 
-/** Milliseconds — override via env in services */
-export const DEFAULT_SELLER_TIMEOUT_MS = () =>
-  parseInt(process.env.SELLER_TIMEOUT_MS || "60000", 10);
+export const DEFAULT_SELLER_TIMEOUT_MS = () => {
+  if (process.env.SELLER_AUTO_ACCEPT_TIMEOUT_SECONDS) {
+    const sec = parseInt(process.env.SELLER_AUTO_ACCEPT_TIMEOUT_SECONDS, 10);
+    if (!Number.isNaN(sec) && sec > 0) return sec * 1000;
+  }
+  if (process.env.SELLER_TIMEOUT_MS) {
+    const ms = parseInt(process.env.SELLER_TIMEOUT_MS, 10);
+    if (!Number.isNaN(ms) && ms > 0) return ms;
+  }
+  return 20000;
+};
 export const DEFAULT_DELIVERY_TIMEOUT_MS = () =>
   parseInt(process.env.DELIVERY_TIMEOUT_MS || "60000", 10);
 

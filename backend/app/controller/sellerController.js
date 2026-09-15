@@ -144,7 +144,23 @@ export const getSellerProfile = async (req, res) => {
 ================================ */
 export const updateSellerProfile = async (req, res) => {
   try {
-    const { name, shopName, phone, address, locality, pincode, city, state, lat, lng, radius, dob, bankDetails } = req.body;
+    const {
+      name,
+      shopName,
+      phone,
+      address,
+      locality,
+      pincode,
+      city,
+      state,
+      lat,
+      lng,
+      radius,
+      serviceRadius,
+      isActive,
+      dob,
+      bankDetails,
+    } = req.body;
 
     // Find seller
     const seller = await Seller.findById(req.user.id);
@@ -162,7 +178,8 @@ export const updateSellerProfile = async (req, res) => {
     if (city !== undefined) seller.city = city;
     if (state !== undefined) seller.state = state;
     if (dob) seller.dob = dob;
-    
+    if (isActive !== undefined) seller.isActive = Boolean(isActive);
+
     if (bankDetails) {
       if (!seller.bankDetails) seller.bankDetails = {};
       if (bankDetails.bankName !== undefined) seller.bankDetails.bankName = bankDetails.bankName;
@@ -173,22 +190,34 @@ export const updateSellerProfile = async (req, res) => {
     }
 
     // Validate and update geo data
-    if (lat !== undefined && lng !== undefined) {
-      if (lat < -90 || lat > 90)
+    if (
+      lat !== undefined &&
+      lat !== null &&
+      lat !== "" &&
+      lng !== undefined &&
+      lng !== null &&
+      lng !== ""
+    ) {
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (isNaN(numLat) || numLat < -90 || numLat > 90)
         return handleResponse(res, 400, "Invalid latitude");
-      if (lng < -180 || lng > 180)
+      if (isNaN(numLng) || numLng < -180 || numLng > 180)
         return handleResponse(res, 400, "Invalid longitude");
 
       seller.location = {
         type: "Point",
-        coordinates: [Number(lng), Number(lat)],
+        coordinates: [numLng, numLat],
       };
     }
 
-    if (radius !== undefined) {
-      if (radius < 1 || radius > 100)
+    // Update service radius (supports both radius and serviceRadius in payload)
+    const targetRadius = radius !== undefined ? radius : serviceRadius;
+    if (targetRadius !== undefined && targetRadius !== null && targetRadius !== "") {
+      const numRadius = Number(targetRadius);
+      if (isNaN(numRadius) || numRadius < 1 || numRadius > 100)
         return handleResponse(res, 400, "Radius must be between 1 and 100 km");
-      seller.serviceRadius = Number(radius);
+      seller.serviceRadius = numRadius;
     }
 
     const updatedSeller = await seller.save();
