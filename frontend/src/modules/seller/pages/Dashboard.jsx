@@ -18,7 +18,6 @@ import {
   HiOutlineTruck,
   HiOutlineXMark,
   HiOutlineMapPin,
-  HiOutlinePhone,
   HiOutlineBanknotes,
   HiOutlineChevronDown,
 } from "react-icons/hi2";
@@ -566,20 +565,6 @@ const Dashboard = () => {
                       <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
                         {selectedOrder.address}
                       </p>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <HiOutlinePhone className="h-3 w-3 text-brand-500" />{" "}
-                        Contact Info
-                      </h4>
-                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                        <p className="text-xs font-bold text-slate-800">
-                          {selectedOrder.customer.name}
-                        </p>
-                        <p className="text-[11px] font-semibold text-slate-600 mt-0.5">
-                          {selectedOrder.customer.phone}
-                        </p>
-                      </div>
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">

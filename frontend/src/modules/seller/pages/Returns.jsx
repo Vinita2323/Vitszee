@@ -502,9 +502,6 @@ const Returns = () => {
                                     <p className="text-sm font-bold text-slate-900">
                                         {selectedReturn.customer?.name || "Customer"}
                                     </p>
-                                    <p className="text-xs text-slate-500">
-                                        {selectedReturn.customer?.phone || ""}
-                                    </p>
                                 </div>
 
                                 <div className="space-y-2">

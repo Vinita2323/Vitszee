@@ -18,7 +18,6 @@ import {
     HiOutlineChevronRight,
     HiOutlineInboxStack,
     HiOutlineMapPin,
-    HiOutlinePhone,
     HiOutlineCalendarDays,
     HiOutlineShieldCheck
 } from 'react-icons/hi2';
@@ -300,11 +299,10 @@ const Orders = () => {
             const s = String(v ?? "").replace(/"/g, '""');
             return /[",\n\r]/.test(s) ? `"${s}"` : s;
         };
-        const headers = ["Order ID", "Customer", "Phone", "Date", "Time", "Total (₹)", "Status", "Address", "Payment"];
+        const headers = ["Order ID", "Customer", "Date", "Time", "Total (₹)", "Status", "Address", "Payment"];
         const rows = data.map((o) => [
             o.id,
             o.customer?.name ?? "",
-            o.customer?.phone ?? "",
             o.date,
             o.time,
             o.total,
@@ -660,7 +658,6 @@ const Orders = () => {
                                                             </div>
                                                             <div>
                                                                 <p className="text-xs font-semibold text-slate-800">{order.customer.name}</p>
-                                                                <p className="text-xs font-medium text-slate-500">{order.customer.phone}</p>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -914,15 +911,6 @@ const Orders = () => {
                                                     <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
                                                         {selectedOrder.address}
                                                     </p>
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                        <HiOutlinePhone className="h-3 w-3 text-brand-500" /> Contact Info
-                                                    </h4>
-                                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                                                        <p className="text-xs font-bold text-slate-800">{selectedOrder.customer.name}</p>
-                                                        <p className="text-xs font-semibold text-slate-600 mt-0.5">{selectedOrder.customer.phone}</p>
-                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="space-y-3 sm:space-y-4">
