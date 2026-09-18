@@ -29,36 +29,57 @@ function buildNearbySellersKey(lat, lng) {
   return buildKey("sellers", "nearby", `${rLat}:${rLng}`);
 }
 
+async function fetchNearbySellersWithDistance(lat, lng) {
+  const sellers = await Seller.find({
+    isActive: true,
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+        $maxDistance: MAX_SELLER_SEARCH_DISTANCE_M,
+      },
+    },
+  })
+    .select("_id location serviceRadius")
+    .lean();
+
+  return sellers
+    .map((seller) => {
+      const coords = seller?.location?.coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) return null;
+      const [sellerLng, sellerLat] = coords;
+      if (!Number.isFinite(sellerLat) || !Number.isFinite(sellerLng)) {
+        return null;
+      }
+      const distanceKm = calculateDistance(lat, lng, sellerLat, sellerLng);
+      if (distanceKm > (seller.serviceRadius || 5)) return null;
+      return { sellerId: String(seller._id), distanceKm };
+    })
+    .filter(Boolean);
+}
+
 export async function getNearbySellerIdsForCustomer(lat, lng) {
   const fetchFn = async () => {
-    const sellers = await Seller.find({
-      isActive: true,
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [lng, lat],
-          },
-          $maxDistance: MAX_SELLER_SEARCH_DISTANCE_M,
-        },
-      },
-    })
-      .select("_id location serviceRadius")
-      .lean();
-
-    return sellers
-      .filter((seller) => {
-        const coords = seller?.location?.coordinates;
-        if (!Array.isArray(coords) || coords.length < 2) return false;
-        const [sellerLng, sellerLat] = coords;
-        if (!Number.isFinite(sellerLat) || !Number.isFinite(sellerLng)) {
-          return false;
-        }
-        const distanceKm = calculateDistance(lat, lng, sellerLat, sellerLng);
-        return distanceKm <= (seller.serviceRadius || 5);
-      })
-      .map((seller) => String(seller._id));
+    const sellers = await fetchNearbySellersWithDistance(lat, lng);
+    return sellers.map((seller) => seller.sellerId);
   };
 
   return getOrSet(buildNearbySellersKey(lat, lng), fetchFn, getTTL("nearbySellers"));
+}
+
+/**
+ * Returns a Map of sellerId -> distanceKm for sellers within their service
+ * radius of the given customer coordinates. Reuses the same cache bucket as
+ * getNearbySellerIdsForCustomer since the underlying fetch is identical.
+ */
+export async function getNearbySellerDistancesForCustomer(lat, lng) {
+  const fetchFn = () => fetchNearbySellersWithDistance(lat, lng);
+  const sellers = await getOrSet(
+    buildKey("sellers", "nearbyWithDistance", `${Number(lat).toFixed(4)}:${Number(lng).toFixed(4)}`),
+    fetchFn,
+    getTTL("nearbySellers")
+  );
+  return new Map(sellers.map((seller) => [seller.sellerId, seller.distanceKm]));
 }

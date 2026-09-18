@@ -212,6 +212,18 @@ const settingSchema = new mongoose.Schema(
                 type: String,
                 default: "",
             },
+            forwardProdToken: {
+                type: String,
+                default: "",
+            },
+            reverseProdToken: {
+                type: String,
+                default: "",
+            },
+            webhookSecret: {
+                type: String,
+                default: "",
+            },
             autoServiceabilityCheck: {
                 type: Boolean,
                 default: true,

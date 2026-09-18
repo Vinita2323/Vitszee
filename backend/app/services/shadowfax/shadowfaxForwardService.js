@@ -28,52 +28,45 @@ import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.co
 export async function checkForwardServiceability({
   pickupPincode,
   deliveryPincode,
-  pickupLatitude,
-  pickupLongitude,
-  dropLatitude,
-  dropLongitude,
-  orderValue = 0,
 }) {
-  const config = await getShadowfaxConfig();
-  if (!config.forwardEnabled && !config.isProduction) {
-    // If not globally enabled in sandbox, report as mock-serviceable for test suites
-    // but in real calls we execute against Shadowfax endpoint
-  }
-
-  const payload = {
-    pickup_pincode: String(pickupPincode || "").trim(),
-    delivery_pincode: String(deliveryPincode || "").trim(),
-  };
-
-  if (pickupLatitude && pickupLongitude) {
-    payload.pickup_latitude = Number(pickupLatitude);
-    payload.pickup_longitude = Number(pickupLongitude);
-  }
-  if (dropLatitude && dropLongitude) {
-    payload.drop_latitude = Number(dropLatitude);
-    payload.drop_longitude = Number(dropLongitude);
-  }
-  if (orderValue) {
-    payload.order_value = Number(orderValue);
-  }
+  const pickup = String(pickupPincode || "").trim();
+  const delivery = String(deliveryPincode || "").trim();
 
   try {
-    const response = await sendShadowfaxRequest({
-      method: "POST",
-      endpoint: "/api/v2/clients/serviceability/",
-      type: "forward",
-      data: payload,
-    });
+    // Shadowfax's serviceability API returns the list of pincodes Shadowfax
+    // services for a given operation, not a pickup->delivery pair check.
+    // We query both legs (seller_pickup for the store, customer_delivery for
+    // the drop) and require both pincodes to be present in their respective lists.
+    const [pickupResp, deliveryResp] = await Promise.all([
+      sendShadowfaxRequest({
+        method: "GET",
+        endpoint: "/api/v1/clients/serviceability/",
+        type: "forward",
+        params: { service: "seller_pickup", pincodes: pickup },
+      }),
+      sendShadowfaxRequest({
+        method: "GET",
+        endpoint: "/api/v1/clients/serviceability/",
+        type: "forward",
+        params: { service: "customer_delivery", pincodes: delivery },
+      }),
+    ]);
 
-    const isServiceable =
-      response.data?.serviceable === true ||
-      response.data?.status === "success" ||
-      response.data?.data?.serviceable === true;
+    const pickupList = Array.isArray(pickupResp.data) ? pickupResp.data : pickupResp.data?.data || [];
+    const deliveryList = Array.isArray(deliveryResp.data) ? deliveryResp.data : deliveryResp.data?.data || [];
+
+    const pickupServiceable = pickupList.some((entry) => String(entry.code) === pickup);
+    const deliveryServiceable = deliveryList.some((entry) => String(entry.code) === delivery);
+    const isServiceable = pickupServiceable && deliveryServiceable;
 
     return {
       serviceable: isServiceable,
-      data: response.data,
-      reason: isServiceable ? null : (response.data?.message || "Route not serviceable by Shadowfax"),
+      data: { pickup: pickupList, delivery: deliveryList },
+      reason: isServiceable
+        ? null
+        : !pickupServiceable
+        ? `Pickup pincode ${pickup} is not serviceable by Shadowfax`
+        : `Delivery pincode ${delivery} is not serviceable by Shadowfax`,
     };
   } catch (err) {
     logger.warn("[Shadowfax] Serviceability check failed", { error: err.message });
@@ -145,11 +138,6 @@ export async function createForwardOrder(orderId, options = {}) {
     const serviceability = await checkForwardServiceability({
       pickupPincode,
       deliveryPincode: dropPincode,
-      pickupLatitude: pickupLat,
-      pickupLongitude: pickupLng,
-      dropLatitude: dropLat,
-      dropLongitude: dropLng,
-      orderValue: order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
     });
 
     if (!serviceability.serviceable) {
@@ -159,13 +147,14 @@ export async function createForwardOrder(orderId, options = {}) {
 
   // 5. Prepare Order Items
   const orderItems = (order.items || []).map((item, index) => ({
-    sku: String(item.product?.sku || item.product?._id || `SKU-${index + 1}`),
-    product_name: item.name || item.product?.name || "Product Item",
+    sku_id: String(item.product?.sku || item.product?._id || `SKU-${index + 1}`),
+    sku_name: item.name || item.product?.name || "Product Item",
     price: Number(item.price || 0),
-    quantity: Number(item.quantity || 1),
     seller_details: {
-      name: seller.shopName || seller.name || "Seller",
-      contact: sellerContact,
+      seller_name: seller.shopName || seller.name || "Seller",
+    },
+    additional_details: {
+      quantity: Number(item.quantity || 1),
     },
   }));
 
@@ -192,7 +181,7 @@ export async function createForwardOrder(orderId, options = {}) {
       address_line_2: address.landmark || "",
       city: address.city || "Bengaluru",
       state: "Karnataka",
-      pincode: dropPincode,
+      pincode: Number(dropPincode),
       latitude: dropLat || undefined,
       longitude: dropLng || undefined,
     },
@@ -202,18 +191,18 @@ export async function createForwardOrder(orderId, options = {}) {
       address_line_1: seller.address || "Store Address",
       city: seller.city || "Bengaluru",
       state: seller.state || "Karnataka",
-      pincode: pickupPincode,
+      pincode: Number(pickupPincode),
       latitude: pickupLat || undefined,
       longitude: pickupLng || undefined,
     },
-    return_details: {
-      return_type: "seller",
+    // Return-to-seller details, used by Shadowfax if the order needs to be returned.
+    rts_details: {
       name: seller.shopName || seller.name || "Store Return Hub",
       contact: sellerContact,
       address_line_1: seller.address || "Store Return Address",
       city: seller.city || "Bengaluru",
       state: seller.state || "Karnataka",
-      pincode: pickupPincode,
+      pincode: Number(pickupPincode),
     },
     product_details: orderItems,
   };
@@ -261,8 +250,9 @@ export async function createForwardOrder(orderId, options = {}) {
     });
 
     const respData = sfxResponse.data || {};
-    const sfxOrderId = respData.order_id || respData.data?.order_id || respData.sfx_order_id || `SFX-${order.orderId}`;
-    const awb = respData.awb_number || respData.data?.awb_number || `AWB-${sfxOrderId}`;
+    const sfxOrderId =
+      respData.data?.id || respData.order_id || respData.data?.order_id || respData.sfx_order_id || `SFX-${order.orderId}`;
+    const awb = respData.data?.awb_number || respData.awb_number || `AWB-${sfxOrderId}`;
 
     shipment.shadowfaxOrderId = String(sfxOrderId);
     shipment.awbNumber = String(awb);
@@ -466,7 +456,8 @@ export async function trackForwardOrder(orderIdOrAwb) {
     });
 
     const trackData = sfxResponse.data || {};
-    const rawStatus = trackData.status || trackData.current_status || trackData.data?.status;
+    const orderDetails = trackData.order_details || trackData.data || trackData;
+    const rawStatus = orderDetails.status || orderDetails.current_status || trackData.status;
     const normalizedStatus = mapShadowfaxForwardStatus(rawStatus);
 
     if (isValidForwardStatusTransition(shipment.shipmentStatus, normalizedStatus)) {
@@ -474,15 +465,14 @@ export async function trackForwardOrder(orderIdOrAwb) {
       shipment.providerStatus = rawStatus;
     }
 
-    // Extract rider info if available
-    const rider = trackData.rider || trackData.delivery_partner || trackData.data?.rider;
-    if (rider) {
+    // Extract rider info if available (flat rider_name/rider_contact on order_details)
+    if (orderDetails.rider_name || orderDetails.rider_contact) {
       shipment.rider = {
-        id: rider.id || shipment.rider?.id,
-        name: rider.name || shipment.rider?.name,
-        phone: rider.contact || rider.phone || shipment.rider?.phone,
-        latitude: rider.latitude ? Number(rider.latitude) : shipment.rider?.latitude,
-        longitude: rider.longitude ? Number(rider.longitude) : shipment.rider?.longitude,
+        id: shipment.rider?.id,
+        name: orderDetails.rider_name || shipment.rider?.name,
+        phone: orderDetails.rider_contact || shipment.rider?.phone,
+        latitude: shipment.rider?.latitude,
+        longitude: shipment.rider?.longitude,
         lastLocationAt: new Date(),
       };
     }
