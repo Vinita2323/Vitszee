@@ -171,7 +171,7 @@ export async function sendShadowfaxRequest({
   const requestId = `sfx-${crypto.randomUUID().slice(0, 8)}`;
 
   const headers = {
-    "Content-Type": "application/json",
+    ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
     Accept: "application/json",
     Authorization: `Token ${token || "sandbox_token"}`,
     "X-Request-Id": requestId,
@@ -195,7 +195,7 @@ export async function sendShadowfaxRequest({
       const response = await axios({
         method,
         url,
-        data,
+        ...(method !== "GET" ? { data } : {}),
         params,
         headers,
         timeout: timeoutMs,

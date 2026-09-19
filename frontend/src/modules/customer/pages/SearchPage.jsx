@@ -122,6 +122,7 @@ const SearchPage = () => {
                     limit: 100,
                     lat: currentLocation.latitude,
                     lng: currentLocation.longitude,
+                    sort: 'nearest',
                 });
                 if (response.data.success) {
                     const rawResult = response.data.result;

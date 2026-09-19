@@ -17,6 +17,7 @@ import {
   parseCustomerLocation,
   getNearbySellerIdsForCustomer,
   isProductAvailableAtLocation,
+  getNearbySellerDistancesForCustomer,
 } from "../services/customerVisibilityService.js";
 import {
   enqueueProductIndex,
@@ -379,10 +380,42 @@ export const getProducts = async (req, res) => {
       "stock-asc": { stock: 1, createdAt: -1 },
       "stock-desc": { stock: -1, createdAt: -1 },
     };
-    const sortQuery = sortMap[String(sort || "newest").toLowerCase()] || sortMap.newest;
+    const normalizedSort = String(sort || "newest").toLowerCase();
+    const sortByNearest = normalizedSort === "nearest" && coords.valid;
+    const sortQuery = sortMap[normalizedSort] || sortMap.newest;
+    const NEAREST_SORT_SCAN_LIMIT = 500;
 
     const fetchFn = async () => {
-      const [rawProducts, total] = await Promise.all([
+      let rawProducts;
+      let total;
+
+      if (sortByNearest) {
+        const [scannedProducts, distanceMap, docTotal] = await Promise.all([
+          Product.find(finalQuery)
+            .select(
+              "name slug description sku price salePrice stock brand weight mainImage galleryImages headerId categoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants createdAt",
+            )
+            .sort({ createdAt: -1 })
+            .limit(NEAREST_SORT_SCAN_LIMIT)
+            .lean(),
+          getNearbySellerDistancesForCustomer(coords.lat, coords.lng),
+          Product.countDocuments(finalQuery),
+        ]);
+
+        const withDistance = scannedProducts.map((p) => ({
+          product: p,
+          distanceKm: p.sellerId ? distanceMap.get(String(p.sellerId)) : undefined,
+        }));
+        withDistance.sort((a, b) => {
+          const da = a.distanceKm ?? Infinity;
+          const db = b.distanceKm ?? Infinity;
+          return da - db;
+        });
+
+        total = docTotal;
+        rawProducts = withDistance.slice(skip, skip + limit).map((entry) => entry.product);
+      } else {
+        [rawProducts, total] = await Promise.all([
         Product.find(finalQuery)
           .select(
             "name slug description sku price salePrice stock brand weight mainImage galleryImages headerId categoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants createdAt",
@@ -393,7 +426,8 @@ export const getProducts = async (req, res) => {
           .limit(limit)
           .lean(),
         Product.countDocuments(finalQuery),
-      ]);
+        ]);
+      }
 
       // Collect unique category IDs (headerId, categoryId) and seller IDs
       const categoryIdSet = new Set();

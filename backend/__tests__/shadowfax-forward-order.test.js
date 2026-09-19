@@ -120,10 +120,15 @@ describe("Shadowfax Forward Order Flow", () => {
 
     mockShipmentFindOne.mockResolvedValue(null);
 
-    // Mock Serviceability check
+    // Mock Serviceability check (pickup leg, then delivery leg)
     mockAxios.mockResolvedValueOnce({
       status: 200,
-      data: { serviceable: true },
+      data: [{ code: 560002, services: ["Regular"] }],
+      headers: {},
+    });
+    mockAxios.mockResolvedValueOnce({
+      status: 200,
+      data: [{ code: 560001, services: ["Regular"] }],
       headers: {},
     });
 
@@ -131,9 +136,12 @@ describe("Shadowfax Forward Order Flow", () => {
     mockAxios.mockResolvedValueOnce({
       status: 200,
       data: {
-        status: "success",
-        order_id: "SFX-9999",
-        awb_number: "AWB-9999",
+        message: "Success",
+        data: {
+          id: 9999,
+          client_order_id: "ORD-9999",
+          awb_number: "AWB-9999",
+        },
       },
       headers: {},
     });

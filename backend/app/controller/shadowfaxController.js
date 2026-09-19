@@ -2,6 +2,7 @@ import Setting from "../models/setting.js";
 import Shipment from "../models/shipment.js";
 import Order from "../models/order.js";
 import handleResponse from "../utils/helper.js";
+import crypto from "crypto";
 import {
   getAdminShadowfaxConfig,
   getShadowfaxConfig,
@@ -49,6 +50,9 @@ export const updateShadowfaxSettings = async (req, res) => {
       clientCode,
       forwardToken,
       reverseToken,
+      forwardProdToken,
+      reverseProdToken,
+      webhookSecret,
       autoServiceabilityCheck,
       autoShipmentCreation,
       autoDispatchReady,
@@ -73,6 +77,9 @@ export const updateShadowfaxSettings = async (req, res) => {
     if (clientCode !== undefined) settingDoc.shadowfax.clientCode = clientCode;
     if (forwardToken && !forwardToken.includes("****")) settingDoc.shadowfax.forwardToken = forwardToken;
     if (reverseToken && !reverseToken.includes("****")) settingDoc.shadowfax.reverseToken = reverseToken;
+    if (forwardProdToken && !forwardProdToken.includes("****")) settingDoc.shadowfax.forwardProdToken = forwardProdToken;
+    if (reverseProdToken && !reverseProdToken.includes("****")) settingDoc.shadowfax.reverseProdToken = reverseProdToken;
+    if (webhookSecret && !webhookSecret.includes("****")) settingDoc.shadowfax.webhookSecret = webhookSecret;
     if (autoServiceabilityCheck !== undefined) settingDoc.shadowfax.autoServiceabilityCheck = Boolean(autoServiceabilityCheck);
     if (autoShipmentCreation !== undefined) settingDoc.shadowfax.autoShipmentCreation = Boolean(autoShipmentCreation);
     if (autoDispatchReady !== undefined) settingDoc.shadowfax.autoDispatchReady = Boolean(autoDispatchReady);
@@ -260,10 +267,45 @@ export const trackShipmentUnified = async (req, res) => {
 };
 
 /**
+ * Verifies inbound Shadowfax webhook calls using a shared secret.
+ * Shadowfax's "Token" auth type sends the configured token back on every call,
+ * but the exact header name isn't documented, so this checks the common
+ * variants (Authorization, token, x-webhook-secret) plus a `?token=` query param.
+ * If no secret is configured, verification is skipped (dev/sandbox convenience)
+ * but a warning is logged.
+ */
+function isWebhookAuthorized(req, config) {
+  if (!config.webhookSecret) {
+    logger.warn("[Shadowfax Webhook] SHADOWFAX_WEBHOOK_SECRET is not configured — webhook is unauthenticated.");
+    return true;
+  }
+
+  const authHeader = req.headers["authorization"] || "";
+  const provided =
+    req.headers["x-webhook-secret"] ||
+    req.headers["token"] ||
+    req.headers["x-token"] ||
+    authHeader.replace(/^Token\s+/i, "").replace(/^Bearer\s+/i, "") ||
+    req.query?.token ||
+    "";
+  const expected = config.webhookSecret;
+
+  if (!provided || provided.length !== expected.length) return false;
+
+  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+/**
  * POST /api/shadowfax/webhook/forward
  */
 export const handleForwardWebhook = async (req, res) => {
   try {
+    const config = await getShadowfaxConfig();
+    if (!isWebhookAuthorized(req, config)) {
+      logger.warn("[Shadowfax Webhook Inbound] Forward webhook rejected: invalid/missing secret");
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
     logger.info("[Shadowfax Webhook Inbound] Forward Webhook received", {
       body: req.body,
       headers: req.headers,
@@ -282,6 +324,12 @@ export const handleForwardWebhook = async (req, res) => {
  */
 export const handleReverseWebhook = async (req, res) => {
   try {
+    const config = await getShadowfaxConfig();
+    if (!isWebhookAuthorized(req, config)) {
+      logger.warn("[Shadowfax Webhook Inbound] Reverse webhook rejected: invalid/missing secret");
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
     logger.info("[Shadowfax Webhook Inbound] Reverse Webhook received", {
       body: req.body,
       headers: req.headers,

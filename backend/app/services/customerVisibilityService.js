@@ -139,6 +139,37 @@ function isSellerInGeoRange(seller, lat, lng, locContext) {
   return true;
 }
 
+async function fetchNearbySellersWithDistance(lat, lng, locContext = null) {
+  const sellers = await Seller.find({
+    isActive: true,
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+        $maxDistance: MAX_SELLER_SEARCH_DISTANCE_M,
+      },
+    },
+  })
+    .select("_id location serviceRadius city state pincode locality")
+    .lean();
+
+  return sellers
+    .map((seller) => {
+      const coords = seller?.location?.coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) return null;
+      const [sellerLng, sellerLat] = coords;
+      if (!Number.isFinite(sellerLat) || !Number.isFinite(sellerLng)) {
+        return null;
+      }
+      if (!isSellerInGeoRange(seller, lat, lng, locContext)) return null;
+      const distanceKm = calculateDistance(lat, lng, sellerLat, sellerLng);
+      return { sellerId: String(seller._id), distanceKm };
+    })
+    .filter(Boolean);
+}
+
 export async function getNearbySellerIdsForCustomer(arg1, arg2) {
   let locContext;
   if (typeof arg1 === "object" && arg1 !== null) {
@@ -150,27 +181,9 @@ export async function getNearbySellerIdsForCustomer(arg1, arg2) {
   const fetchFn = async () => {
     // If coordinates are valid, try geospatial search first
     if (locContext.coords.valid) {
-      const sellers = await Seller.find({
-        isActive: true,
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [locContext.lng, locContext.lat],
-            },
-            $maxDistance: MAX_SELLER_SEARCH_DISTANCE_M,
-          },
-        },
-      })
-        .select("_id location serviceRadius city state pincode locality")
-        .lean();
-
-      const matchedGeo = sellers
-        .filter((seller) => isSellerInGeoRange(seller, locContext.lat, locContext.lng, locContext))
-        .map((seller) => String(seller._id));
-
+      const matchedGeo = await fetchNearbySellersWithDistance(locContext.lat, locContext.lng, locContext);
       if (matchedGeo.length > 0) {
-        return matchedGeo;
+        return matchedGeo.map((s) => s.sellerId);
       }
     }
 
@@ -194,6 +207,23 @@ export async function getNearbySellerIdsForCustomer(arg1, arg2) {
   };
 
   return getOrSet(buildNearbySellersKey(locContext), fetchFn, getTTL("nearbySellers"));
+}
+
+/**
+ * Returns a Map of sellerId -> distanceKm for sellers within their service
+ * radius of the given customer coordinates. Reuses the same cache bucket as
+ * getNearbySellerIdsForCustomer since the underlying fetch is identical.
+ */
+export async function getNearbySellerDistancesForCustomer(lat, lng) {
+  const coords = parseCustomerCoordinates({ lat, lng });
+  if (!coords.valid) return new Map();
+  const fetchFn = () => fetchNearbySellersWithDistance(coords.lat, coords.lng);
+  const sellers = await getOrSet(
+    buildKey("sellers", "nearbyWithDistance", `${Number(coords.lat).toFixed(4)}:${Number(coords.lng).toFixed(4)}`),
+    fetchFn,
+    getTTL("nearbySellers")
+  );
+  return new Map(sellers.map((seller) => [seller.sellerId, seller.distanceKm]));
 }
 
 /**
@@ -288,4 +318,3 @@ export async function isProductAvailableAtLocation(product, locQuery = {}) {
 
   return { available: true };
 }
-

@@ -264,6 +264,7 @@ const Home = () => {
       if (hasValidLocation) {
         productParams.lat = currentLocation.latitude;
         productParams.lng = currentLocation.longitude;
+        productParams.sort = 'nearest';
       }
       const [catRes, prodRes, expRes, sectionsRes, headerCategoriesRes, lowestPriceRes] = await Promise.all([
         customerApi.getCategories(),
@@ -412,6 +413,7 @@ const Home = () => {
         if (hasValidLocation) {
           params.lat = currentLocation.latitude;
           params.lng = currentLocation.longitude;
+          params.sort = 'nearest';
         }
 
         const res = await customerApi.getProducts(params);

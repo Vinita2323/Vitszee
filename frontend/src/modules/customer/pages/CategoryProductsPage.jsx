@@ -57,6 +57,7 @@ const CategoryProductsPage = () => {
                         categoryId: activeCatId,
                         lat: currentLocation.latitude,
                         lng: currentLocation.longitude,
+                        sort: 'nearest',
                     })
                     : Promise.resolve({ data: { success: true, result: { items: [] } } }),
                 customerApi.getCategories(),
