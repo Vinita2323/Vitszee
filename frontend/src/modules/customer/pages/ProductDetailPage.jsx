@@ -264,10 +264,24 @@ const ProductDetailPage = () => {
                         <p className="text-slate-600 text-lg leading-relaxed mb-6 font-medium max-w-2xl">
                             {product.description || "Fresh and premium quality product sourced directly from local vendors."}
                         </p>
+
+                        {product.isAvailableInLocation === false && (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-900 mb-6 shadow-sm">
+                                <span className="text-2xl">📍</span>
+                                <div>
+                                    <p className="font-extrabold text-sm sm:text-base">This product is not available in your location.</p>
+                                    <p className="text-xs sm:text-sm text-amber-700 font-medium">Currently unavailable for delivery to {currentLocation?.city || 'your area'}. Try changing your delivery address or pincode.</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-                        {product.stock <= 0 ? (
+                        {product.isAvailableInLocation === false ? (
+                            <div className="flex-1 bg-amber-100/80 text-amber-900 h-16 w-full sm:w-72 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 border border-amber-300 uppercase tracking-wider cursor-not-allowed shadow-sm select-none">
+                                <span>🚫</span> UNAVAILABLE IN YOUR LOCATION
+                            </div>
+                        ) : product.stock <= 0 ? (
                             <div className="flex-1 bg-gray-100 text-gray-400 h-16 w-full sm:w-64 rounded-2xl font-black text-lg flex items-center justify-center gap-2 border border-gray-200 uppercase tracking-widest">
                                 OUT OF STOCK
                             </div>

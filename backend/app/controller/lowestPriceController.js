@@ -3,6 +3,7 @@ import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
 import {
   parseCustomerCoordinates,
+  parseCustomerLocation,
   getNearbySellerIdsForCustomer,
 } from "../services/customerVisibilityService.js";
 import { getApprovedOrLegacyFilter } from "../services/productModerationService.js";
@@ -94,11 +95,11 @@ export const getPublicLowestPriceConfig = async (req, res) => {
     }
 
     let products = [];
-    const coords = parseCustomerCoordinates(req.query || {});
+    const locContext = parseCustomerLocation(req.query || {});
     let nearbySellerSet = null;
 
-    if (coords.valid) {
-      const nearbySellerIds = await getNearbySellerIdsForCustomer(coords.lat, coords.lng);
+    if (locContext.hasLocation) {
+      const nearbySellerIds = await getNearbySellerIdsForCustomer(locContext);
       nearbySellerSet = new Set(nearbySellerIds.map(String));
     }
 

@@ -21,6 +21,7 @@ import {
   HiOutlineFolderOpen,
   HiOutlineSwatch,
   HiOutlineSquaresPlus,
+  HiOutlineMapPin,
 } from "react-icons/hi2";
 import Modal from "@shared/components/ui/Modal";
 import { cn } from "@/lib/utils";
@@ -99,8 +100,16 @@ const ProductManagement = () => {
     }
   };
 
+  const [sellerProfile, setSellerProfile] = useState(null);
+
   React.useEffect(() => {
     fetchCategories();
+    sellerApi
+      .getProfile()
+      .then((res) => {
+        if (res.data?.result) setSellerProfile(res.data.result);
+      })
+      .catch(() => {});
   }, []);
 
   const categories = dbCategories;
@@ -202,6 +211,12 @@ const ProductManagement = () => {
     variants: [
       { id: Date.now(), name: "", price: "", salePrice: "", stock: "", sku: "" },
     ],
+    locationRestriction: {
+      isCustom: false,
+      serviceRadius: "",
+      cities: "",
+      pincodes: "",
+    },
   });
 
   const safeProducts = useMemo(
@@ -325,6 +340,19 @@ const ProductManagement = () => {
       data.append("tags", formData.tags);
       data.append("variants", JSON.stringify(formData.variants));
 
+      if (formData.locationRestriction) {
+        const loc = formData.locationRestriction;
+        data.append(
+          "locationRestriction",
+          JSON.stringify({
+            isCustom: !!loc.isCustom,
+            serviceRadius: loc.serviceRadius ? Number(loc.serviceRadius) : undefined,
+            cities: loc.cities ? loc.cities.split(",").map((c) => c.trim()).filter(Boolean) : [],
+            pincodes: loc.pincodes ? loc.pincodes.split(",").map((p) => p.trim()).filter(Boolean) : [],
+          })
+        );
+      }
+
       if (formData.mainImageFile) {
         data.append("mainImage", formData.mainImageFile);
       } else if (formData.mainImage && typeof formData.mainImage === "string" && formData.mainImage.startsWith("http")) {
@@ -410,6 +438,7 @@ const ProductManagement = () => {
 
   const openEditModal = (item = null) => {
     if (item) {
+      const loc = item.locationRestriction || {};
       setFormData({
         name: item.name || "",
         slug: item.slug || "",
@@ -437,6 +466,12 @@ const ProductManagement = () => {
             sku: item.sku || "",
           },
         ],
+        locationRestriction: {
+          isCustom: !!loc.isCustom,
+          serviceRadius: loc.serviceRadius || "",
+          cities: Array.isArray(loc.cities) ? loc.cities.join(", ") : (loc.cities || ""),
+          pincodes: Array.isArray(loc.pincodes) ? loc.pincodes.join(", ") : (loc.pincodes || ""),
+        },
       });
       setEditingItem(item);
     } else {
@@ -467,6 +502,12 @@ const ProductManagement = () => {
             sku: "",
           },
         ],
+        locationRestriction: {
+          isCustom: false,
+          serviceRadius: "",
+          cities: "",
+          pincodes: "",
+        },
       });
       setEditingItem(null);
     }
@@ -929,6 +970,11 @@ const ProductManagement = () => {
                       icon: HiOutlineFolderOpen,
                     },
                     { id: "media", label: "Photos", icon: HiOutlinePhoto },
+                    {
+                      id: "location",
+                      label: "Location & Coverage",
+                      icon: HiOutlineMapPin,
+                    },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -1268,6 +1314,186 @@ const ProductManagement = () => {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {modalTab === "location" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+                      <div className="bg-brand-50/50 p-4 sm:p-5 rounded-2xl border border-brand-100">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                            <HiOutlineMapPin className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                              Store Location & Service Area
+                            </h4>
+                            <p className="text-xs text-slate-500 font-medium">
+                              Configure where customers can discover and order this product.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3 border-t border-brand-100/60 text-xs">
+                          <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                              Store Address
+                            </span>
+                            <span className="font-black text-slate-700">
+                              {[sellerProfile?.locality, sellerProfile?.city, sellerProfile?.state, sellerProfile?.pincode]
+                                .filter(Boolean)
+                                .join(", ") || "Indore, Madhya Pradesh"}
+                            </span>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                              Store Default Radius
+                            </span>
+                            <span className="font-black text-primary">
+                              {sellerProfile?.serviceRadius || 30} KM Coverage
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1 block">
+                          Delivery Coverage Scope
+                        </label>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                locationRestriction: { ...prev.locationRestriction, isCustom: false },
+                              }))
+                            }
+                            className={cn(
+                              "p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3",
+                              !formData.locationRestriction?.isCustom
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-slate-100 hover:border-slate-200 bg-white"
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="coverageScope"
+                              checked={!formData.locationRestriction?.isCustom}
+                              onChange={() => {}}
+                              className="mt-1 text-primary focus:ring-primary"
+                            />
+                            <div>
+                              <p className="text-xs font-black text-slate-800">Use Store Default</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Product is available within your store's standard {sellerProfile?.serviceRadius || 30} KM coverage area.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                locationRestriction: { ...prev.locationRestriction, isCustom: true },
+                              }))
+                            }
+                            className={cn(
+                              "p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3",
+                              formData.locationRestriction?.isCustom
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-slate-100 hover:border-slate-200 bg-white"
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="coverageScope"
+                              checked={formData.locationRestriction?.isCustom}
+                              onChange={() => {}}
+                              className="mt-1 text-primary focus:ring-primary"
+                            />
+                            <div>
+                              <p className="text-xs font-black text-slate-800">Custom Coverage for this Item</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Specify custom delivery radius, target cities, or pincodes for this product.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {formData.locationRestriction?.isCustom && (
+                          <div className="space-y-4 pt-3 border-t border-slate-100 animate-in fade-in duration-300">
+                            <div>
+                              <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1 block mb-1">
+                                Service Radius Override (KM)
+                              </label>
+                              <input
+                                type="number"
+                                placeholder={`Default: ${sellerProfile?.serviceRadius || 30}`}
+                                value={formData.locationRestriction?.serviceRadius || ""}
+                                onChange={(e) =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    locationRestriction: {
+                                      ...prev.locationRestriction,
+                                      serviceRadius: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-primary focus:bg-white transition-all"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1 block mb-1">
+                                Target Cities (Comma Separated)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Indore, Bhopal, Ujjain"
+                                value={formData.locationRestriction?.cities || ""}
+                                onChange={(e) =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    locationRestriction: {
+                                      ...prev.locationRestriction,
+                                      cities: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-primary focus:bg-white transition-all"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                                Leave empty to allow all cities within your delivery radius.
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1 block mb-1">
+                                Target Pincodes (Comma Separated)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 452001, 452010"
+                                value={formData.locationRestriction?.pincodes || ""}
+                                onChange={(e) =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    locationRestriction: {
+                                      ...prev.locationRestriction,
+                                      pincodes: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-primary focus:bg-white transition-all"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                                Specify exact pincodes if product is limited to select areas.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

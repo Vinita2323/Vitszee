@@ -14,7 +14,9 @@ async function getAdminIds() {
 }
 import {
   parseCustomerCoordinates,
+  parseCustomerLocation,
   getNearbySellerIdsForCustomer,
+  isProductAvailableAtLocation,
 } from "../services/customerVisibilityService.js";
 import {
   enqueueProductIndex,
@@ -231,6 +233,11 @@ export const getProducts = async (req, res) => {
       sort,
       lat,
       lng,
+      city,
+      state,
+      district,
+      pincode,
+      area,
     } = req.query;
     const enforceRadius = isCustomerVisibilityRequest(req);
 
@@ -257,32 +264,65 @@ export const getProducts = async (req, res) => {
     if (finalCategoryId && finalCategoryId !== "all") query.categoryId = finalCategoryId;
 
     const requestedSellerIds = parseSellerIdFilters({ sellerId, sellerIds });
-    const coords = parseCustomerCoordinates({ lat, lng });
-    const shouldApplyLocationFilter = enforceRadius || coords.valid;
-    if (enforceRadius && !coords.valid) {
+    const locContext = parseCustomerLocation({
+      lat,
+      lng,
+      city,
+      state,
+      district,
+      pincode,
+      area,
+    });
+    const shouldApplyLocationFilter = enforceRadius || locContext.hasLocation;
+
+    if (enforceRadius && !locContext.hasLocation) {
       return handleResponse(
         res,
         400,
-        "lat and lng are required for customer product visibility",
+        "Location parameters (coordinates or city/pincode) are required for customer product visibility",
       );
     }
+
     if (shouldApplyLocationFilter) {
-      const nearbySellerIds = await getNearbySellerIdsForCustomer(
-        coords.lat,
-        coords.lng,
-      );
+      const nearbySellerIds = await getNearbySellerIdsForCustomer(locContext);
 
       const nearbySet = new Set(nearbySellerIds.map(String));
       const finalSellerIds = requestedSellerIds.length
         ? requestedSellerIds.filter((id) => nearbySet.has(String(id)))
         : nearbySellerIds;
 
-      if (finalSellerIds.length > 0) {
-        query.$or = [
-          { sellerId: { $in: finalSellerIds } },
-          { lastSubmittedByRole: "admin" },
-          { sellerId: { $exists: true } }
+      if (finalSellerIds.length === 0) {
+        // No sellers serve the customer's location -> return empty list
+        return handleResponse(res, 200, "Products fetched", {
+          items: [],
+          page: Number(req.query?.page) || 1,
+          limit: Number(req.query?.limit) || 24,
+          total: 0,
+          totalPages: 1,
+        });
+      }
+
+      query.sellerId = { $in: finalSellerIds };
+
+      // Also respect custom product-level location restrictions if user has city/pincode
+      if (locContext.city || locContext.pincode) {
+        const normCity = String(locContext.city || "").trim().toLowerCase();
+        const normPin = String(locContext.pincode || "").trim();
+        const restrictionClauses = [
+          { "locationRestriction.isCustom": { $ne: true } },
+          { locationRestriction: { $exists: false } },
         ];
+        if (normCity) {
+          restrictionClauses.push({
+            "locationRestriction.cities": { $regex: new RegExp(`^${normCity}$`, "i") },
+          });
+        }
+        if (normPin) {
+          restrictionClauses.push({
+            "locationRestriction.pincodes": normPin,
+          });
+        }
+        query.$or = restrictionClauses;
       }
     }
 
@@ -624,6 +664,13 @@ export const createProduct = async (req, res) => {
         });
       }
     }
+    if (typeof productData.locationRestriction === "string") {
+      try {
+        productData.locationRestriction = JSON.parse(productData.locationRestriction);
+      } catch (e) {
+        // Not JSON, keep as is
+      }
+    }
     if (typeof productData.tags === "string" && productData.tags.startsWith("[")) {
       try {
         productData.tags = JSON.parse(productData.tags);
@@ -852,6 +899,14 @@ export const updateProduct = async (req, res) => {
       }
     }
 
+    if (typeof productData.locationRestriction === "string") {
+      try {
+        productData.locationRestriction = JSON.parse(productData.locationRestriction);
+      } catch (e) {
+        // keep as is
+      }
+    }
+
     if (Array.isArray(productData.variants)) {
       productData.variants = productData.variants.map((variant, idx) => ({
         ...variant,
@@ -990,34 +1045,17 @@ export const getProductById = async (req, res) => {
     const { id } = req.params;
     const enforceRadius = isCustomerVisibilityRequest(req);
 
-    let nearbySellerSet = null;
-    const coords = parseCustomerCoordinates(req.query || {});
-    if (enforceRadius) {
-      if (!coords.valid) {
-        return handleResponse(
-          res,
-          400,
-          "lat and lng are required for customer product visibility",
-        );
-      }
-      const nearbySellerIds = await getNearbySellerIdsForCustomer(
-        coords.lat,
-        coords.lng,
-      );
-      nearbySellerSet = new Set(nearbySellerIds.map(String));
-    }
-
     const cacheKey = buildKey("catalog", "product", id);
     const product = await getOrSet(
       cacheKey,
       async () =>
         Product.findById(id)
           .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants createdAt",
+            "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants locationRestriction createdAt",
           )
           .populate("headerId", "name")
           .populate("categoryId", "name")
-          .populate("sellerId", "shopName")
+          .populate("sellerId", "shopName location serviceRadius city state pincode locality")
           .lean(),
       getTTL("product"),
     );
@@ -1033,14 +1071,23 @@ export const getProductById = async (req, res) => {
       }
     }
 
+    let isAvailableInLocation = true;
+    let locationMessage = "";
+
     if (enforceRadius) {
-      const sellerIdForProduct = String(product?.sellerId?._id || product?.sellerId);
-      if (!nearbySellerSet || !nearbySellerSet.has(sellerIdForProduct)) {
-        return handleResponse(res, 404, "Product not available in your area");
+      const locContext = parseCustomerLocation(req.query || {});
+      if (locContext.hasLocation) {
+        const availability = await isProductAvailableAtLocation(product, locContext);
+        isAvailableInLocation = availability.available;
+        if (!isAvailableInLocation) {
+          locationMessage = availability.reason || "This product is not available in your location.";
+        }
       }
     }
 
     const payload = normalizeProductDocumentModeration(product);
+    payload.isAvailableInLocation = isAvailableInLocation;
+    payload.locationMessage = locationMessage;
     
     if (req.user) {
         const userId = req.user.id;

@@ -539,12 +539,15 @@ const ProductDetailSheet = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    {currentStock <= 0 ? (
-                                                        <div className="text-red-500 font-bold text-sm mb-2">Out of stock</div>
-                                                    ) : currentStock <= (selectedProduct.lowStockAlert || 5) ? (
-                                                        <div className="text-orange-500 font-bold text-sm mb-2">Only {currentStock} left!</div>
-                                                    ) : null}
-                                                    {quantity > 0 ? (
+                                                    {extendedProduct?.isAvailableInLocation === false ? (
+                                                        <div className="bg-amber-100/80 text-amber-900 h-12 px-5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 border border-amber-300 uppercase tracking-wider cursor-not-allowed">
+                                                            <span>🚫</span> Unavailable in your area
+                                                        </div>
+                                                    ) : currentStock <= 0 ? (
+                                                        <div className="bg-gray-100 text-gray-400 h-12 px-8 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 border border-gray-200 uppercase tracking-widest w-fit">
+                                                            OUT OF STOCK
+                                                        </div>
+                                                    ) : quantity > 0 ? (
                                                         <div className="flex items-center gap-1 bg-white border border-brand-200 rounded-xl p-1 shadow-sm">
                                                             <motion.button whileTap={{ scale: 0.85 }} onClick={handleDecrement} className="w-9 h-9 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700 hover:bg-brand-100 transition-colors">
                                                                 <Minus size={16} strokeWidth={2.5} />
@@ -553,10 +556,6 @@ const ProductDetailSheet = () => {
                                                             <motion.button disabled={quantity >= currentStock} whileTap={{ scale: 0.85 }} onClick={handleIncrement} className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center text-white hover:bg-[var(--brand-400)] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                                                                 <Plus size={16} strokeWidth={2.5} />
                                                             </motion.button>
-                                                        </div>
-                                                    ) : currentStock <= 0 ? (
-                                                        <div className="bg-gray-100 text-gray-400 h-12 px-8 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 border border-gray-200 uppercase tracking-widest w-fit">
-                                                            OUT OF STOCK
                                                         </div>
                                                     ) : (
                                                     <motion.button

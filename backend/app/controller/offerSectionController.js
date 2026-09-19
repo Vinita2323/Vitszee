@@ -2,6 +2,7 @@ import OfferSection from "../models/offerSection.js";
 import handleResponse from "../utils/helper.js";
 import {
   parseCustomerCoordinates,
+  parseCustomerLocation,
   getNearbySellerIdsForCustomer,
 } from "../services/customerVisibilityService.js";
 import { buildKey, getOrSet, getTTL } from "../services/cacheService.js";
@@ -9,29 +10,28 @@ import { getApprovedOrLegacyFilter } from "../services/productModerationService.
 
 export const getPublicOfferSections = async (req, res) => {
   try {
-    const coords = parseCustomerCoordinates(req.query || {});
-    if (!coords.valid) {
+    const locContext = parseCustomerLocation(req.query || {});
+    if (!locContext.hasLocation) {
       return handleResponse(
         res,
         400,
-        "lat and lng are required for customer offer visibility",
+        "Location parameters are required for customer offer visibility",
       );
     }
 
-    // Round coordinates to 3 decimals for cache bucket
+    const latKey = locContext.lat != null ? locContext.lat.toFixed(3) : "none";
+    const lngKey = locContext.lng != null ? locContext.lng.toFixed(3) : "none";
+    const cityKey = (locContext.city || "none").toLowerCase();
     const cacheKey = buildKey(
       "offersections",
       "public",
-      `${coords.lat.toFixed(3)}:${coords.lng.toFixed(3)}`,
+      `${latKey}:${lngKey}:${cityKey}`,
     );
 
     const filteredSections = await getOrSet(
       cacheKey,
       async () => {
-        const nearbySellerIds = await getNearbySellerIdsForCustomer(
-          coords.lat,
-          coords.lng,
-        );
+        const nearbySellerIds = await getNearbySellerIdsForCustomer(locContext);
         const nearbySellerSet = new Set(nearbySellerIds.map(String));
 
         const sections = await OfferSection.find({ status: "active" })

@@ -1,5 +1,22 @@
 import axiosInstance from "@core/api/axios";
 import { getWithDedupe, invalidateCache } from "@core/api/dedupe";
+import { getJSON, STORAGE_KEYS } from "@core/utils/storage";
+
+function getActiveLocationParams(explicitParams = {}) {
+  const cached = getJSON(STORAGE_KEYS.LOCATION);
+  const locParams = {};
+  if (cached) {
+    if (typeof cached.latitude === "number" && typeof cached.longitude === "number") {
+      locParams.lat = cached.latitude;
+      locParams.lng = cached.longitude;
+    }
+    if (cached.city) locParams.city = cached.city;
+    if (cached.state) locParams.state = cached.state;
+    if (cached.pincode) locParams.pincode = cached.pincode;
+    if (cached.locality || cached.area) locParams.area = cached.locality || cached.area;
+  }
+  return { ...locParams, ...explicitParams };
+}
 
 export const customerApi = {
   sendLoginOtp: (data) => axiosInstance.post("/customer/send-login-otp", data),
@@ -14,17 +31,17 @@ export const customerApi = {
     getWithDedupe("/categories", params, { ttl: 5000 }), // 5 seconds for categories to reflect admin changes fast
   getHeaderCategories: () =>
     getWithDedupe("/header-categories", {}, { ttl: 5000 }), // 5 seconds for header categories to reflect admin changes fast
-  getProducts: (params) => getWithDedupe("/products", params),
-  getProductById: (id, params) => getWithDedupe(`/products/${id}`, params),
+  getProducts: (params) => getWithDedupe("/products", getActiveLocationParams(params)),
+  getProductById: (id, params) => getWithDedupe(`/products/${id}`, getActiveLocationParams(params)),
 
   // Sellers & Location
-  getNearbySellers: (params) => getWithDedupe("/seller/nearby", params),
+  getNearbySellers: (params) => getWithDedupe("/seller/nearby", getActiveLocationParams(params)),
 
   // Cart
   getCart: () => getWithDedupe("/cart", {}, { ttl: 2000 }), // Very short cache for cart
   addToCart: (data) => {
     invalidateCache("/cart"); // Invalidate cart cache
-    return axiosInstance.post("/cart/add", data);
+    return axiosInstance.post("/cart/add", { ...getActiveLocationParams(), ...data });
   },
   updateCartQuantity: (data) => {
     invalidateCache("/cart");
@@ -137,9 +154,9 @@ export const customerApi = {
   // Public offers
   getOffers: () => getWithDedupe("/offers"),
   // Offer sections (category → products, banner + side image)
-  getOfferSections: (params) => getWithDedupe("/offer-sections", params),
+  getOfferSections: (params) => getWithDedupe("/offer-sections", getActiveLocationParams(params)),
   // Lowest Price section
-  getLowestPriceSection: (params) => getWithDedupe("/lowest-price", params),
+  getLowestPriceSection: (params) => getWithDedupe("/lowest-price", getActiveLocationParams(params)),
 
   // Coupons
   validateCoupon: (data) => axiosInstance.post("/coupons/validate", data),

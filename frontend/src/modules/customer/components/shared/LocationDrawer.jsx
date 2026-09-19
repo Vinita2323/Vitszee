@@ -133,6 +133,9 @@ const LocationDrawer = ({ isOpen, onClose }) => {
       const newLoc = {
         name: address.address,
         time: "12-15 mins",
+        city: address.city || currentLocation?.city || "Indore",
+        state: address.state || currentLocation?.state || "Madhya Pradesh",
+        pincode: address.pincode || currentLocation?.pincode || "452001",
         ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
       };
 

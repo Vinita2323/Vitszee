@@ -120,6 +120,28 @@ const productSchema = new mongoose.Schema(
         isFeatured: {
             type: Boolean,
             default: false,
+        },
+        locationRestriction: {
+            isCustom: {
+                type: Boolean,
+                default: false,
+            },
+            serviceRadius: {
+                type: Number,
+                default: null,
+            },
+            cities: [{
+                type: String,
+                trim: true,
+            }],
+            states: [{
+                type: String,
+                trim: true,
+            }],
+            pincodes: [{
+                type: String,
+                trim: true,
+            }],
         }
     },
     { timestamps: true }

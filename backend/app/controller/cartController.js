@@ -3,6 +3,10 @@ import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
 import { getApprovedOrLegacyFilter } from "../services/productModerationService.js";
 import { getIO } from "../socket/socketManager.js";
+import {
+  parseCustomerLocation,
+  isProductAvailableAtLocation,
+} from "../services/customerVisibilityService.js";
 
 const CART_POPULATE_FIELDS =
   "name slug price salePrice mainImage stock status headerId categoryId sellerId variants";
@@ -76,6 +80,19 @@ export const addToCart = async (req, res) => {
     const customerVisibleProduct = await getCustomerVisibleProductById(productId);
     if (!customerVisibleProduct) {
       return handleResponse(res, 404, "Product is not available for purchase");
+    }
+
+    // Validate location availability if customer location is supplied in body or query
+    const locQuery = { ...req.query, ...req.body };
+    const locContext = parseCustomerLocation(locQuery);
+    if (locContext.hasLocation) {
+      const fullProd = await Product.findById(productId)
+        .populate("sellerId", "location serviceRadius city state pincode locality isActive")
+        .lean();
+      const availability = await isProductAvailableAtLocation(fullProd, locContext);
+      if (!availability.available) {
+        return handleResponse(res, 400, availability.reason || "This product is not available in your location.");
+      }
     }
 
     let cart = await Cart.findOne({ customerId }).populate("items.productId", "sellerId").lean();
