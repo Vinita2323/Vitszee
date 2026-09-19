@@ -14,8 +14,9 @@ import {
   reverseGeocodeLatLng,
   getCurrentPosition,
 } from "@/core/utils/addressUtils";
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
 
-const libraries = ["places", "geometry"];
+const libraries = GOOGLE_MAPS_LIBRARIES;
 const mapContainerStyle = {
   width: "100%",
   height: "320px",

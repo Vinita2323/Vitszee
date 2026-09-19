@@ -33,6 +33,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
   const CACHE_TTL_MS = 3 * 60 * 1000;
 
   const mapsReadyRef = React.useRef(false);
+  const autocompleteSuggestionRef = React.useRef(null);
   const autocompleteServiceRef = React.useRef(null);
   const geocoderRef = React.useRef(null);
   const latestPlacesRequestRef = React.useRef(0);
@@ -65,12 +66,33 @@ const LocationDrawer = ({ isOpen, onClose }) => {
 
     try {
       await loadGoogleMaps(apiKey);
-      if (!window.google?.maps?.places) {
-        setPlacesError("Google Places library is unavailable");
-        return false;
+
+      // Support modern Places API (New) AutocompleteSuggestion
+      if (typeof window.google?.maps?.importLibrary === "function") {
+        try {
+          const placesLib = await window.google.maps.importLibrary("places");
+          if (placesLib?.AutocompleteSuggestion) {
+            autocompleteSuggestionRef.current = placesLib.AutocompleteSuggestion;
+          }
+        } catch {
+          // ignore
+        }
       }
-      autocompleteServiceRef.current =
-        new window.google.maps.places.AutocompleteService();
+
+      if (window.google?.maps?.places?.AutocompleteSuggestion) {
+        autocompleteSuggestionRef.current =
+          window.google.maps.places.AutocompleteSuggestion;
+      }
+
+      if (window.google?.maps?.places?.AutocompleteService) {
+        try {
+          autocompleteServiceRef.current =
+            new window.google.maps.places.AutocompleteService();
+        } catch {
+          // ignore
+        }
+      }
+
       geocoderRef.current = new window.google.maps.Geocoder();
       mapsReadyRef.current = true;
       return true;
@@ -178,7 +200,98 @@ const LocationDrawer = ({ isOpen, onClose }) => {
   };
 
   const handleSelectPlace = React.useCallback(
-    (prediction) => {
+    async (prediction) => {
+      // If prediction already has resolved coordinates (e.g., from fallback search)
+      if (
+        prediction?.lat != null &&
+        prediction?.lng != null &&
+        Number.isFinite(prediction.lat) &&
+        Number.isFinite(prediction.lng)
+      ) {
+        updateLocation(
+          {
+            name: prediction.formattedAddress || prediction.description,
+            time: "12-15 mins",
+            city: prediction.city || currentLocation.city || "Indore",
+            state: prediction.state || currentLocation.state || "Madhya Pradesh",
+            pincode: prediction.pincode || currentLocation.pincode || "452001",
+            latitude: prediction.lat,
+            longitude: prediction.lng,
+          },
+          { persist: true, updateSavedHome: false },
+        );
+
+        setSearchQuery("");
+        setPlacePredictions([]);
+        setPlacesError("");
+        setIsSearchFocused(false);
+        resetAutocompleteSession();
+        onClose();
+        return;
+      }
+
+      // If prediction has toPlace() from modern Places API (New)
+      if (typeof prediction?.toPlace === "function") {
+        try {
+          const place = prediction.toPlace();
+          await place.fetchFields({
+            fields: [
+              "displayName",
+              "formattedAddress",
+              "location",
+              "addressComponents",
+            ],
+          });
+
+          const lat = place.location?.lat ? place.location.lat() : null;
+          const lng = place.location?.lng ? place.location.lng() : null;
+
+          if (lat != null && lng != null) {
+            const components = place.addressComponents || [];
+            const getComp = (type) =>
+              components.find((c) => c.types?.includes(type))?.longText ||
+              components.find((c) => c.types?.includes(type))?.shortText ||
+              "";
+
+            const city =
+              getComp("locality") ||
+              getComp("administrative_area_level_3") ||
+              getComp("administrative_area_level_2") ||
+              currentLocation.city;
+            const state =
+              getComp("administrative_area_level_1") || currentLocation.state;
+            const pincode =
+              getComp("postal_code") || currentLocation.pincode;
+
+            updateLocation(
+              {
+                name:
+                  place.formattedAddress ||
+                  place.displayName ||
+                  prediction.description,
+                time: "12-15 mins",
+                city,
+                state,
+                pincode,
+                latitude: lat,
+                longitude: lng,
+              },
+              { persist: true, updateSavedHome: false },
+            );
+
+            setSearchQuery("");
+            setPlacePredictions([]);
+            setPlacesError("");
+            setIsSearchFocused(false);
+            resetAutocompleteSession();
+            onClose();
+            return;
+          }
+        } catch (err) {
+          console.warn("Places API (New) toPlace failed:", err);
+        }
+      }
+
       const geocoder = geocoderRef.current;
       if (!geocoder || !prediction?.place_id) return;
 
@@ -227,6 +340,91 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     ],
   );
 
+  const searchFallbackPlaces = React.useCallback(
+    async (queryText, requestId, cacheKey) => {
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(queryText)}&countrycodes=in&limit=${MAX_SUGGESTIONS}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (!resp.ok) throw new Error("Fallback request failed");
+        const data = await resp.json();
+
+        if (
+          requestId !== latestPlacesRequestRef.current ||
+          queryText !== searchQuery.trim()
+        ) {
+          return;
+        }
+
+        setIsSearchingPlaces(false);
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map((item) => {
+            const mainText =
+              item.name ||
+              item.address?.city ||
+              item.address?.town ||
+              item.address?.suburb ||
+              queryText;
+            const secondaryText = [
+              item.address?.suburb,
+              item.address?.city || item.address?.town,
+              item.address?.state_district,
+              item.address?.state,
+              item.address?.postcode,
+            ]
+              .filter(Boolean)
+              .filter((val, idx, arr) => arr.indexOf(val) === idx && val !== mainText)
+              .join(", ");
+
+            return {
+              place_id: `osm-${item.place_id}`,
+              description: item.display_name,
+              structured_formatting: {
+                main_text: mainText,
+                secondary_text: secondaryText || item.display_name,
+              },
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              city:
+                item.address?.city ||
+                item.address?.town ||
+                item.address?.village ||
+                item.address?.state_district ||
+                item.name ||
+                "",
+              state: item.address?.state || "",
+              pincode: item.address?.postcode || "",
+              formattedAddress: item.display_name,
+              isFallback: true,
+            };
+          });
+
+          setPlacePredictions(formatted);
+          setPlacesError("");
+          placesCacheRef.current.set(cacheKey, {
+            predictions: formatted,
+            expiresAt: Date.now() + CACHE_TTL_MS,
+          });
+          return;
+        }
+
+        setPlacePredictions([]);
+        setPlacesError("");
+      } catch {
+        if (
+          requestId === latestPlacesRequestRef.current &&
+          queryText === searchQuery.trim()
+        ) {
+          setIsSearchingPlaces(false);
+          setPlacePredictions([]);
+          setPlacesError("Location search is temporarily unavailable");
+        }
+      }
+    },
+    [CACHE_TTL_MS, MAX_SUGGESTIONS, searchQuery],
+  );
+
   React.useEffect(() => {
     if (!isOpen) return;
     if (!isSearchFocused) return;
@@ -249,9 +447,6 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     }
 
     const timer = setTimeout(async () => {
-      const ready = await initGooglePlaces();
-      if (!ready || !autocompleteServiceRef.current) return;
-
       const requestId = latestPlacesRequestRef.current + 1;
       latestPlacesRequestRef.current = requestId;
       const querySnapshot = query;
@@ -259,23 +454,31 @@ const LocationDrawer = ({ isOpen, onClose }) => {
       setIsSearchingPlaces(true);
       setPlacesError("");
 
-      const request = {
-        input: query,
-        componentRestrictions: { country: "in" },
-        sessionToken: getAutocompleteSessionToken(),
-      };
+      await initGooglePlaces();
 
-      const lat = Number(currentLocation?.latitude);
-      const lng = Number(currentLocation?.longitude);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        request.location = new window.google.maps.LatLng(lat, lng);
-        request.radius = 50000;
-      }
+      // 1. Try modern Places API (New) AutocompleteSuggestion if available
+      if (autocompleteSuggestionRef.current?.fetchAutocompleteSuggestions) {
+        try {
+          const newRequest = {
+            input: query,
+            includedRegionCodes: ["in"],
+            sessionToken: getAutocompleteSessionToken(),
+          };
 
-      autocompleteServiceRef.current.getPlacePredictions(
-        request,
-        (predictions, status) => {
-          // Ignore stale responses from older keystrokes.
+          const lat = Number(currentLocation?.latitude);
+          const lng = Number(currentLocation?.longitude);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            newRequest.locationBias = {
+              center: { lat, lng },
+              radius: 50000,
+            };
+          }
+
+          const response =
+            await autocompleteSuggestionRef.current.fetchAutocompleteSuggestions(
+              newRequest,
+            );
+
           if (
             requestId !== latestPlacesRequestRef.current ||
             querySnapshot !== searchQuery.trim()
@@ -283,11 +486,29 @@ const LocationDrawer = ({ isOpen, onClose }) => {
             return;
           }
 
-          setIsSearchingPlaces(false);
-          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-            const trimmedPredictions = Array.isArray(predictions)
-              ? predictions.slice(0, MAX_SUGGESTIONS)
-              : [];
+          const suggestions = response?.suggestions;
+          if (Array.isArray(suggestions) && suggestions.length > 0) {
+            setIsSearchingPlaces(false);
+            const trimmedPredictions = suggestions
+              .slice(0, MAX_SUGGESTIONS)
+              .map((s) => ({
+                place_id: s.placePrediction?.placeId,
+                description:
+                  s.placePrediction?.text?.text ||
+                  s.placePrediction?.text?.toString() ||
+                  "",
+                structured_formatting: {
+                  main_text:
+                    s.placePrediction?.structuredFormat?.mainText?.text ||
+                    s.placePrediction?.text?.text ||
+                    "",
+                  secondary_text:
+                    s.placePrediction?.structuredFormat?.secondaryText?.text ||
+                    "",
+                },
+                toPlace: () => s.placePrediction?.toPlace(),
+              }));
+
             setPlacePredictions(trimmedPredictions);
             placesCacheRef.current.set(cacheKey, {
               predictions: trimmedPredictions,
@@ -295,16 +516,74 @@ const LocationDrawer = ({ isOpen, onClose }) => {
             });
             return;
           }
-          if (
-            status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS
-          ) {
+
+          if (Array.isArray(suggestions) && suggestions.length === 0) {
+            setIsSearchingPlaces(false);
             setPlacePredictions([]);
             return;
           }
-          setPlacePredictions([]);
-          setPlacesError("Google search is temporarily unavailable");
-        },
-      );
+        } catch {
+          // If Places (New) fetch suggestions throws, proceed to legacy / fallback
+        }
+      }
+
+      // 2. Try legacy AutocompleteService if available
+      if (autocompleteServiceRef.current) {
+        const legacyRequest = {
+          input: query,
+          componentRestrictions: { country: "in" },
+          sessionToken: getAutocompleteSessionToken(),
+        };
+
+        const lat = Number(currentLocation?.latitude);
+        const lng = Number(currentLocation?.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          legacyRequest.locationBias = {
+            center: { lat, lng },
+            radius: 50000,
+          };
+        }
+
+        autocompleteServiceRef.current.getPlacePredictions(
+          legacyRequest,
+          (predictions, status) => {
+            if (
+              requestId !== latestPlacesRequestRef.current ||
+              querySnapshot !== searchQuery.trim()
+            ) {
+              return;
+            }
+
+            if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+              setIsSearchingPlaces(false);
+              const trimmedPredictions = Array.isArray(predictions)
+                ? predictions.slice(0, MAX_SUGGESTIONS)
+                : [];
+              setPlacePredictions(trimmedPredictions);
+              placesCacheRef.current.set(cacheKey, {
+                predictions: trimmedPredictions,
+                expiresAt: Date.now() + CACHE_TTL_MS,
+              });
+              return;
+            }
+            if (
+              status ===
+              window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS
+            ) {
+              setIsSearchingPlaces(false);
+              setPlacePredictions([]);
+              return;
+            }
+
+            // Fallback seamlessly if Google Places API is not active or returns an error
+            searchFallbackPlaces(querySnapshot, requestId, cacheKey);
+          },
+        );
+        return;
+      }
+
+      // 3. Fallback to OpenStreetMap Nominatim
+      searchFallbackPlaces(querySnapshot, requestId, cacheKey);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
@@ -319,6 +598,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     initGooglePlaces,
     isSearchFocused,
     isOpen,
+    searchFallbackPlaces,
     searchQuery,
   ]);
 
@@ -391,7 +671,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
                 <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 overflow-hidden">
                   {isSearchingPlaces && placePredictions.length === 0 && (
                     <div className="px-3.5 py-2.5 text-xs font-medium text-slate-500">
-                      Searching with Google...
+                      Searching locations...
                     </div>
                   )}
 

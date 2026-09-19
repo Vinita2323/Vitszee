@@ -9,8 +9,9 @@ import {
   getCachedDeliveryPartnerLocation,
   saveDeliveryPartnerLocation,
 } from "../utils/deliveryLastLocation";
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
 
-const libraries = ["geometry"];
+const libraries = GOOGLE_MAPS_LIBRARIES;
 const ROUTE_REFRESH_THRESHOLD_M = 150;
 const ROUTE_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const RECENTER_INTERVAL_MS = 15000;
@@ -127,7 +128,7 @@ const DeliveryTrackingMapComponent = ({
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
   const { isLoaded, loadError } = useJsApiLoader({
-    id: "delivery-tracking-map",
+    id: GOOGLE_MAPS_SCRIPT_ID,
     googleMapsApiKey: apiKey,
     libraries,
   });

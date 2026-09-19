@@ -69,13 +69,26 @@ const PendingSellers = () => {
 
     useEffect(() => {
         if (isReviewModalOpen || previewDoc) {
+            const scrollBarWidth =
+                window.innerWidth - document.documentElement.clientWidth;
+            const prevBodyOverflow = document.body.style.overflow;
+            const prevHtmlOverflow = document.documentElement.style.overflow;
+            const prevPaddingRight = document.body.style.paddingRight;
+
             document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
+            document.documentElement.style.overflow = 'hidden';
+            if (scrollBarWidth > 0) {
+                document.body.style.paddingRight = `${scrollBarWidth}px`;
+            }
+            window.lenis?.stop();
+
+            return () => {
+                document.body.style.overflow = prevBodyOverflow;
+                document.documentElement.style.overflow = prevHtmlOverflow;
+                document.body.style.paddingRight = prevPaddingRight;
+                window.lenis?.start();
+            };
         }
-        return () => {
-            document.body.style.overflow = '';
-        };
     }, [isReviewModalOpen, previewDoc]);
 
     const stats = useMemo(() => ({
@@ -312,7 +325,13 @@ const PendingSellers = () => {
             {/* Review Modal */}
             <AnimatePresence>
                 {isReviewModalOpen && viewingSeller && (
-                    <div className="fixed inset-0 z-[100] overflow-y-auto">
+                    <div
+                        className="fixed inset-0 z-[100] overflow-y-auto overscroll-contain"
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        data-lenis-prevent-touch
+                        style={{ overscrollBehavior: "contain" }}
+                    >
                         <div className="min-h-full flex items-center justify-center p-4 lg:p-6">
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -327,6 +346,10 @@ const PendingSellers = () => {
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                                 className="w-full max-w-4xl relative z-10 bg-white rounded-2xl shadow-2xl overflow-hidden"
+                                data-lenis-prevent
+                                data-lenis-prevent-wheel
+                                data-lenis-prevent-touch
+                                style={{ overscrollBehavior: "contain" }}
                             >
                                 <div className="grid grid-cols-1 lg:grid-cols-12">
                                     {/* Sidebar Info */}
@@ -502,7 +525,13 @@ const PendingSellers = () => {
             {/* In-App Document Preview Modal */}
             <AnimatePresence>
                 {previewDoc && (
-                    <div className="fixed inset-0 z-[120] overflow-y-auto">
+                    <div
+                        className="fixed inset-0 z-[120] overflow-y-auto overscroll-contain"
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        data-lenis-prevent-touch
+                        style={{ overscrollBehavior: "contain" }}
+                    >
                         <div className="min-h-full flex items-center justify-center p-4 lg:p-6">
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -517,6 +546,10 @@ const PendingSellers = () => {
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                                 className="w-full max-w-4xl max-h-[92vh] relative z-10 bg-white border border-slate-200 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-900"
+                                data-lenis-prevent
+                                data-lenis-prevent-wheel
+                                data-lenis-prevent-touch
+                                style={{ overscrollBehavior: "contain" }}
                             >
                                 {/* Header */}
                                 <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between bg-white">
@@ -550,7 +583,13 @@ const PendingSellers = () => {
                                 </div>
 
                                 {/* Viewer Body */}
-                                <div className="flex-1 bg-slate-50 flex items-center justify-center p-6 min-h-[400px] max-h-[75vh] overflow-auto">
+                                <div
+                                    className="flex-1 bg-slate-50 flex items-center justify-center p-6 min-h-[400px] max-h-[75vh] overflow-auto overscroll-contain"
+                                    data-lenis-prevent
+                                    data-lenis-prevent-wheel
+                                    data-lenis-prevent-touch
+                                    style={{ overscrollBehavior: "contain" }}
+                                >
                                     {previewDoc.fileType === 'pdf' || (previewDoc.url && previewDoc.url.toLowerCase().endsWith('.pdf')) ? (
                                         <iframe
                                             src={previewDoc.url}

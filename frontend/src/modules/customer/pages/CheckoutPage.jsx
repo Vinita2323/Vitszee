@@ -38,7 +38,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@shared/components/ui/Toast";
 import { useSettings } from "@core/context/SettingsContext";
 import SlideToPay from "../components/shared/SlideToPay";
-import { Autocomplete, useLoadScript } from "@react-google-maps/api";
+import { Autocomplete, useJsApiLoader } from "@react-google-maps/api";
 import { getCachedGeocode, setCachedGeocode } from "@/core/utils/geocodeCache";
 import { getJSON, setJSON, STORAGE_KEYS } from "@core/utils/storage";
 import { createSocketTokenReader } from "@core/utils/authStorage";
@@ -71,10 +71,13 @@ import CheckoutRecommendedProducts from "./checkout/components/CheckoutRecommend
 import CheckoutWishlistSection from "./checkout/components/CheckoutWishlistSection";
 import CheckoutOrderSuccess from "./checkout/components/CheckoutOrderSuccess";
 
-const placesLibrary = ["places"];
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
+
+const placesLibrary = GOOGLE_MAPS_LIBRARIES;
 
 const CheckoutPage = () => {
-  const { isLoaded } = useLoadScript({
+  const { isLoaded } = useJsApiLoader({
+    id: GOOGLE_MAPS_SCRIPT_ID,
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries: placesLibrary,
   });

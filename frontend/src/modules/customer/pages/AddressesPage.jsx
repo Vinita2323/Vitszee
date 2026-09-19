@@ -22,8 +22,9 @@ import {
     reverseGeocodeLatLng,
     getCurrentPosition,
 } from "@/core/utils/addressUtils";
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
 
-const libraries = ["places"];
+const libraries = GOOGLE_MAPS_LIBRARIES;
 
 const PlacesAutocompleteInput = ({ isLoaded, value, onChange, onPlaceSelected, id, placeholder, maxLength }) => {
     const inputRef = useRef(null);

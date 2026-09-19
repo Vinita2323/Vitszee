@@ -15,8 +15,9 @@ import {
 import customerPin from "@/assets/customer-pin.png";
 import deliveryIcon from "@/assets/deliveryIcon.png";
 import storePin from "@/assets/store-pin.png";
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
 
-const libraries = ["places", "geometry"];
+const libraries = GOOGLE_MAPS_LIBRARIES;
 
 const containerStyle = {
   width: "100%",

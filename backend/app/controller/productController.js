@@ -381,7 +381,7 @@ export const getProducts = async (req, res) => {
       "stock-desc": { stock: -1, createdAt: -1 },
     };
     const normalizedSort = String(sort || "newest").toLowerCase();
-    const sortByNearest = normalizedSort === "nearest" && coords.valid;
+    const sortByNearest = normalizedSort === "nearest" && Boolean(locContext?.coords?.valid);
     const sortQuery = sortMap[normalizedSort] || sortMap.newest;
     const NEAREST_SORT_SCAN_LIMIT = 500;
 
@@ -398,7 +398,7 @@ export const getProducts = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(NEAREST_SORT_SCAN_LIMIT)
             .lean(),
-          getNearbySellerDistancesForCustomer(coords.lat, coords.lng),
+          getNearbySellerDistancesForCustomer(locContext.lat, locContext.lng),
           Product.countDocuments(finalQuery),
         ]);
 

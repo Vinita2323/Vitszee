@@ -21,7 +21,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { adminApi } from "../services/adminApi";
 
-const MAP_LIBRARIES = ["places", "geometry"];
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
+
+const MAP_LIBRARIES = GOOGLE_MAPS_LIBRARIES;
 const DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 };
 const PAGE_SIZE = 25;
 const TARGET_VIEW_RADIUS_KM = 25;

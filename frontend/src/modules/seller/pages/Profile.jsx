@@ -53,7 +53,9 @@ import {
   CartesianGrid
 } from "recharts";
 
-const mapLibraries = ["places", "geometry"];
+import { GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_SCRIPT_ID } from "@/core/utils/googleMapsConfig";
+
+const mapLibraries = GOOGLE_MAPS_LIBRARIES;
 
 const SellerProfile = () => {
   const { refreshEarnings } = useSellerEarnings();

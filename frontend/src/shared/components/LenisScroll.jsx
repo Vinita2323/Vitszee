@@ -29,6 +29,8 @@ const LenisScroll = () => {
             },
         });
 
+        window.lenis = lenis;
+
         let rafId;
 
         function raf(time) {
@@ -41,6 +43,9 @@ const LenisScroll = () => {
         return () => {
             cancelAnimationFrame(rafId);
             lenis.destroy();
+            if (window.lenis === lenis) {
+                window.lenis = null;
+            }
         };
     }, []);
 
