@@ -38,7 +38,7 @@ const CheckoutCouponSection = React.memo(function CheckoutCouponSection({
   return (
     <>
       {/* Inline coupon carousel */}
-      <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <motion.div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Tag size={20} className="text-orange-500" />

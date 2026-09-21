@@ -30,45 +30,56 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
   selectedCoupon,
   discountAmount,
 }) {
-  const deliveryFee = pricingPreview?.deliveryFeeCharged || 0;
   const handlingFee = pricingPreview?.handlingFeeCharged || 0;
   const tipAmount = pricingPreview?.tipTotal || selectedTip || 0;
-  const taxAmount = pricingPreview?.taxTotal || 0;
 
   return (
     <>
       {/* Tip for Partner */}
-      <motion.div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-100">
-        <div className="flex items-center gap-2 mb-3">
-          <Heart size={18} className="text-pink-500 fill-pink-500" />
-          <h3 className="font-black text-slate-800">Tip your delivery partner</h3>
+      <motion.div className="bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-emerald-50/70 rounded-2xl p-4 border border-emerald-100/80 shadow-sm">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100/80 text-[#1A4516] flex items-center justify-center">
+              <Heart size={15} className="fill-[#1A4516] text-[#1A4516]" />
+            </div>
+            <h3 className="font-black text-slate-800 text-sm tracking-tight">Tip your delivery partner</h3>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+            100% to partner
+          </span>
         </div>
-        <p className="text-xs text-slate-600 mb-3">100% of the tip goes to them</p>
+        <p className="text-xs text-slate-500 mb-3">Thank your delivery partner for their fast service</p>
         <div className="grid grid-cols-4 gap-2">
-          {tipAmounts.map((tip) => (
-            <button
-              key={tip.value}
-              onClick={() => onSelectTip(tip.value)}
-              className={`py-2 rounded-xl border-2 transition-all font-bold text-sm ${
-                selectedTip === tip.value
-                  ? "border-pink-500 bg-pink-100 text-pink-700"
-                  : "border-pink-200 bg-white text-slate-700 hover:border-pink-300"
-              }`}>
-              {tip.label}
-            </button>
-          ))}
+          {tipAmounts.map((tip) => {
+            const isSelected = selectedTip === tip.value;
+            return (
+              <button
+                key={tip.value}
+                onClick={() => onSelectTip(tip.value)}
+                className={`py-2 px-1 rounded-xl border font-bold text-xs sm:text-sm transition-all active:scale-95 ${
+                  isSelected
+                    ? "border-[#1A4516] bg-[#1A4516] text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30"
+                }`}>
+                {tip.label}
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
       {/* Bill Details */}
-      <motion.div className="bg-white rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 border border-slate-100">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="h-10 w-10 rounded-2xl bg-[#F5FBF5] flex items-center justify-center">
-            <Clipboard size={20} className="text-[#1A4516]" />
+      <motion.div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80">
+        <div className="flex items-center gap-2.5 mb-5 pb-3 border-b border-slate-100">
+          <div className="h-9 w-9 rounded-xl bg-[#F5FBF5] flex items-center justify-center text-[#1A4516]">
+            <Clipboard size={18} />
           </div>
-          <h3 className="font-[1000] text-slate-800 text-xl tracking-tight uppercase">
-            Order Summary
-          </h3>
+          <div>
+            <h3 className="font-black text-slate-800 text-base sm:text-lg tracking-tight">
+              Order Summary
+            </h3>
+            <p className="text-[11px] text-slate-400 font-medium">Detailed price breakdown</p>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -82,38 +93,9 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
           </div>
           <div className="flex justify-between items-center px-2">
             <span className="text-slate-500 font-bold text-[13px] uppercase tracking-wider">
-              Delivery Fee
-            </span>
-            <span className="font-black text-slate-800">₹{deliveryFee}</span>
-          </div>
-          {pricingPreview &&
-            typeof pricingPreview.distanceKmActual === "number" &&
-            typeof pricingPreview.distanceKmRounded === "number" && (
-              <div className="px-2 -mt-3 flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                <span>
-                  Distance: {pricingPreview.distanceKmActual.toFixed(2)} km
-                  {pricingPreview.distanceKmRounded
-                    ? ` (billed ${pricingPreview.distanceKmRounded.toFixed(2)} km)`
-                    : ""}
-                </span>
-                <span className="uppercase tracking-wider">
-                  {pricingPreview?.snapshots?.deliverySettings?.deliveryPricingMode ||
-                    pricingPreview?.snapshots?.deliverySettings?.pricingMode ||
-                    ""}
-                </span>
-              </div>
-            )}
-          <div className="flex justify-between items-center px-2">
-            <span className="text-slate-500 font-bold text-[13px] uppercase tracking-wider">
               Handling Fee
             </span>
             <span className="font-black text-slate-800">₹{handlingFee}</span>
-          </div>
-          <div className="flex justify-between items-center px-2">
-            <span className="text-slate-500 font-bold text-[13px] uppercase tracking-wider">
-              Tax
-            </span>
-            <span className="font-black text-slate-800">₹{taxAmount}</span>
           </div>
 
           {selectedCoupon && (
@@ -130,12 +112,12 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
           )}
 
           {tipAmount > 0 && (
-            <div className="flex justify-between items-center px-3 py-2 bg-pink-50 rounded-xl border border-pink-100 italic">
-              <span className="text-pink-600 font-bold text-xs flex items-center gap-2">
-                <Heart size={14} className="fill-pink-500" />
-                Partner Support
+            <div className="flex justify-between items-center px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-100">
+              <span className="text-emerald-700 font-bold text-xs flex items-center gap-2">
+                <Heart size={14} className="fill-emerald-600 text-emerald-600" />
+                Partner Support Tip
               </span>
-              <span className="font-black text-pink-600">₹{tipAmount}</span>
+              <span className="font-black text-emerald-700">₹{tipAmount}</span>
             </div>
           )}
 

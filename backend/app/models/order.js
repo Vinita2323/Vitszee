@@ -52,7 +52,10 @@ const orderSchema = new mongoose.Schema(
       },
       name: String,
       address: String,
+      fullAddress: String,
       city: String,
+      state: String,
+      pincode: String,
       phone: String,
       landmark: String,
       location: {
@@ -383,6 +386,21 @@ const orderSchema = new mongoose.Schema(
     timeSlot: {
       type: String,
       default: "now",
+    },
+    deliveryProvider: {
+      type: String,
+      enum: ["shadowfax", "internal"],
+      default: "shadowfax",
+      index: true,
+    },
+    awbNumber: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    deliveryFailureReason: {
+      type: String,
+      default: null,
     },
     deliveryBoy: {
       type: mongoose.Schema.Types.ObjectId,

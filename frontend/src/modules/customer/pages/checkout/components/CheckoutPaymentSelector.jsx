@@ -27,7 +27,7 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
     <>
       {/* Wallet Section */}
       {walletBalance > 0 && (
-        <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 overflow-hidden relative">
+        <motion.div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 overflow-hidden relative">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-full bg-[#F5FBF5] flex items-center justify-center">
@@ -72,7 +72,7 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
       )}
 
       {/* Payment Method */}
-      <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <motion.div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
         <h3 className="font-black text-slate-800 mb-4 uppercase text-sm tracking-widest">
           Payment Method
         </h3>

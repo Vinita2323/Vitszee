@@ -1366,6 +1366,14 @@ export const acceptOrder = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
+    if (order.deliveryProvider === "shadowfax") {
+      return handleResponse(
+        res,
+        400,
+        "Orders are delivered exclusively through Shadowfax logistics partner.",
+      );
+    }
+
     if (order.workflowVersion >= 2) {
       try {
         const idem = req.headers["idempotency-key"];

@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Contact2 } from "lucide-react";
+import { Check, Contact2, MapPin, Navigation, UserPlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,16 @@ import { Button } from "@/components/ui/button";
  *   onSelectAddress      – () => void  — opens the address-selection modal
  *   onEditAddress        – () => void  — opens the edit-address modal
  *   onUseCurrentLocation – () => void  — triggers live-location detection
- *
- * Internal state for the "order for someone else" form is kept here because
- * it is purely presentational; the parent only needs the saved result.
+ *   isFetchingLocation   – boolean
+ *   showRecipientForm    – boolean
+ *   onToggleRecipientForm – () => void
+ *   recipientData        – object
+ *   onRecipientDataChange – (data) => void
+ *   onSaveRecipient      – () => void
+ *   onRemoveRecipient    – () => void
+ *   displayName          – string
+ *   displayPhone         – string
+ *   displayAddress       – string
  */
 const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
   currentAddress,
@@ -25,7 +32,6 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
   onSelectAddress,
   onEditAddress,
   onUseCurrentLocation,
-  // Extra props forwarded from CheckoutPage that the section needs
   isFetchingLocation,
   showRecipientForm,
   onToggleRecipientForm,
@@ -38,38 +44,47 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
   displayAddress,
 }) {
   return (
-    <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      {/* "Order for someone else" toggle */}
-      <div className="flex justify-between items-center mb-3">
-        <span className="text-xs text-slate-500 font-medium">
-          Ordering for someone else?
-        </span>
+    <motion.div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#1A4516] flex items-center justify-center font-bold">
+            <MapPin size={17} />
+          </div>
+          <div>
+            <h3 className="font-black text-slate-800 text-sm sm:text-base tracking-tight">
+              Delivery Address
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Order will be delivered to this location
+            </p>
+          </div>
+        </div>
         <button
+          type="button"
           onClick={onToggleRecipientForm}
-          className="text-[#1A4516] text-xs font-bold hover:underline">
-          {showRecipientForm
-            ? "Close"
-            : savedRecipient
-              ? "Change details"
-              : "Add details"}
+          className="text-xs font-bold text-[#1A4516] hover:text-emerald-700 hover:underline flex items-center gap-1 transition-colors">
+          <UserPlus size={14} />
+          <span>{showRecipientForm ? "Close" : savedRecipient ? "Change Details" : "Ordering for someone else?"}</span>
         </button>
       </div>
 
-      {/* Saved recipient card */}
+      {/* Saved recipient notification card */}
       {savedRecipient && !showRecipientForm && (
-        <div className="mb-4 p-4 bg-[#F5FBF5] border border-[#1A4516]/10 rounded-2xl flex items-start justify-between">
+        <div className="mb-4 p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-start justify-between">
           <div className="flex gap-3">
-            <div className="h-10 w-10 rounded-full bg-[#E6F3E6] flex items-center justify-center text-[#1A4516] flex-shrink-0">
+            <div className="h-9 w-9 rounded-xl bg-emerald-100/80 flex items-center justify-center text-[#1A4516] shrink-0">
               <Contact2 size={18} />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800">
-                {savedRecipient.name}
-              </p>
-              <p className="text-xs text-[#1A4516] font-bold mb-1">
-                {savedRecipient.phone}
-              </p>
-              <p className="text-xs text-slate-500 leading-tight">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-slate-800">{savedRecipient.name}</p>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  Recipient
+                </span>
+              </div>
+              <p className="text-xs text-[#1A4516] font-bold mt-0.5">{savedRecipient.phone}</p>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                 {savedRecipient.completeAddress}
                 {savedRecipient.landmark && `, ${savedRecipient.landmark}`}
                 {savedRecipient.pincode && ` - ${savedRecipient.pincode}`}
@@ -78,13 +93,13 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
           </div>
           <button
             onClick={onRemoveRecipient}
-            className="text-red-500 text-xs font-bold hover:underline">
+            className="text-red-500 text-xs font-bold hover:underline shrink-0 ml-2">
             Remove
           </button>
         </div>
       )}
 
-      {/* Recipient form */}
+      {/* Recipient form (Accordion) */}
       <AnimatePresence>
         {showRecipientForm && (
           <motion.div
@@ -93,63 +108,63 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden mb-4">
-            <div className="bg-[#f8f9fb] rounded-2xl p-4 border border-slate-100 space-y-4">
+            <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 space-y-4">
               <div>
-                <h4 className="text-sm font-bold text-slate-800 mb-3">
-                  Enter delivery address details
+                <h4 className="text-sm font-bold text-slate-800 mb-2">
+                  Enter Delivery Address Details
                 </h4>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <Input
                     placeholder="Enter complete address*"
                     value={recipientData.completeAddress}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, completeAddress: e.target.value })
                     }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
+                    className="h-11 rounded-xl bg-white border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
                   />
                   <Input
-                    placeholder="Find landmark (optional)"
+                    placeholder="Landmark (e.g. Near City Hospital) - optional"
                     value={recipientData.landmark}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, landmark: e.target.value })
                     }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
+                    className="h-11 rounded-xl bg-white border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
                   />
                   <Input
-                    placeholder="Enter pin code (optional)"
+                    placeholder="Pincode (e.g. 452001) - optional"
                     value={recipientData.pincode}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, pincode: e.target.value })
                     }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
+                    className="h-11 rounded-xl bg-white border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
                   />
                 </div>
               </div>
 
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-1">
-                  Enter receiver details
+                  Receiver Contact
                 </h4>
-                <p className="text-[10px] text-slate-400 mb-3 font-medium">
-                  We&apos;ll contact receiver to get the exact delivery address
+                <p className="text-[11px] text-slate-500 mb-2.5">
+                  Delivery partner will contact receiver at this phone number
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <Input
                     placeholder="Receiver's name*"
                     value={recipientData.name}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, name: e.target.value })
                     }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
+                    className="h-11 rounded-xl bg-white border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm"
                   />
                   <div className="relative">
                     <Input
-                      placeholder="Receiver's phone number*"
+                      placeholder="Receiver's 10-digit phone number*"
                       value={recipientData.phone}
                       onChange={(e) =>
                         onRecipientDataChange({ ...recipientData, phone: e.target.value })
                       }
-                      className="h-12 rounded-xl border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm pr-10"
+                      className="h-11 rounded-xl bg-white border-slate-200 focus:ring-[#1A4516] focus:border-[#1A4516] text-sm pr-10"
                     />
                     <Contact2
                       size={18}
@@ -161,73 +176,61 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
 
               <Button
                 onClick={onSaveRecipient}
-                className="w-full h-12 bg-[var(--brand-700)] hover:bg-[var(--brand-600)] text-white font-bold rounded-xl">
-                Save address
+                className="w-full h-11 bg-[#1A4516] hover:bg-[#143d11] text-white font-bold rounded-xl shadow-sm">
+                Save Recipient Details
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Delivery address heading */}
-      <div className="mb-3">
-        <h3 className="font-black text-slate-800 text-base">Delivery Address</h3>
-        <p className="text-xs text-slate-500">Select or edit your saved address</p>
-      </div>
-
-      {/* Active address card */}
-      <div className="border rounded-xl p-3 mb-3 relative cursor-pointer transition-all border-[#1A4516] bg-[#F5FBF5]/50">
+      {/* Active Address Card */}
+      <div className="border-2 rounded-2xl p-4 mb-3 transition-all border-[#1A4516]/40 bg-[#F5FBF5]/70 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="mt-1">
-            <div className="h-5 w-5 rounded-full bg-[#1A4516] flex items-center justify-center">
-              <Check size={12} className="text-white stroke-[4]" />
+          <div className="mt-0.5">
+            <div className="h-6 w-6 rounded-full bg-[#1A4516] flex items-center justify-center shadow-sm shrink-0">
+              <Check size={14} className="text-white stroke-[3]" />
             </div>
           </div>
-          <div className="flex-1">
-            <div className="flex justify-between items-start">
-              <h4 className="font-bold text-slate-800 text-sm">{displayName}</h4>
-              <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">{displayName}</h4>
+                {displayPhone && (
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">{displayPhone}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); onEditAddress(); }}
-                  className="text-slate-500 text-xs font-bold hover:underline">
+                  className="text-slate-600 text-xs font-bold hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-lg hover:border-slate-300 transition-colors">
                   Edit
                 </button>
                 <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); onSelectAddress(); }}
-                  className="text-[#1A4516] text-xs font-bold hover:underline">
+                  className="text-[#1A4516] text-xs font-bold hover:bg-emerald-100 bg-white border border-[#1A4516]/30 px-2.5 py-1 rounded-lg transition-colors">
                   Change
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">{displayPhone}</p>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">{displayAddress}</p>
+            <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed font-medium">
+              {displayAddress}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Use current location */}
+      {/* Use Current Live Location Button */}
       <button
         type="button"
         onClick={onUseCurrentLocation}
         disabled={isFetchingLocation}
-        className="mt-3 w-full py-2.5 rounded-2xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-        {isFetchingLocation ? "Detecting live location..." : "Use current live location"}
+        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-emerald-500 transition-all flex items-center justify-center gap-2">
+        <Navigation size={14} className={`text-emerald-700 ${isFetchingLocation ? "animate-spin" : ""}`} />
+        <span>{isFetchingLocation ? "Detecting live location..." : "Use current live location"}</span>
       </button>
-
-      {/* Confirmation banner */}
-      <motion.div className="mt-3 rounded-2xl border border-[#1A4516]/10 bg-[#F5FBF5]/70 px-4 py-3 flex items-center gap-3 shadow-sm">
-        <div className="h-8 w-8 rounded-full bg-[#1A4516] flex items-center justify-center shadow-[#1A4516]/40 shadow-md">
-          <Check size={16} className="text-white stroke-[3]" />
-        </div>
-        <div className="flex-1">
-          <p className="text-[13px] font-semibold text-[#1A4516]">
-            Delivery address confirmed
-          </p>
-          <p className="text-[11px] font-medium text-[#1A4516]/80">
-            We&apos;ll deliver to the address you&apos;ve entered above.
-          </p>
-        </div>
-      </motion.div>
     </motion.div>
   );
 });

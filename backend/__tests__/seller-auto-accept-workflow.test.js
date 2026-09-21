@@ -153,8 +153,8 @@ describe("Seller Auto-Accept 20s Workflow", () => {
         expect.any(Object)
       );
 
-      expect(mockDeliveryAssignmentCreate).toHaveBeenCalled();
-      expect(mockEmitDeliveryBroadcastForSeller).toHaveBeenCalled();
+      expect(mockDeliveryAssignmentCreate).not.toHaveBeenCalled();
+      expect(mockEmitDeliveryBroadcastForSeller).not.toHaveBeenCalled();
       expect(mockEmitOrderStatusUpdate).toHaveBeenCalled();
     });
 

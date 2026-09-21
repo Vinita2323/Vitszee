@@ -90,8 +90,8 @@ export async function createForwardOrder(orderId, options = {}) {
 
   // 1. Fetch Order with populated customer and seller
   const order = await Order.findOne({ orderId })
-    .populate("customer", "name phone email")
-    .populate("seller", "shopName name phone address location city state pincode")
+    .populate("customer", "name phone email addresses")
+    .populate("seller", "shopName name phone address locality location city state pincode")
     .populate("items.product", "name price sku");
 
   if (!order) {
@@ -104,8 +104,17 @@ export async function createForwardOrder(orderId, options = {}) {
     providerType: "forward",
   });
 
-  if (existingShipment && existingShipment.shadowfaxOrderId) {
-    logger.info(`[Shadowfax] Shipment already exists for order #${orderId}. Reusing ${existingShipment.shadowfaxOrderId}`);
+  if (
+    existingShipment &&
+    (existingShipment.shadowfaxOrderId ||
+      ["ORDER_CREATED", "DISPATCH_READY", "RIDER_ASSIGNED", "RIDER_ARRIVED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"].includes(existingShipment.shipmentStatus))
+  ) {
+    logger.info(`[Shadowfax] Active shipment already exists for order #${orderId}. Reusing ${existingShipment.shadowfaxOrderId || existingShipment._id}`);
+    if (!order.awbNumber && existingShipment.awbNumber) {
+      order.deliveryProvider = "shadowfax";
+      order.awbNumber = existingShipment.awbNumber;
+      if (typeof order.save === "function") await order.save().catch(() => {});
+    }
     return existingShipment;
   }
 
@@ -114,33 +123,106 @@ export async function createForwardOrder(orderId, options = {}) {
   const customer = order.customer || {};
   const address = order.address || {};
 
+  // Validate Seller (Pickup) Details
+  const sellerPhone = String(seller.phone || "").replace(/[^0-9]/g, "").slice(-10);
+  if (!sellerPhone || sellerPhone.length !== 10) {
+    throw new ShadowfaxInvalidRequestError("Seller pickup phone number is missing or invalid (must be 10 digits).");
+  }
+  const sellerAddressLine = String(seller.address || seller.locality || seller.shopName || "").trim();
+  if (!sellerAddressLine) {
+    throw new ShadowfaxInvalidRequestError("Seller pickup address line is missing.");
+  }
+  const sellerCity = String(seller.city || "").trim();
+  if (!sellerCity) {
+    throw new ShadowfaxInvalidRequestError("Seller pickup city is missing.");
+  }
+  const sellerState = String(seller.state || "").trim();
+  if (!sellerState) {
+    throw new ShadowfaxInvalidRequestError("Seller pickup state is missing.");
+  }
+  let sellerPincode = String(seller.pincode || "").trim();
+  if (!/^\d{6}$/.test(sellerPincode)) {
+    const match = sellerAddressLine.match(/\b\d{6}\b/);
+    if (match) {
+      sellerPincode = match[0];
+    } else {
+      throw new ShadowfaxInvalidRequestError("Seller pickup pincode is missing or invalid (must be 6 digits).");
+    }
+  }
+
+  // Validate Customer (Drop) Details
+  const customerPhone = String(address.phone || customer.phone || "").replace(/[^0-9]/g, "").slice(-10);
+  if (!customerPhone || customerPhone.length !== 10) {
+    throw new ShadowfaxInvalidRequestError("Customer delivery contact phone number is missing or invalid (must be 10 digits).");
+  }
+  const customerAddressLine = String(address.fullAddress || address.address || address.landmark || "").trim();
+  if (!customerAddressLine) {
+    throw new ShadowfaxInvalidRequestError("Customer delivery address line is missing.");
+  }
+
+  // City extraction
+  let customerCity = String(address.city || "").trim();
+  if (!customerCity && Array.isArray(customer.addresses)) {
+    const matched = customer.addresses.find((a) => a.city);
+    if (matched?.city) customerCity = String(matched.city).trim();
+  }
+  if (!customerCity && sellerCity) {
+    customerCity = sellerCity;
+  }
+  if (!customerCity) {
+    throw new ShadowfaxInvalidRequestError("Customer delivery city is missing.");
+  }
+
+  // State extraction
+  let customerState = String(address.state || "").trim();
+  if (!customerState && Array.isArray(customer.addresses)) {
+    const matched = customer.addresses.find((a) => a.state);
+    if (matched?.state) customerState = String(matched.state).trim();
+  }
+  if (!customerState && sellerState) {
+    customerState = sellerState;
+  }
+  if (!customerState) {
+    throw new ShadowfaxInvalidRequestError("Customer delivery state is missing.");
+  }
+
+  // Pincode extraction: strictly 6 digits, never silently falling back to 560001
+  let customerPincode = "";
+  if (address.pincode && /^\d{6}$/.test(String(address.pincode).trim())) {
+    customerPincode = String(address.pincode).trim();
+  } else {
+    const match = customerAddressLine.match(/\b\d{6}\b/);
+    if (match) {
+      customerPincode = match[0];
+    } else if (Array.isArray(customer.addresses)) {
+      const matched = customer.addresses.find((a) => /^\d{6}$/.test(String(a.pincode || "").trim()));
+      if (matched?.pincode) customerPincode = String(matched.pincode).trim();
+    }
+  }
+
+  if (!customerPincode || !/^\d{6}$/.test(customerPincode)) {
+    order.deliveryProvider = "shadowfax";
+    order.deliveryFailureReason = "Customer delivery address is missing a valid 6-digit postal pincode.";
+    if (typeof order.save === "function") await order.save().catch(() => {});
+    throw new ShadowfaxInvalidRequestError("Customer delivery address is missing a valid 6-digit postal pincode.");
+  }
+
   const pickupLat = seller.location?.coordinates?.[1] || seller.location?.lat || 0;
   const pickupLng = seller.location?.coordinates?.[0] || seller.location?.lng || 0;
   const dropLat = address.location?.lat || 0;
   const dropLng = address.location?.lng || 0;
 
-  const sellerContact = String(seller.phone || "").replace(/[^0-9]/g, "").slice(-10) || "9876543210";
-  const customerContact = String(address.phone || customer.phone || "").replace(/[^0-9]/g, "").slice(-10) || "9876543210";
-
-  const extractPincode = (pincodeVal, addressStr) => {
-    if (pincodeVal && /^\d{6}$/.test(String(pincodeVal).trim())) {
-      return String(pincodeVal).trim();
-    }
-    const match = String(addressStr || "").match(/\b\d{6}\b/);
-    return match ? match[0] : "560001";
-  };
-
-  const pickupPincode = extractPincode(seller.pincode, seller.address);
-  const dropPincode = extractPincode(address.pincode, address.address);
-
   // 4. Check Serviceability if enabled
   if (config.autoServiceabilityCheck) {
     const serviceability = await checkForwardServiceability({
-      pickupPincode,
-      deliveryPincode: dropPincode,
+      pickupPincode: sellerPincode,
+      deliveryPincode: customerPincode,
     });
 
     if (!serviceability.serviceable) {
+      order.deliveryProvider = "shadowfax";
+      order.deliveryFailureReason = serviceability.reason;
+      if (typeof order.save === "function") await order.save().catch(() => {});
       throw new ShadowfaxServiceabilityError(serviceability.reason);
     }
   }
@@ -176,33 +258,33 @@ export async function createForwardOrder(orderId, options = {}) {
     },
     customer_details: {
       name: address.name || customer.name || "Customer",
-      contact: customerContact,
-      address_line_1: address.address || "Customer Address",
+      contact: customerPhone,
+      address_line_1: customerAddressLine,
       address_line_2: address.landmark || "",
-      city: address.city || "Bengaluru",
-      state: "Karnataka",
-      pincode: Number(dropPincode),
+      city: customerCity,
+      state: customerState,
+      pincode: Number(customerPincode),
       latitude: dropLat || undefined,
       longitude: dropLng || undefined,
     },
     pickup_details: {
       name: seller.shopName || seller.name || "Store",
-      contact: sellerContact,
-      address_line_1: seller.address || "Store Address",
-      city: seller.city || "Bengaluru",
-      state: seller.state || "Karnataka",
-      pincode: Number(pickupPincode),
+      contact: sellerPhone,
+      address_line_1: sellerAddressLine,
+      city: sellerCity,
+      state: sellerState,
+      pincode: Number(sellerPincode),
       latitude: pickupLat || undefined,
       longitude: pickupLng || undefined,
     },
     // Return-to-seller details, used by Shadowfax if the order needs to be returned.
     rts_details: {
       name: seller.shopName || seller.name || "Store Return Hub",
-      contact: sellerContact,
-      address_line_1: seller.address || "Store Return Address",
-      city: seller.city || "Bengaluru",
-      state: seller.state || "Karnataka",
-      pincode: Number(pickupPincode),
+      contact: sellerPhone,
+      address_line_1: sellerAddressLine,
+      city: sellerCity,
+      state: sellerState,
+      pincode: Number(sellerPincode),
     },
     product_details: orderItems,
   };
@@ -218,19 +300,21 @@ export async function createForwardOrder(orderId, options = {}) {
     serviceabilityStatus: "serviceable",
     pickupDetails: {
       name: seller.shopName || seller.name,
-      contact: sellerContact,
-      address: seller.address,
-      city: seller.city,
-      pincode: pickupPincode,
+      contact: sellerPhone,
+      address: sellerAddressLine,
+      city: sellerCity,
+      state: sellerState,
+      pincode: sellerPincode,
       latitude: pickupLat,
       longitude: pickupLng,
     },
     dropDetails: {
       name: address.name || customer.name,
-      contact: customerContact,
-      address: address.address,
-      city: address.city,
-      pincode: dropPincode,
+      contact: customerPhone,
+      address: customerAddressLine,
+      city: customerCity,
+      state: customerState,
+      pincode: customerPincode,
       latitude: dropLat,
       longitude: dropLng,
       instructions: address.landmark,
@@ -270,11 +354,14 @@ export async function createForwardOrder(orderId, options = {}) {
 
     await shipment.save();
 
-    // 9. Update internal order workflow status
+    // 9. Update internal order workflow and delivery fields
+    order.deliveryProvider = "shadowfax";
+    order.awbNumber = shipment.awbNumber;
+    order.deliveryFailureReason = null;
     if (order.workflowStatus === "SELLER_ACCEPTED" || order.workflowStatus === "DELIVERY_SEARCH") {
       order.workflowStatus = "DELIVERY_SEARCH";
-      await order.save();
     }
+    if (typeof order.save === "function") await order.save().catch(() => {});
 
     emitOrderStatusUpdate(order.orderId, {
       workflowStatus: order.workflowStatus,
@@ -288,6 +375,10 @@ export async function createForwardOrder(orderId, options = {}) {
     shipment.failureReason = err.message;
     shipment.lastProviderResponse = err.details || { error: err.message };
     await shipment.save();
+
+    order.deliveryProvider = "shadowfax";
+    order.deliveryFailureReason = err.message;
+    if (typeof order.save === "function") await order.save().catch(() => {});
 
     logger.error(`[Shadowfax] Failed to create shipment for order #${orderId}`, { error: err.message });
     throw new ShadowfaxOrderCreationFailedError(err.message, err.details);

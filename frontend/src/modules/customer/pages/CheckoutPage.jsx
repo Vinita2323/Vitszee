@@ -965,7 +965,7 @@ const CheckoutPage = () => {
 
   // ─── Main checkout return ────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f5f1e8] pb-32 font-sans">
+    <div className="min-h-screen bg-[#f8fafc] pb-32 font-sans">
       {/* Order Success Overlay */}
       <CheckoutOrderSuccess orderId={orderId} show={showSuccess} />
 
@@ -1006,18 +1006,27 @@ const CheckoutPage = () => {
           {/* Left Column */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-4 sm:space-y-6 pb-6">
             {/* Delivery Time Banner */}
-            <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80">
+            <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-[#1A4516]/10 flex items-center justify-center text-[#1A4516] shrink-0">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-50 border border-emerald-100/60 flex items-center justify-center text-[#1A4516] shrink-0">
                   <Clock size={22} className="text-[#1A4516]" />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-800 text-base sm:text-lg tracking-tight">
-                    Delivery in {pricingPreview?.estimatedTimeMins ? `${pricingPreview.estimatedTimeMins}-${pricingPreview.estimatedTimeMins + 5}` : "12-15"} mins
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Shipment of {cartCount} items</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-slate-800 text-sm sm:text-base tracking-tight">
+                      Delivery in {pricingPreview?.estimatedTimeMins ? `${pricingPreview.estimatedTimeMins}-${pricingPreview.estimatedTimeMins + 5}` : "12-15"} mins
+                    </h3>
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">Instant quick-commerce dispatch</p>
                 </div>
               </div>
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100/80 hidden sm:inline-block">
+                ⚡ Express
+              </span>
             </div>
 
             {/* Address Section */}

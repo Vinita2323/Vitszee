@@ -44,6 +44,8 @@ import { requireCanonicalOrderId } from "../utils/orderLookup.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import logger from "./logger.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+import { getShadowfaxConfig } from "./shadowfax/shadowfaxConfig.js";
+import { createForwardOrder } from "./shadowfax/shadowfaxForwardService.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -178,6 +180,46 @@ export async function removeReturnPickupTimeoutJob(orderId, attempt = 1) {
 import Setting from "../models/setting.js";
 
 /**
+ * Automatically dispatches an eligible order to Shadowfax forward delivery.
+ * Connects directly to existing createForwardOrder and respects autoShipmentCreation.
+ * Does NOT broadcast to internal captains, does NOT create DeliveryAssignment, does NOT schedule captain timeouts.
+ */
+export async function dispatchOrderToShadowfax(orderId, orderDoc = null) {
+  try {
+    const config = await getShadowfaxConfig();
+
+    if (!config.forwardEnabled) {
+      logger.warn(`[dispatchOrderToShadowfax] Shadowfax forward delivery is disabled in settings. Order #${orderId}`);
+      return null;
+    }
+
+    if (!config.autoShipmentCreation) {
+      logger.info(`[dispatchOrderToShadowfax] Shadowfax autoShipmentCreation is disabled in settings. Order #${orderId} awaiting manual dispatch.`);
+      return null;
+    }
+
+    const shipment = await createForwardOrder(orderId);
+    logger.info(`[dispatchOrderToShadowfax] Shadowfax shipment created successfully for #${orderId}`, {
+      shadowfaxOrderId: shipment.shadowfaxOrderId,
+      awbNumber: shipment.awbNumber,
+    });
+    return shipment;
+  } catch (err) {
+    logger.error(`[dispatchOrderToShadowfax] Shadowfax dispatch failed for #${orderId}: ${err.message}`);
+    await Order.findOneAndUpdate(
+      { orderId },
+      {
+        $set: {
+          deliveryProvider: "shadowfax",
+          deliveryFailureReason: err.message,
+        },
+      }
+    ).catch(() => {});
+    return null;
+  }
+}
+
+/**
  * Shared atomic execution for order acceptance (manual by SELLER or automatic by SYSTEM).
  */
 export async function executeOrderAcceptance({
@@ -250,12 +292,7 @@ export async function executeOrderAcceptance({
           acceptedBy,
           autoAccepted: isAutoAccepted,
           sellerResponseStatus: responseStatus,
-          deliverySearchExpiresAt: new Date(now.getTime() + deliveryMs),
-          deliverySearchMeta: {
-            radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
-            attempt: 1,
-            lastBroadcastAt: now,
-          },
+          deliveryProvider: "shadowfax",
         },
         $unset: { expiresAt: 1 },
       };
@@ -279,29 +316,22 @@ export async function executeOrderAcceptance({
   await removeSellerTimeoutJob(orderId);
 
   if (!isPaymentPending) {
-    await scheduleDeliveryTimeoutJob(orderId, 1);
-
-    await DeliveryAssignment.create({
-      orderMongoId: updated._id,
-      orderId: updated.orderId,
-      status: "broadcasting",
-      radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
-      attempt: 1,
-      expiresAt: updated.deliverySearchExpiresAt,
-    });
+    // Shadowfax exclusive delivery dispatch
+    const shipment = await dispatchOrderToShadowfax(orderId, updated);
+    if (shipment?.awbNumber) {
+      updated.awbNumber = shipment.awbNumber;
+      updated.deliveryProvider = "shadowfax";
+    }
 
     emitOrderStatusUpdate(
       updated.orderId,
       {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-        deliverySearchExpiresAt: updated.deliverySearchExpiresAt,
+        deliveryProvider: "shadowfax",
+        awbNumber: updated.awbNumber,
         autoAccepted: isAutoAccepted,
       },
       updated.customer?._id || updated.customer,
-    );
-    await emitDeliveryBroadcastForSeller(
-      updated.seller,
-      deliveryBroadcastPayloadFromOrder(updated),
     );
   } else {
     // Notify customer that seller accepted and payment is pending
@@ -375,9 +405,6 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
  * Called when a customer selects a payment method post-acceptance, or automatically for non-pending payments.
  */
 export async function proceedToDeliverySearch(orderId, orderDoc = null) {
-  const now = new Date();
-  const deliveryMs = DEFAULT_DELIVERY_TIMEOUT_MS();
-  
   const updated = await Order.findOneAndUpdate(
     {
       orderId,
@@ -387,12 +414,7 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
       $set: {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
         status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
-        deliverySearchExpiresAt: new Date(now.getTime() + deliveryMs),
-        deliverySearchMeta: {
-          radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
-          attempt: 1,
-          lastBroadcastAt: now,
-        },
+        deliveryProvider: "shadowfax",
       },
       $unset: { expiresAt: 1 },
     },
@@ -403,28 +425,21 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
 
   if (!updated) return null;
 
-  await scheduleDeliveryTimeoutJob(orderId, 1);
-
-  await DeliveryAssignment.create({
-    orderMongoId: updated._id,
-    orderId: updated.orderId,
-    status: "broadcasting",
-    radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
-    attempt: 1,
-    expiresAt: updated.deliverySearchExpiresAt,
-  });
+  // Shadowfax exclusive delivery dispatch
+  const shipment = await dispatchOrderToShadowfax(orderId, updated);
+  if (shipment?.awbNumber) {
+    updated.awbNumber = shipment.awbNumber;
+    updated.deliveryProvider = "shadowfax";
+  }
 
   emitOrderStatusUpdate(
     updated.orderId,
     {
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      deliverySearchExpiresAt: updated.deliverySearchExpiresAt,
+      deliveryProvider: "shadowfax",
+      awbNumber: updated.awbNumber,
     },
     updated.customer?._id || updated.customer,
-  );
-  await emitDeliveryBroadcastForSeller(
-    updated.seller,
-    deliveryBroadcastPayloadFromOrder(updated),
   );
 
   return updated;
@@ -723,6 +738,12 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
   const now = new Date();
   const order = await Order.findOne({ orderId, workflowVersion: { $gte: 2 } });
   if (!order || order.workflowStatus !== WORKFLOW_STATUS.DELIVERY_SEARCH) return;
+
+  // If order is handled by Shadowfax, ignore internal captain delivery timeout
+  if (order.deliveryProvider === "shadowfax") {
+    logger.info(`[processDeliveryTimeoutJob] Order #${orderId} is handled by Shadowfax. Skipping internal delivery timeout.`);
+    return;
+  }
 
   if (order.deliverySearchExpiresAt && order.deliverySearchExpiresAt > now) {
     return;
