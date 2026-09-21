@@ -31,6 +31,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
   discountAmount,
 }) {
   const handlingFee = pricingPreview?.handlingFeeCharged || 0;
+  const deliveryFee = pricingPreview?.deliveryFeeCharged || 0;
   const tipAmount = pricingPreview?.tipTotal || selectedTip || 0;
 
   return (
@@ -89,6 +90,14 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             </span>
             <span className="font-black text-slate-800">
               ₹{pricingPreview?.productSubtotal ?? cartTotal}
+            </span>
+          </div>
+          <div className="flex justify-between items-center px-2">
+            <span className="text-slate-500 font-bold text-[13px] uppercase tracking-wider">
+              Delivery Fee
+            </span>
+            <span className="font-black text-slate-800">
+              {deliveryFee > 0 ? `₹${deliveryFee}` : "FREE"}
             </span>
           </div>
           <div className="flex justify-between items-center px-2">

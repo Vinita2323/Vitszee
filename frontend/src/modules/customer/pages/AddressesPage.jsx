@@ -618,7 +618,12 @@ const AddressesPage = () => {
 
             {/* Compact Add Address Modal */}
             <Dialog open={isAddOpen} onOpenChange={(open) => !open ? handleCloseAddModal() : setIsAddOpen(true)}>
-                <DialogContent className="sm:max-w-[460px] p-4 sm:p-5 max-h-[90vh] overflow-y-auto no-scrollbar">
+                <DialogContent
+                    className="sm:max-w-[460px] p-4 sm:p-5 max-h-[90vh] overflow-y-auto no-scrollbar"
+                    onInteractOutside={(e) => {
+                        if (e.target.closest?.('.pac-container')) e.preventDefault();
+                    }}
+                >
                     <DialogHeader className="pb-1 border-b border-slate-100">
                         <DialogTitle className="text-base font-bold text-slate-800">Add New Address</DialogTitle>
                         <DialogDescription className="text-xs text-slate-500">
@@ -709,7 +714,12 @@ const AddressesPage = () => {
 
             {/* Compact Edit Address Modal */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-[460px] p-4 sm:p-5 max-h-[90vh] overflow-y-auto no-scrollbar">
+                <DialogContent
+                    className="sm:max-w-[460px] p-4 sm:p-5 max-h-[90vh] overflow-y-auto no-scrollbar"
+                    onInteractOutside={(e) => {
+                        if (e.target.closest?.('.pac-container')) e.preventDefault();
+                    }}
+                >
                     <DialogHeader className="pb-1 border-b border-slate-100">
                         <DialogTitle className="text-base font-bold text-slate-800">Edit Address</DialogTitle>
                         <DialogDescription className="text-xs text-slate-500">

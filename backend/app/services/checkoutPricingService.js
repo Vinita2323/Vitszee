@@ -495,8 +495,11 @@ export async function buildCheckoutPricingSnapshot({
   // (so `grossTotal` is final on the delivery axis) and BEFORE tip /
   // wallet allocation (so they clamp against the post-rebate grandTotal,
   // matching the frontend math).
-  // Free delivery for customers on checkout: zero out any customer delivery charges
-  applyFreeDeliveryToSellerBreakdowns(sellerBreakdownEntries);
+  // Free delivery for customers on checkout: zero out any customer delivery
+  // charges, but ONLY when a free-delivery coupon was actually applied.
+  if (applyFreeDelivery) {
+    applyFreeDeliveryToSellerBreakdowns(sellerBreakdownEntries);
+  }
   allocateCheckoutTipToSellerBreakdowns(sellerBreakdownEntries, tipAmount);
   // Audit Phase 4 (C-1): subtract wallet redemption from each seller's
   // grandTotal proportionate to their share. No-op when the flag is off.

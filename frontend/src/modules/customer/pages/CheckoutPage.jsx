@@ -142,7 +142,7 @@ const CheckoutPage = () => {
 
   // State management
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("now");
-  const [selectedPayment, setSelectedPayment] = useState("cash");
+  const [selectedPayment, setSelectedPayment] = useState("cod");
   const [selectedTip, setSelectedTip] = useState(0);
   const [showAllCartItems, setShowAllCartItems] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -221,10 +221,16 @@ const CheckoutPage = () => {
 
   const paymentMethods = [
     {
-      id: "pending",
-      label: "Pay after seller accepts",
-      icon: Clock,
-      sublabel: "Choose Online or Cash later",
+      id: "online",
+      label: "Pay Online",
+      icon: CreditCard,
+      sublabel: "UPI, Card, Netbanking",
+    },
+    {
+      id: "cod",
+      label: "Cash on Delivery",
+      icon: Banknote,
+      sublabel: "Pay when your order arrives",
     },
   ];
 
@@ -787,9 +793,10 @@ const CheckoutPage = () => {
     setIsPlacingOrder(true);
     try {
       const taxAmount = pricingPreview?.taxTotal || 0;
+      const paymentMode = selectedPayment === "online" ? "ONLINE" : "COD";
       const orderData = {
         address: buildAddressForOrder(),
-        paymentMode: "PENDING",
+        paymentMode,
         discountTotal: discountAmount,
         taxTotal: taxAmount,
         tipAmount: selectedTip,
@@ -826,7 +833,40 @@ const CheckoutPage = () => {
           return;
         }
 
-        // PENDING / COD flow
+        if (paymentMode === "ONLINE") {
+          // Order is created but held back from the seller until payment
+          // succeeds (backend: shouldStartSellerWorkflow is false for
+          // ONLINE). Kick off the Razorpay session immediately and
+          // redirect — the seller only sees the order after payment
+          // verification completes.
+          try {
+            const payRes = await customerApi.createPaymentOrder({ orderRef: paymentRef });
+            const redirectUrl = payRes.data?.result?.redirectUrl;
+            if (payRes.data?.success && redirectUrl) {
+              clearCart();
+              window.location.href = redirectUrl;
+              return;
+            }
+            setIsPlacingOrder(false);
+            showToast(
+              payRes.data?.message || "Order placed, but payment could not be started. Check My Orders to retry payment.",
+              "warning"
+            );
+            clearCart();
+            navigate(`/orders/${mainOrderId}`);
+          } catch (payErr) {
+            setIsPlacingOrder(false);
+            showToast(
+              payErr?.response?.data?.message || "Order placed, but payment could not be started. Check My Orders to retry payment.",
+              "warning"
+            );
+            clearCart();
+            navigate(`/orders/${mainOrderId}`);
+          }
+          return;
+        }
+
+        // COD flow — order goes straight to the seller, no payment step
         clearCart();
         showToast("Order placed — waiting for seller to accept.", "success");
         setOrderId(mainOrderId);
