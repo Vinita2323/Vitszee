@@ -12,6 +12,7 @@ export const adminShadowfaxApi = {
   createShadowfaxForwardOrder: (orderId) => axiosInstance.post(`/shadowfax/shipments/${orderId}/create-forward`),
   markShadowfaxDispatchReady: (orderId) => axiosInstance.post(`/shadowfax/shipments/${orderId}/dispatch-ready`),
   cancelShadowfaxShipment: (orderId, reason) => axiosInstance.post(`/shadowfax/shipments/${orderId}/cancel`, { reason }),
+  syncShadowfaxShipment: (orderId) => axiosInstance.post(`/shadowfax/shipments/${orderId}/sync`),
   trackShadowfaxShipment: (identifier) => axiosInstance.get(`/shadowfax/track/${identifier}`),
 };
 
