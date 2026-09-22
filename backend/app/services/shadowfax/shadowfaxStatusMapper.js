@@ -48,72 +48,88 @@ const TERMINAL_REVERSE_STATUSES = new Set([
 ]);
 
 /**
- * Normalizes raw Forward status strings from Shadowfax into internal Shipment statuses.
+ * Lower-cases a Shadowfax status and turns display text ("Out For Delivery")
+ * into the snake_case id form ("out_for_delivery").
+ */
+export function normalizeShadowfaxStatus(rawStatus) {
+  return String(rawStatus || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Maps a Shadowfax marketplace (forward) status to our internal Shipment status.
+ *
+ * Input should be the status id: `event` in push callbacks, `order_details.status`
+ * in the v4 track API (see "Marketplace order states" in the Shadowfax Unified API docs).
+ * Returns null for exception statuses that don't move the shipment forward
+ * (nc, na, cid, on_hold, pickup_on_hold, reopen_ndr, ...) and for unknown values,
+ * so callers leave the shipment state untouched instead of guessing.
  */
 export function mapShadowfaxForwardStatus(rawStatus) {
-  const s = String(rawStatus || "").trim().toLowerCase();
-
-  switch (s) {
-    case "order_created":
-    case "created":
+  switch (normalizeShadowfaxStatus(rawStatus)) {
     case "new":
-    case "open":
-    case "confirmed":
       return "ORDER_CREATED";
 
-    case "allotted":
-    case "allocated":
-    case "assigned":
-    case "rider_assigned":
-    case "delivery_assigned":
+    case "assigned_for_seller_pickup":
+    case "assigned_for_pickup":
+    case "ofp":
+    case "out_for_pickup":
       return "RIDER_ASSIGNED";
 
-    case "arrived":
-    case "arrived_at_store":
-    case "at_pickup":
-    case "reached_pickup":
-      return "RIDER_ARRIVED";
-
-    case "picked_up":
     case "picked":
-    case "collected":
+    case "picked_up":
       return "PICKED_UP";
 
-    case "in_transit":
-    case "intransit":
+    case "recd_at_rev_hub":
+    case "received_at_reverse_hub":
+    case "item_manifested":
+    case "bag_in_transit":
+    case "bag_received":
+    case "bag_received_at_via":
+    case "recd_at_fwd_dc":
+    case "recd_at_fwd_hub":
+    case "received_at_forward_hub":
+    case "assigned_for_delivery":
+    case "assigned_for_customer_delivery":
       return "IN_TRANSIT";
 
-    case "out_for_delivery":
     case "ofd":
-    case "reached_customer":
-    case "doorstep":
+    case "out_for_delivery":
       return "OUT_FOR_DELIVERY";
 
     case "delivered":
-    case "dlv":
-    case "successful":
-    case "completed":
       return "DELIVERED";
 
+    case "cancelled_by_customer":
+    case "cancelled_by_seller":
     case "cancelled":
-    case "can":
-    case "canceled":
       return "CANCELLED";
 
-    case "failed":
-    case "rto":
+    // Return-to-seller journey and lost shipments: the customer will not get this parcel.
+    case "rts":
+    case "return_to_seller_initiated":
+    case "rts_in_process":
+    case "rts_ofd":
+    case "recd_at_dc_rts":
+    case "in_transit_return":
+    case "rts_d":
+    case "returned_to_client":
+    case "rts_nd":
     case "undelivered":
-    case "rejected":
-    case "unserviceable":
+    case "lost":
       return "FAILED";
 
     default:
-      return "IN_TRANSIT";
+      return null;
   }
 }
 
 /**
  * Maps normalized Shipment status to internal Order `workflowStatus`.
+ * Hub movements stay on PICKUP_READY ("Confirmed" for customers) so the order
+ * only shows "Out for delivery" once Shadowfax reports `ofd`.
  */
 export function mapShipmentToWorkflowStatus(shipmentStatus) {
   switch (shipmentStatus) {
@@ -123,13 +139,14 @@ export function mapShipmentToWorkflowStatus(shipmentStatus) {
     case "RIDER_ARRIVED":
       return WORKFLOW_STATUS.DELIVERY_ASSIGNED;
     case "PICKED_UP":
-      return WORKFLOW_STATUS.PICKUP_READY;
     case "IN_TRANSIT":
+      return WORKFLOW_STATUS.PICKUP_READY;
     case "OUT_FOR_DELIVERY":
       return WORKFLOW_STATUS.OUT_FOR_DELIVERY;
     case "DELIVERED":
       return WORKFLOW_STATUS.DELIVERED;
     case "CANCELLED":
+    case "FAILED":
       return WORKFLOW_STATUS.CANCELLED;
     default:
       return null;

@@ -59,6 +59,7 @@ import { computeReturnWindowForOrder } from "../utils/returnWindow.js";
 import logger from "../services/logger.js";
 import { validateBody as validateWithJoi } from "../middleware/validate.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
+import { cancelForwardOrder } from "../services/shadowfax/shadowfaxForwardService.js";
 
 function normalizePaymentMode(value) {
   const raw = String(value || "").trim().toUpperCase();
@@ -461,9 +462,27 @@ export const updateOrderStatus = async (req, res) => {
     // -----------------------------
 
     const oldStatus = order.status;
+
+    // A live Shadowfax parcel must be cancelled at Shadowfax first, otherwise it is
+    // still picked up and delivered after the order is cancelled here.
+    if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "shadowfax" && order.awbNumber) {
+      try {
+        await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
+      } catch (sfxError) {
+        return handleResponse(
+          res,
+          409,
+          `Shadowfax shipment could not be cancelled, so the order was not cancelled: ${sfxError.message}`,
+        );
+      }
+    }
+
     if (status) {
       order.status = status;
       order.orderStatus = status;
+      if (status === "cancelled" && order.workflowVersion >= 2) {
+        order.workflowStatus = WORKFLOW_STATUS.CANCELLED;
+      }
     }
     if (deliveryBoyId) order.deliveryBoy = deliveryBoyId;
 

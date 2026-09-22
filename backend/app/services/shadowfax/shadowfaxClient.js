@@ -38,74 +38,66 @@ function sanitizeLogPayload(obj) {
 }
 
 /**
- * Generates realistic simulation response for sandbox testing when external staging server is unreachable.
+ * Builds a readable message from any Shadowfax error body. Shadowfax uses
+ * `message`, `responseMsg`, `errors` (string, array or nested object) and `detail`.
  */
-function generateSandboxSimulation({ method, endpoint, type, data }) {
+export function extractShadowfaxErrorMessage(body, fallback = "Shadowfax request failed.") {
+  if (!body || typeof body !== "object") {
+    return typeof body === "string" && body.trim() ? body.trim() : fallback;
+  }
+
+  const flatten = (value, prefix = "") => {
+    if (value == null || value === "") return [];
+    if (typeof value === "string" || typeof value === "number") {
+      return [prefix ? `${prefix}: ${value}` : String(value)];
+    }
+    if (Array.isArray(value)) return value.flatMap((item) => flatten(item, prefix));
+    if (typeof value === "object") {
+      return Object.entries(value).flatMap(([key, nested]) =>
+        flatten(nested, prefix ? `${prefix}.${key}` : key)
+      );
+    }
+    return [];
+  };
+
+  const errors = flatten(body.errors);
+  if (errors.length) return errors.join("; ");
+
+  const message = body.responseMsg || body.detail || body.error || body.message;
+  if (message && !["failure", "failed"].includes(String(message).toLowerCase())) {
+    return String(message);
+  }
+  return fallback;
+}
+
+/**
+ * Simulated responses for offline sandbox testing (SHADOWFAX_SANDBOX_SIMULATION=true only).
+ * Shapes follow the documented Shadowfax responses so callers parse them like real ones.
+ */
+function generateSandboxSimulation({ method, endpoint, type, data, params }) {
   const normEndpoint = String(endpoint || "").toLowerCase();
   const requestId = `sfx-sim-${crypto.randomUUID().slice(0, 8)}`;
+  const simulated = (body) => ({ success: true, status: 200, data: body, headers: {}, requestId, simulated: true });
 
   if (normEndpoint.includes("serviceability")) {
-    return {
-      success: true,
-      status: 200,
-      data: {
-        serviceable: true,
-        status: "success",
-        message: "Pincode is serviceable (Sandbox Simulation)",
-      },
-      headers: {},
-      requestId,
-      simulated: true,
-    };
+    if (method === "GET") {
+      const pincodes = String(params?.pincodes || "").split(",").map((p) => p.trim()).filter(Boolean);
+      return simulated(pincodes.map((code) => ({ code: Number(code), services: ["Regular"] })));
+    }
+    return simulated({ serviceable: true, status: "success", message: "Serviceable (Sandbox Simulation)" });
   }
 
   if (normEndpoint.includes("orders/cancel") || normEndpoint.includes("requests/cancel")) {
-    return {
-      success: true,
-      status: 200,
-      data: {
-        status: "success",
-        message: "Cancellation processed successfully (Sandbox Simulation)",
-      },
-      headers: {},
-      requestId,
-      simulated: true,
-    };
+    return simulated({ responseMsg: "Request has been marked as cancelled", responseCode: 200 });
   }
 
   if (normEndpoint.includes("order_update")) {
-    return {
-      success: true,
-      status: 200,
-      data: {
-        status: "success",
-        message: "Order marked ready for dispatch (Sandbox Simulation)",
-      },
-      headers: {},
-      requestId,
-      simulated: true,
-    };
+    return simulated({ message: "Request accepted." });
   }
 
-  if (normEndpoint.includes("/track") || normEndpoint.includes("/requests/")) {
-    return {
-      success: true,
-      status: 200,
-      data: {
-        status: "success",
-        data: {
-          status: "out_for_delivery",
-          rider_name: "Shadowfax Express Rider",
-          rider_contact: "9876543210",
-          latitude: 12.9716,
-          longitude: 77.5946,
-          updated_at: new Date().toISOString(),
-        },
-      },
-      headers: {},
-      requestId,
-      simulated: true,
-    };
+  if (normEndpoint.includes("/track")) {
+    const awb = normEndpoint.split("/orders/")[1]?.split("/")[0] || "";
+    return simulated({ message: "Success", order_details: { awb_number: awb, status: "new" }, tracking_details: [] });
   }
 
   if (type === "reverse" || normEndpoint.includes("requests")) {
@@ -127,19 +119,16 @@ function generateSandboxSimulation({ method, endpoint, type, data }) {
 
   // Forward Order Creation
   const randomDigits = Math.floor(1000000000 + Math.random() * 9000000000);
-  return {
-    success: true,
-    status: 200,
+  return simulated({
+    message: "Success",
+    errors: null,
     data: {
-      status: "success",
-      order_id: `SFX-${Date.now().toString().slice(-6)}`,
-      awb_number: `AWB-${randomDigits}`,
-      message: "Shadowfax order created successfully (Sandbox Simulation)",
+      id: Number(Date.now().toString().slice(-8)),
+      client_order_id: data?.order_details?.client_order_id,
+      awb_number: `SIM${randomDigits}`,
+      status: "new",
     },
-    headers: {},
-    requestId,
-    simulated: true,
-  };
+  });
 }
 
 /**
@@ -157,11 +146,11 @@ export async function sendShadowfaxRequest({
   overrideBaseUrl = null,
 }) {
   const config = await getShadowfaxConfig();
-  const isSandbox = config.environment === "sandbox";
+  const simulate = config.simulationEnabled;
   const baseUrl = overrideBaseUrl || (type === "reverse" ? config.reverseBaseUrl : config.forwardBaseUrl);
   const token = overrideToken || (type === "reverse" ? config.reverseToken : config.forwardToken);
 
-  if (!token && !isSandbox) {
+  if (!token && !simulate) {
     throw new ShadowfaxAuthError(
       `Shadowfax ${type} token is not configured. Please check environment variables or Admin Settings.`
     );
@@ -230,23 +219,23 @@ export async function sendShadowfaxRequest({
         response: sanitizeLogPayload(responseData),
       });
 
-      // In Sandbox mode, if remote staging server is down/404/unreachable or auth-pending, provide sandbox simulation
-      if (isSandbox && (httpStatus === 404 || httpStatus === 401 || !httpStatus || httpStatus >= 500)) {
+      // Opt-in offline testing only (SHADOWFAX_SANDBOX_SIMULATION=true, never in production).
+      if (simulate && (httpStatus === 404 || httpStatus === 401 || !httpStatus || httpStatus >= 500)) {
         logger.info(`[Shadowfax Sandbox] External staging returned HTTP ${httpStatus || "ERR"}. Using Sandbox Simulation.`);
-        return generateSandboxSimulation({ method, endpoint, type, data });
+        return generateSandboxSimulation({ method, endpoint, type, data, params });
       }
 
       // Handle Non-Retryable Client Errors (400, 401, 403, 404, 422)
       if (httpStatus === 401 || httpStatus === 403) {
         throw new ShadowfaxAuthError(
-          responseData?.message || responseData?.error || "Shadowfax authentication failed.",
+          extractShadowfaxErrorMessage(responseData, "Shadowfax authentication failed."),
           responseData
         );
       }
 
       if (httpStatus === 400 || httpStatus === 422) {
         throw new ShadowfaxInvalidRequestError(
-          responseData?.message || responseData?.error || "Invalid request sent to Shadowfax.",
+          extractShadowfaxErrorMessage(responseData, "Invalid request sent to Shadowfax."),
           responseData
         );
       }
@@ -267,7 +256,7 @@ export async function sendShadowfaxRequest({
           throw new ShadowfaxTimeoutError("Shadowfax API request timed out.", responseData);
         }
         throw new ShadowfaxError(
-          responseData?.message || responseData?.error || err.message || "Shadowfax request failed.",
+          extractShadowfaxErrorMessage(responseData, err.message || "Shadowfax request failed."),
           "SHADOWFAX_REQUEST_FAILED",
           httpStatus || 502,
           responseData
@@ -281,8 +270,8 @@ export async function sendShadowfaxRequest({
     }
   }
 
-  if (isSandbox) {
-    return generateSandboxSimulation({ method, endpoint, type, data });
+  if (simulate) {
+    return generateSandboxSimulation({ method, endpoint, type, data, params });
   }
 
   throw new ShadowfaxError(

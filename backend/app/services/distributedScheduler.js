@@ -1,4 +1,4 @@
-/**
+cs/**
  * Distributed Scheduler Service
  * 
  * Executes scheduled jobs with distributed locking to ensure single execution
@@ -28,7 +28,7 @@ const activeIntervals = new Map();
  */
 async function acquireLock(jobName, lockDuration) {
   const client = getRedisClient();
-  
+
   if (!client || !isRedisEnabled()) {
     // No Redis available, allow execution (non-production fallback)
     logger.warn('Distributed lock unavailable, executing without lock', {
@@ -37,14 +37,14 @@ async function acquireLock(jobName, lockDuration) {
     });
     return { acquired: true, lockKey: null, lockValue: null };
   }
-  
+
   const lockKey = `scheduler:lock:${jobName}`;
   const lockValue = `${instanceId}:${Date.now()}`;
-  
+
   try {
     // Use SET with NX (not exists) and PX (expiry in milliseconds)
     const result = await client.set(lockKey, lockValue, 'PX', lockDuration, 'NX');
-    
+
     if (result === 'OK') {
       logger.debug('Lock acquired successfully', {
         jobName,
@@ -84,12 +84,12 @@ async function releaseLock(lockKey, lockValue) {
   if (!lockKey || !lockValue) {
     return true; // No lock to release
   }
-  
+
   const client = getRedisClient();
   if (!client) {
     return true;
   }
-  
+
   try {
     // Only delete if the lock value matches (we own the lock)
     const currentValue = await client.get(lockKey);
@@ -127,11 +127,11 @@ async function releaseLock(lockKey, lockValue) {
  */
 async function executeJob(name, handler, lockDuration) {
   const startTime = Date.now();
-  
+
   try {
     // Acquire lock
     const lock = await acquireLock(name, lockDuration);
-    
+
     if (!lock.acquired) {
       logger.debug('Skipping job execution - lock held by another instance', {
         jobName: name,
@@ -139,27 +139,27 @@ async function executeJob(name, handler, lockDuration) {
       });
       return;
     }
-    
+
     // Execute job
     logger.debug('Starting job execution', {
       jobName: name,
       instanceId
     });
-    
+
     await handler();
-    
+
     const duration = Date.now() - startTime;
     logger.debug('Job execution completed successfully', {
       jobName: name,
       instanceId,
       duration
     });
-    
+
     // Release lock
     if (lock.lockKey) {
       await releaseLock(lock.lockKey, lock.lockValue);
     }
-    
+
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.error('Job execution failed', {
@@ -183,16 +183,16 @@ function registerScheduledJob(name, intervalMs, handler) {
     logger.warn('Job already registered, skipping', { jobName: name });
     return;
   }
-  
+
   const lockDuration = intervalMs * 2; // Lock duration is 2x interval
-  
+
   registeredJobs.set(name, {
     name,
     intervalMs,
     handler,
     lockDuration
   });
-  
+
   logger.debug('Scheduled job registered', {
     jobName: name,
     intervalMs,
@@ -210,23 +210,23 @@ async function startScheduledJobs() {
     logger.info('No scheduled jobs to start');
     return;
   }
-  
+
   logger.debug(`Starting ${registeredJobs.size} scheduled job(s)`, {
     instanceId,
     jobs: Array.from(registeredJobs.keys())
   });
-  
+
   for (const [name, job] of registeredJobs.entries()) {
     // Execute immediately on start
     executeJob(name, job.handler, job.lockDuration);
-    
+
     // Set up interval
     const intervalHandle = setInterval(() => {
       executeJob(name, job.handler, job.lockDuration);
     }, job.intervalMs);
-    
+
     activeIntervals.set(name, intervalHandle);
-    
+
     logger.debug('Scheduled job started', {
       jobName: name,
       intervalMs: job.intervalMs,
@@ -244,11 +244,11 @@ async function stopScheduledJobs() {
     logger.info('No scheduled jobs to stop');
     return;
   }
-  
+
   logger.info(`Stopping ${activeIntervals.size} scheduled job(s)`, {
     instanceId
   });
-  
+
   for (const [name, intervalHandle] of activeIntervals.entries()) {
     clearInterval(intervalHandle);
     logger.info('Scheduled job stopped', {
@@ -256,7 +256,7 @@ async function stopScheduledJobs() {
       instanceId
     });
   }
-  
+
   activeIntervals.clear();
 }
 
