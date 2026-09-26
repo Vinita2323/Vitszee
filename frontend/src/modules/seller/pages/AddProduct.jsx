@@ -15,6 +15,7 @@ import {
   HiOutlinePlus,
   HiOutlineSquaresPlus,
   HiOutlineMapPin,
+  HiOutlineXMark,
 } from "react-icons/hi2";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -231,21 +232,46 @@ const AddProduct = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === "main") {
-          setFormData({
-            ...formData,
+          setFormData((prev) => ({
+            ...prev,
             mainImage: reader.result,
-            mainImageFile: file
-          });
+            mainImageFile: file,
+          }));
         } else {
-          setFormData({
-            ...formData,
-            galleryImages: [...formData.galleryImages, reader.result],
-            galleryFiles: [...(formData.galleryFiles || []), file]
+          setFormData((prev) => {
+            if (prev.galleryImages.length >= 5) {
+              toast.error("Maximum 5 gallery photos allowed");
+              return prev;
+            }
+            return {
+              ...prev,
+              galleryImages: [...prev.galleryImages, reader.result],
+              galleryFiles: [...(prev.galleryFiles || []), file],
+            };
           });
         }
       };
       reader.readAsDataURL(file);
+      e.target.value = "";
     }
+  };
+
+  const handleRemoveMainImage = () => {
+    setFormData((prev) => ({
+      ...prev,
+      mainImage: null,
+      mainImageFile: null,
+    }));
+    toast.info("Cover photo deselected");
+  };
+
+  const handleRemoveGalleryImage = (indexToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      galleryImages: prev.galleryImages.filter((_, idx) => idx !== indexToRemove),
+      galleryFiles: (prev.galleryFiles || []).filter((_, idx) => idx !== indexToRemove),
+    }));
+    toast.info("Gallery photo deselected");
   };
 
   return (
@@ -634,26 +660,66 @@ const AddProduct = () => {
                   Main Cover Photo
                 </label>
                 <div className="flex flex-col md:flex-row items-start gap-6">
-                  <div className="w-48 aspect-square rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer overflow-hidden relative">
-                    <input
-                      type="file"
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      onChange={(e) => handleImageUpload(e, "main")}
-                    />
-                    {formData.mainImage ? (
+                  {formData.mainImage ? (
+                    <div className="w-48 aspect-square rounded-xl border-2 border-slate-200 bg-slate-50 relative group overflow-hidden shadow-sm">
                       <img
                         src={formData.mainImage}
+                        alt="Main cover preview"
                         className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <>
-                        <HiOutlinePhoto className="h-10 w-10 text-slate-200 group-hover:text-primary transition-colors" />
-                        <p className="text-[9px] font-bold text-slate-600 mt-2 uppercase tracking-widest group-hover:text-primary">
-                          Upload Cover
-                        </p>
-                      </>
-                    )}
-                  </div>
+                      {/* Hover Overlay with Action Buttons */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <label
+                          className="p-2 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-lg transition-all cursor-pointer hover:scale-105 active:scale-95"
+                          title="Change cover photo">
+                          <HiOutlinePhoto className="h-4 w-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload(e, "main")}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveMainImage();
+                          }}
+                          className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                          title="Deselect / Remove cover photo">
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {/* Mobile Visible Close Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRemoveMainImage();
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-rose-600/90 text-white rounded-full shadow-md hover:bg-rose-700 transition-all sm:hidden"
+                        title="Deselect cover photo">
+                        <HiOutlineXMark className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-48 aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer overflow-hidden relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        onChange={(e) => handleImageUpload(e, "main")}
+                      />
+                      <HiOutlinePhoto className="h-10 w-10 text-slate-200 group-hover:text-primary transition-colors" />
+                      <p className="text-[9px] font-bold text-slate-600 mt-2 uppercase tracking-widest group-hover:text-primary">
+                        Upload Cover
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex-1 space-y-2 pt-2">
                     <p className="text-xs font-bold text-slate-900">
                       Choose a primary image
@@ -662,43 +728,99 @@ const AddProduct = () => {
                       We show this image on the search page and the main
                       store listing. Make sure it is clear and bright.
                     </p>
-                    <button className="text-[10px] font-black text-primary uppercase tracking-wider hover:underline">
-                      Pick from Library
-                    </button>
+                    {formData.mainImage ? (
+                      <div className="flex items-center gap-2 pt-2">
+                        <label className="text-[11px] font-bold text-primary px-3 py-1.5 bg-primary/10 hover:bg-primary/20 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1.5">
+                          <HiOutlinePhoto className="h-3.5 w-3.5" />
+                          Change Photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload(e, "main")}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRemoveMainImage}
+                          className="text-[11px] font-bold text-rose-600 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1.5">
+                          <HiOutlineTrash className="h-3.5 w-3.5" />
+                          Deselect Cover Photo
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
 
               {/* Gallery Section */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                  Gallery Photos (Max 5)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    Gallery Photos (Max 5)
+                  </label>
+                  {formData.galleryImages.length > 0 && (
+                    <span className="text-[11px] font-bold text-slate-500">
+                      {formData.galleryImages.length} of 5 selected
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-md border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer relative overflow-hidden">
-                      {formData.galleryImages[i - 1] ? (
+                  {[0, 1, 2, 3, 4].map((index) => {
+                    const img = formData.galleryImages[index];
+                    return img ? (
+                      <div
+                        key={`gallery-slot-${index}`}
+                        className="aspect-square rounded-xl border-2 border-slate-200 bg-slate-50 relative group overflow-hidden shadow-sm">
                         <img
-                          src={formData.galleryImages[i - 1]}
+                          src={img}
+                          alt={`Gallery photo ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
-                      ) : (
-                        <>
-                          <input
-                            type="file"
-                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                            onChange={(e) => handleImageUpload(e, "gallery")}
-                          />
-                          <HiOutlinePlus className="h-5 w-5 text-slate-200 group-hover:text-primary transition-colors" />
-                          <p className="text-[8px] font-bold text-slate-600 mt-1 uppercase tracking-widest group-hover:text-primary">
-                            Add
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                        {/* Hover Overlay with Delete Button */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRemoveGalleryImage(index);
+                            }}
+                            className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Deselect / Remove photo">
+                            <HiOutlineTrash className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {/* Corner Deselect Button (always visible on mobile, clear icon) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveGalleryImage(index);
+                          }}
+                          className="absolute top-1.5 right-1.5 z-20 p-1 bg-rose-600 text-white rounded-full shadow-md hover:bg-rose-700 transition-all sm:hidden"
+                          title="Deselect photo">
+                          <HiOutlineXMark className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        key={`gallery-empty-${index}`}
+                        className="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer relative overflow-hidden">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                          onChange={(e) => handleImageUpload(e, "gallery")}
+                        />
+                        <HiOutlinePlus className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
+                        <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest group-hover:text-primary">
+                          Add Photo
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

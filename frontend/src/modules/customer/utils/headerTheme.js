@@ -57,8 +57,11 @@ export function buildHeaderGradient(baseHeaderColor) {
   return `linear-gradient(to bottom, ${shiftHex(base, -18)} 0%, ${shiftHex(base, 20)} 54%, ${shiftHex(base, 165)} 100%)`;
 }
 
-/** Solid fill for floating cart pill: header mid tone, slightly darker. */
+/** Solid fill for floating cart pill: logo royal blue by default or derived. */
 export function buildMiniCartColor(baseHeaderColor) {
+  if (!baseHeaderColor || baseHeaderColor.toUpperCase() === "#FFFFFF" || baseHeaderColor === "transparent") {
+    return "#0F52BA";
+  }
   const base = baseHeaderColor || DEFAULT_BASE;
   const mid = shiftHex(base, 20);
   return shiftHex(mid, -26);
