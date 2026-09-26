@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/design-system.css";
+@config "../tailwind.config.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -48,7 +49,7 @@
   --glass-border: rgba(255, 255, 255, 0.4);
 
   /* Cart pill fill — overridden on Home by MainLocationHeader */
-  --customer-mini-cart-color: #0284c7;
+  --customer-mini-cart-color: #0F52BA;
 }
 
 body {

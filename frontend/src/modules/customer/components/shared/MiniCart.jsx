@@ -45,7 +45,7 @@ const MiniCart = () => {
                         <Link
                             to="/checkout"
                             style={{
-                                backgroundColor: "var(--customer-mini-cart-color, var(--primary))",
+                                backgroundColor: "var(--customer-mini-cart-color, #0F52BA)",
                             }}
                             className="flex items-center gap-2 text-white py-1.5 px-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.22)] hover:scale-[1.02] active:scale-95 transition-all group border border-white/10 relative overflow-hidden"
                         >
