@@ -178,49 +178,38 @@ const settingSchema = new mongoose.Schema(
                 default: false,
             },
         },
-        shadowfax: {
+        delhivery: {
             forwardEnabled: {
                 type: Boolean,
-                default: false,
-            },
-            reverseEnabled: {
-                type: Boolean,
-                default: false,
+                default: true,
             },
             environment: {
                 type: String,
-                enum: ["sandbox", "production"],
-                default: "sandbox",
+                enum: ["staging", "production"],
+                default: "production",
             },
-            forwardBaseUrl: {
-                type: String,
-                default: "https://dale.staging.shadowfax.in",
-            },
-            reverseBaseUrl: {
-                type: String,
-                default: "https://dale.staging.shadowfax.in",
-            },
-            clientCode: {
+            baseUrl: {
                 type: String,
                 default: "",
             },
-            forwardToken: {
+            clientName: {
                 type: String,
                 default: "",
             },
-            reverseToken: {
+            prodApiToken: {
                 type: String,
                 default: "",
             },
-            forwardProdToken: {
-                type: String,
-                default: "",
-            },
-            reverseProdToken: {
+            stagingApiToken: {
                 type: String,
                 default: "",
             },
             webhookSecret: {
+                type: String,
+                default: "",
+            },
+            // Used when a seller has no pickup location of their own.
+            fallbackPickupLocation: {
                 type: String,
                 default: "",
             },
@@ -232,13 +221,30 @@ const settingSchema = new mongoose.Schema(
                 type: Boolean,
                 default: true,
             },
-            autoDispatchReady: {
+            autoRegisterSellerWarehouse: {
                 type: Boolean,
                 default: true,
             },
-            qcEnabled: {
+            autoPickupRequest: {
                 type: Boolean,
                 default: true,
+            },
+            // Delhivery expects the shipment weight in grams.
+            defaultWeightGrams: {
+                type: Number,
+                default: 500,
+            },
+            pickupTime: {
+                type: String,
+                default: "16:00:00",
+            },
+            pickupCutoffHour: {
+                type: Number,
+                default: 14,
+            },
+            shippingMode: {
+                type: String,
+                default: "Surface",
             },
             reconciliationIntervalMinutes: {
                 type: Number,

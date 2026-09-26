@@ -59,7 +59,7 @@ import { computeReturnWindowForOrder } from "../utils/returnWindow.js";
 import logger from "../services/logger.js";
 import { validateBody as validateWithJoi } from "../middleware/validate.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
-import { cancelForwardOrder } from "../services/shadowfax/shadowfaxForwardService.js";
+import { cancelForwardOrder } from "../services/delhivery/delhiveryForwardService.js";
 
 function normalizePaymentMode(value) {
   const raw = String(value || "").trim().toUpperCase();
@@ -463,16 +463,16 @@ export const updateOrderStatus = async (req, res) => {
 
     const oldStatus = order.status;
 
-    // A live Shadowfax parcel must be cancelled at Shadowfax first, otherwise it is
+    // A live Delhivery parcel must be cancelled at Delhivery first, otherwise it is
     // still picked up and delivered after the order is cancelled here.
-    if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "shadowfax" && order.awbNumber) {
+    if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "delhivery" && order.awbNumber) {
       try {
         await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
-      } catch (sfxError) {
+      } catch (courierError) {
         return handleResponse(
           res,
           409,
-          `Shadowfax shipment could not be cancelled, so the order was not cancelled: ${sfxError.message}`,
+          `Delhivery shipment could not be cancelled, so the order was not cancelled: ${courierError.message}`,
         );
       }
     }
@@ -1385,11 +1385,11 @@ export const acceptOrder = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
-    if (order.deliveryProvider === "shadowfax") {
+    if (order.deliveryProvider && order.deliveryProvider !== "internal") {
       return handleResponse(
         res,
         400,
-        "Orders are delivered exclusively through Shadowfax logistics partner.",
+        "Orders are delivered exclusively through our courier partner.",
       );
     }
 

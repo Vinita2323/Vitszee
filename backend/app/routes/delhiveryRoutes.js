@@ -1,38 +1,38 @@
 import express from "express";
 import {
-  getShadowfaxSettings,
-  updateShadowfaxSettings,
-  testShadowfaxConnection,
+  getDelhiverySettings,
+  updateDelhiverySettings,
+  testDelhiveryConnection,
   getAdminShipments,
   getShipmentByOrderId,
   triggerForwardOrderCreation,
-  triggerDispatchReady,
   triggerOrderCancellation,
   syncShipmentTracking,
+  triggerPickupRequest,
+  registerSellerPickupLocation,
   trackShipmentUnified,
-  handleForwardWebhook,
-  handleReverseWebhook,
-} from "../controller/shadowfaxController.js";
+  handleScanWebhook,
+} from "../controller/delhiveryController.js";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ── Inbound Webhooks (No auth headers required by Shadowfax callback servers) ──
-router.post("/webhook/forward", handleForwardWebhook);
-router.post("/webhook/reverse", handleReverseWebhook);
+// ── Inbound scan push from Delhivery (authorised with the shared webhook secret) ──
+router.post("/webhook", handleScanWebhook);
 
 // ── Unified Tracking (Customer, Seller, Admin) ──
 router.get("/track/:identifier", verifyToken, trackShipmentUnified);
 
-// ── Admin Protected Routes ──
-router.get("/config", verifyToken, allowRoles("admin"), getShadowfaxSettings);
-router.put("/config", verifyToken, allowRoles("admin"), updateShadowfaxSettings);
-router.post("/test-connection", verifyToken, allowRoles("admin"), testShadowfaxConnection);
+// ── Admin / Seller ──
+router.get("/config", verifyToken, allowRoles("admin"), getDelhiverySettings);
+router.put("/config", verifyToken, allowRoles("admin"), updateDelhiverySettings);
+router.post("/test-connection", verifyToken, allowRoles("admin"), testDelhiveryConnection);
 router.get("/shipments", verifyToken, allowRoles("admin"), getAdminShipments);
 router.get("/shipments/:orderId", verifyToken, allowRoles("admin"), getShipmentByOrderId);
 router.post("/shipments/:orderId/create-forward", verifyToken, allowRoles("admin", "seller"), triggerForwardOrderCreation);
-router.post("/shipments/:orderId/dispatch-ready", verifyToken, allowRoles("admin", "seller"), triggerDispatchReady);
 router.post("/shipments/:orderId/cancel", verifyToken, allowRoles("admin"), triggerOrderCancellation);
 router.post("/shipments/:orderId/sync", verifyToken, allowRoles("admin"), syncShipmentTracking);
+router.post("/pickup-request", verifyToken, allowRoles("admin"), triggerPickupRequest);
+router.post("/sellers/:sellerId/register-pickup", verifyToken, allowRoles("admin"), registerSellerPickupLocation);
 
 export default router;

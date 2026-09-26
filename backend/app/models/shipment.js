@@ -15,8 +15,10 @@ const shipmentSchema = new mongoose.Schema(
     },
     deliveryProvider: {
       type: String,
-      enum: ["shadowfax", "internal"],
-      default: "shadowfax",
+      // "shadowfax" is kept only so shipment records created before the Delhivery
+      // migration still validate; nothing writes it any more.
+      enum: ["delhivery", "internal", "shadowfax"],
+      default: "delhivery",
       index: true,
     },
     providerType: {
@@ -25,11 +27,20 @@ const shipmentSchema = new mongoose.Schema(
       default: "forward",
       index: true,
     },
-    // Shadowfax specific order / request IDs
-    shadowfaxOrderId: {
+    // Delhivery pickup location (warehouse) this parcel is collected from.
+    pickupLocationName: {
       type: String,
-      index: true,
-      sparse: true,
+      trim: true,
+    },
+    // Pickup request raised with Delhivery so the parcel gets collected.
+    pickupRequestId: {
+      type: String,
+      trim: true,
+    },
+    // Delhivery's manifestation batch reference (upload_wbn).
+    delhiveryUploadWbn: {
+      type: String,
+      trim: true,
     },
     clientOrderId: {
       type: String,
@@ -168,8 +179,6 @@ const shipmentSchema = new mongoose.Schema(
     arrivedAt: Date,
     deliveredAt: Date,
     cancelledAt: Date,
-    // Set when Shadowfax queues a cancellation (applied at its next facility).
-    cancellationRequestedAt: Date,
     failedAt: Date,
     failureReason: String,
     lastProviderResponse: {

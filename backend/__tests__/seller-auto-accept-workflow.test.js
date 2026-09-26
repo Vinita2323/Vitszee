@@ -88,6 +88,9 @@ const {
 describe("Seller Auto-Accept 20s Workflow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // These tests cover seller acceptance only; keep courier dispatch out of the way
+    // so no Delhivery call is attempted.
+    process.env.DELHIVERY_FORWARD_ENABLED = "false";
   });
 
   describe("executeOrderAcceptance", () => {

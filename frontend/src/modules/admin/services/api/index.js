@@ -22,7 +22,7 @@ import { adminSupportApi } from './supportApi';
 import { adminDeliveryApi } from './deliveryApi';
 import { adminContentApi } from './contentApi';
 import { adminBirthdayApi } from './birthdayApi';
-import { adminShadowfaxApi } from './shadowfaxApi';
+import { adminDelhiveryApi } from './delhiveryApi';
 
 export {
     adminAuthApi,
@@ -35,7 +35,7 @@ export {
     adminDeliveryApi,
     adminContentApi,
     adminBirthdayApi,
-    adminShadowfaxApi,
+    adminDelhiveryApi,
 };
 
 /**
@@ -53,7 +53,7 @@ export const adminApi = {
     ...adminDeliveryApi,
     ...adminContentApi,
     ...adminBirthdayApi,
-    ...adminShadowfaxApi,
+    ...adminDelhiveryApi,
 };
 
 export default adminApi;

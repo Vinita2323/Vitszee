@@ -151,6 +151,14 @@ const sellerSchema = new mongoose.Schema(
       type: Number,
       default: 5, // Default 5km
     },
+
+    // Delhivery pickup location (warehouse) registered for this shop. The name must
+    // match exactly when a shipment is created, so it is stored once and reused.
+    delhiveryWarehouse: {
+      name: { type: String, trim: true },
+      pin: { type: String, trim: true },
+      registeredAt: Date,
+    },
     lastLogin: Date,
   },
   { timestamps: true },

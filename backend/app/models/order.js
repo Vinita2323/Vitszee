@@ -389,8 +389,10 @@ const orderSchema = new mongoose.Schema(
     },
     deliveryProvider: {
       type: String,
-      enum: ["shadowfax", "internal"],
-      default: "shadowfax",
+      // "shadowfax" is kept only so orders created before the Delhivery migration
+      // still validate; nothing writes it any more.
+      enum: ["delhivery", "internal", "shadowfax"],
+      default: "delhivery",
       index: true,
     },
     awbNumber: {

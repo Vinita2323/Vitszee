@@ -1,7 +1,7 @@
 import Order from "../../models/order.js";
 import logger from "../logger.js";
 import { WORKFLOW_STATUS, legacyStatusFromWorkflow } from "../../constants/orderWorkflow.js";
-import { mapShipmentToWorkflowStatus } from "./shadowfaxStatusMapper.js";
+import { mapShipmentToWorkflowStatus } from "./delhiveryStatusMapper.js";
 import { applyDeliveredSettlement } from "../orderSettlement.js";
 import { compensateOrderCancellation } from "../orderCompensation.js";
 import { emitOrderStatusUpdate } from "../orderSocketEmitter.js";
@@ -12,13 +12,13 @@ const FINISHED_WORKFLOW = [WORKFLOW_STATUS.DELIVERED, WORKFLOW_STATUS.CANCELLED]
 const FINISHED_LEGACY = ["delivered", "cancelled"];
 
 /**
- * Applies a Shadowfax shipment status to the linked order.
+ * Applies a Delhivery shipment status to the linked order.
  *
- * Shared by the webhook and the tracking/reconciliation path so both produce the
- * same side effects: settlement on delivery, cancellation compensation (stock +
- * refund) when Shadowfax cancels, returns or loses the parcel, and progress updates.
- * Every update is conditional on the order not already being in that state (or
- * finished), so repeated callbacks and polling never apply side effects twice.
+ * Shared by the webhook and the tracking/reconciliation path so both produce the same
+ * side effects: settlement on delivery, cancellation compensation (stock + refund) when
+ * Delhivery cancels or returns the parcel, and progress updates in between.
+ * Every update is conditional on the order not already being in that state (or finished),
+ * so repeated scans and polling never apply side effects twice.
  */
 export async function syncOrderWithShipmentStatus(
   shipment,
@@ -54,7 +54,7 @@ export async function syncOrderWithShipmentStatus(
       await applyDeliveredSettlement(order, order.orderId);
     } catch (err) {
       // The order is delivered either way; finance can reconcile out-of-band.
-      logger.error("[Shadowfax] Settlement failed after delivery", { orderId, error: err.message });
+      logger.error("[Delhivery] Settlement failed after delivery", { orderId, error: err.message });
     }
 
     emitOrderStatusUpdate(
@@ -62,7 +62,7 @@ export async function syncOrderWithShipmentStatus(
       {
         workflowStatus: WORKFLOW_STATUS.DELIVERED,
         status: "delivered",
-        deliveryProvider: "shadowfax",
+        deliveryProvider: "delhivery",
         awbNumber: shipment.awbNumber,
       },
       order.customer
@@ -80,8 +80,8 @@ export async function syncOrderWithShipmentStatus(
     const failed = shipmentStatus === "FAILED";
     const detail = `${rawStatus || shipmentStatus.toLowerCase()}${remarks ? `: ${remarks}` : ""}`;
     const reason = failed
-      ? `Shadowfax could not deliver this order (${detail})`
-      : `Shadowfax cancelled this order (${detail})`;
+      ? `Delhivery could not deliver this order (${detail})`
+      : `Delhivery cancelled this order (${detail})`;
 
     const order = await Order.findOneAndUpdate(
       openOrderFilter,
@@ -102,7 +102,7 @@ export async function syncOrderWithShipmentStatus(
 
     emitOrderStatusUpdate(
       order.orderId,
-      { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled", deliveryProvider: "shadowfax" },
+      { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled", deliveryProvider: "delhivery" },
       order.customer
     );
     emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
@@ -129,9 +129,8 @@ export async function syncOrderWithShipmentStatus(
     {
       workflowStatus,
       status: set.status,
-      deliveryProvider: "shadowfax",
+      deliveryProvider: "delhivery",
       awbNumber: shipment.awbNumber,
-      rider: shipment.rider,
     },
     order.customer
   );

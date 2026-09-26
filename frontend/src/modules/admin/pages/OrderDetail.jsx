@@ -45,7 +45,7 @@ const OrderDetail = () => {
 
     const fetchShipment = async () => {
         try {
-            const res = await adminApi.getShadowfaxShipmentDetail(orderId);
+            const res = await adminApi.getDelhiveryShipmentDetail(orderId);
             if (res.data?.success && res.data?.result) {
                 setShipment(res.data.result);
             }
@@ -69,28 +69,28 @@ const OrderDetail = () => {
         }
     };
 
-    const handleCreateShadowfaxShipment = async () => {
+    const handleCreateDelhiveryShipment = async () => {
         setIsShipmentActionLoading(true);
         try {
-            await adminApi.createShadowfaxForwardOrder(orderId);
-            showToast("Shadowfax shipment created successfully!", "success");
+            await adminApi.createDelhiveryShipment(orderId);
+            showToast("Delhivery shipment created successfully!", "success");
             await fetchShipment();
             await fetchDetail();
         } catch (err) {
-            showToast(err.response?.data?.message || err.message || "Failed to create Shadowfax shipment", "error");
+            showToast(err.response?.data?.message || err.message || "Failed to create Delhivery shipment", "error");
         } finally {
             setIsShipmentActionLoading(false);
         }
     };
 
-    const handleMarkDispatchReady = async () => {
+    const handleRequestPickup = async () => {
         setIsShipmentActionLoading(true);
         try {
-            await adminApi.markShadowfaxDispatchReady(orderId);
-            showToast("Order marked Ready for Dispatch with Shadowfax", "success");
+            await adminApi.requestDelhiveryPickup({ pickupLocation: shipment?.pickupLocationName, packageCount: 1 });
+            showToast("Pickup requested from Delhivery", "success");
             await fetchShipment();
         } catch (err) {
-            showToast(err.response?.data?.message || "Failed to mark dispatch ready", "error");
+            showToast(err.response?.data?.message || "Failed to request pickup", "error");
         } finally {
             setIsShipmentActionLoading(false);
         }
@@ -99,8 +99,8 @@ const OrderDetail = () => {
     const handleRefreshTracking = async () => {
         setIsShipmentActionLoading(true);
         try {
-            await adminApi.syncShadowfaxShipment(orderId);
-            showToast("Tracking status synced with Shadowfax", "success");
+            await adminApi.syncDelhiveryShipment(orderId);
+            showToast("Tracking status synced with Delhivery", "success");
             await fetchShipment();
             await fetchDetail();
         } catch (err) {
@@ -359,12 +359,12 @@ const OrderDetail = () => {
                         </div>
                     </Card>
 
-                    {/* Shadowfax Logistics Card */}
+                    {/* Delhivery Courier Card */}
                     <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
                                 <Truck className="h-4 w-4 text-primary" />
-                                Delivery Provider: {shipment?.deliveryProvider === 'shadowfax' ? 'Shadowfax' : 'Internal Captain'}
+                                Delivery Provider: {shipment?.deliveryProvider === 'internal' ? 'Internal Captain' : 'Delhivery'}
                             </h3>
                             {shipment?.awbNumber && (
                                 <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700">
@@ -384,14 +384,14 @@ const OrderDetail = () => {
                                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Internal Status</p>
                                         <p className="text-xs font-black text-primary capitalize mt-0.5">{shipment.shipmentStatus}</p>
                                     </div>
-                                    {shipment.rider?.name && (
+                                    {shipment.pickupLocationName && (
                                         <div className="col-span-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
                                             <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Assigned Rider</p>
-                                                <p className="text-xs font-black text-slate-800">{shipment.rider.name}</p>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Pickup Location</p>
+                                                <p className="text-xs font-black text-slate-800">{shipment.pickupLocationName}</p>
                                             </div>
-                                            {shipment.rider.phone && (
-                                                <span className="text-xs font-bold text-slate-600">{shipment.rider.phone}</span>
+                                            {shipment.pickupRequestId && (
+                                                <span className="text-xs font-bold text-slate-600">Pickup #{shipment.pickupRequestId}</span>
                                             )}
                                         </div>
                                     )}
@@ -406,29 +406,29 @@ const OrderDetail = () => {
                                     >
                                         Refresh Tracking
                                     </button>
-                                    {shipment.shipmentStatus === 'ORDER_CREATED' && (
+                                    {shipment.shipmentStatus === 'ORDER_CREATED' && shipment.pickupLocationName && (
                                         <button
                                             type="button"
                                             disabled={isShipmentActionLoading}
-                                            onClick={handleMarkDispatchReady}
+                                            onClick={handleRequestPickup}
                                             className="px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
                                         >
-                                            Mark Ready for Dispatch
+                                            Request Pickup
                                         </button>
                                     )}
                                 </div>
                             </div>
                         ) : (
                             <div className="p-4 bg-slate-50 rounded-xl text-left space-y-3">
-                                <p className="text-xs text-slate-500">No Shadowfax shipment registered for this order yet.</p>
+                                <p className="text-xs text-slate-500">No Delhivery shipment registered for this order yet.</p>
                                 <button
                                     type="button"
                                     disabled={isShipmentActionLoading}
-                                    onClick={handleCreateShadowfaxShipment}
+                                    onClick={handleCreateDelhiveryShipment}
                                     className="px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
                                 >
                                     <Truck className="h-3.5 w-3.5" />
-                                    Dispatch with Shadowfax
+                                    Dispatch with Delhivery
                                 </button>
                             </div>
                         )}
