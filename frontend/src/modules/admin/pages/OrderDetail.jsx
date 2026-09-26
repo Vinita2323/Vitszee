@@ -99,9 +99,10 @@ const OrderDetail = () => {
     const handleRefreshTracking = async () => {
         setIsShipmentActionLoading(true);
         try {
-            await adminApi.trackShadowfaxShipment(orderId);
+            await adminApi.syncShadowfaxShipment(orderId);
             showToast("Tracking status synced with Shadowfax", "success");
             await fetchShipment();
+            await fetchDetail();
         } catch (err) {
             showToast(err.response?.data?.message || "Failed to refresh tracking", "error");
         } finally {

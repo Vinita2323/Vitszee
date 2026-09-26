@@ -48,7 +48,18 @@ export async function getShadowfaxConfig() {
     ? process.env.SHADOWFAX_REVERSE_PROD_TOKEN || dbSettings.reverseProdToken || forwardToken || ""
     : process.env.SHADOWFAX_REVERSE_TOKEN || dbSettings.reverseToken || forwardToken || "";
 
-  const webhookSecret = process.env.SHADOWFAX_WEBHOOK_SECRET || dbSettings.webhookSecret || "";
+  // Shadowfax configures a separate callback secret per environment, so production
+  // prefers SHADOWFAX_WEBHOOK_PROD_SECRET (falling back to the shared variable).
+  const webhookSecret = isProduction
+    ? process.env.SHADOWFAX_WEBHOOK_PROD_SECRET || process.env.SHADOWFAX_WEBHOOK_SECRET || dbSettings.webhookSecret || ""
+    : process.env.SHADOWFAX_WEBHOOK_SECRET || dbSettings.webhookSecret || "";
+
+  // Shadowfax expects weights in grams (actual_weight / volumetric_weight).
+  const defaultWeightGrams = Number(process.env.SHADOWFAX_DEFAULT_WEIGHT_GRAMS) || 500;
+
+  // Fake "sandbox simulation" responses hide real API failures, so they are opt-in.
+  const simulationEnabled =
+    !isProduction && String(process.env.SHADOWFAX_SANDBOX_SIMULATION || "").toLowerCase() === "true";
 
   const clientCode =
     process.env.SHADOWFAX_CLIENT_CODE || dbSettings.clientCode || "";
@@ -100,6 +111,8 @@ export async function getShadowfaxConfig() {
     autoDispatchReady,
     qcEnabled,
     reconciliationIntervalMinutes,
+    defaultWeightGrams,
+    simulationEnabled,
   };
 }
 

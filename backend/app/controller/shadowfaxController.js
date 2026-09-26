@@ -101,7 +101,8 @@ export const updateShadowfaxSettings = async (req, res) => {
  */
 export const testShadowfaxConnection = async (req, res) => {
   try {
-    const { type = "forward", pickupPincode = "560001", deliveryPincode = "560002" } = req.body || {};
+    // Defaults are serviceable for seller pickup / customer delivery on both staging and production.
+    const { type = "forward", pickupPincode = "110009", deliveryPincode = "560007" } = req.body || {};
 
     if (type === "forward") {
       const result = await checkForwardServiceability({
@@ -180,11 +181,28 @@ export const getShipmentByOrderId = async (req, res) => {
 };
 
 /**
+ * Admins can act on any order; sellers only on their own orders and customers
+ * (tracking only) on theirs.
+ */
+async function canAccessOrder(user, orderId) {
+  if (user?.role === "admin") return true;
+  const order = await Order.findOne({ orderId }).select("customer seller").lean();
+  if (!order) return false;
+  const userId = String(user?.id || "");
+  if (user?.role === "seller") return String(order.seller) === userId;
+  if (user?.role === "customer" || user?.role === "user") return String(order.customer) === userId;
+  return false;
+}
+
+/**
  * POST /api/shadowfax/shipments/:orderId/create-forward
  */
 export const triggerForwardOrderCreation = async (req, res) => {
   try {
     const { orderId } = req.params;
+    if (!(await canAccessOrder(req.user, orderId))) {
+      return handleResponse(res, 404, "Order not found");
+    }
     const shipment = await createForwardOrder(orderId);
     return handleResponse(res, 200, "Shadowfax forward order created", shipment);
   } catch (err) {
@@ -198,6 +216,9 @@ export const triggerForwardOrderCreation = async (req, res) => {
 export const triggerDispatchReady = async (req, res) => {
   try {
     const { orderId } = req.params;
+    if (!(await canAccessOrder(req.user, orderId))) {
+      return handleResponse(res, 404, "Order not found");
+    }
     const shipment = await markDispatchReady(orderId);
     return handleResponse(res, 200, "Shipment marked dispatch ready", shipment);
   } catch (err) {
@@ -213,7 +234,28 @@ export const triggerOrderCancellation = async (req, res) => {
     const { orderId } = req.params;
     const { reason = "Cancelled by admin" } = req.body || {};
     const shipment = await cancelForwardOrder(orderId, reason);
-    return handleResponse(res, 200, "Shipment cancelled", shipment);
+    if (!shipment) {
+      return handleResponse(res, 200, "No live Shadowfax shipment to cancel", null);
+    }
+    const message =
+      shipment.shipmentStatus === "CANCELLED"
+        ? "Shipment cancelled"
+        : "Cancellation queued at Shadowfax; it applies when the parcel reaches the next facility";
+    return handleResponse(res, 200, message, shipment);
+  } catch (err) {
+    return handleResponse(res, err.statusCode || 400, err.message);
+  }
+};
+
+/**
+ * POST /api/shadowfax/shipments/:orderId/sync (Admin only)
+ * Pulls the latest status from Shadowfax and applies it to the shipment and order.
+ */
+export const syncShipmentTracking = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = await trackForwardOrder(orderId);
+    return handleResponse(res, 200, "Tracking synced with Shadowfax", result);
   } catch (err) {
     return handleResponse(res, err.statusCode || 400, err.message);
   }
@@ -230,7 +272,7 @@ export const trackShipmentUnified = async (req, res) => {
       $or: [{ internalOrderId: identifier }, { awbNumber: identifier }, { shadowfaxOrderId: identifier }, { clientRequestId: identifier }],
     }).lean();
 
-    if (!shipment) {
+    if (!shipment || !(await canAccessOrder(req.user, shipment.internalOrderId))) {
       return handleResponse(res, 404, "Tracking details not found");
     }
 
@@ -276,6 +318,10 @@ export const trackShipmentUnified = async (req, res) => {
  */
 function isWebhookAuthorized(req, config) {
   if (!config.webhookSecret) {
+    if (config.isProduction) {
+      logger.error("[Shadowfax Webhook] No webhook secret configured in production — rejecting callback.");
+      return false;
+    }
     logger.warn("[Shadowfax Webhook] SHADOWFAX_WEBHOOK_SECRET is not configured — webhook is unauthenticated.");
     return true;
   }

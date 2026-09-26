@@ -4,30 +4,56 @@ import WebhookEventLog from "../../models/webhookEventLog.js";
 import logger from "../logger.js";
 import {
   mapShadowfaxForwardStatus,
-  mapShipmentToWorkflowStatus,
   mapShadowfaxReverseStatus,
   isValidForwardStatusTransition,
   isValidReverseStatusTransition,
 } from "./shadowfaxStatusMapper.js";
+import { applyForwardStatusTimestamps } from "./shadowfaxForwardService.js";
+import { syncOrderWithShipmentStatus } from "./shadowfaxOrderSync.js";
 import { emitOrderStatusUpdate } from "../orderSocketEmitter.js";
 import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
-import { applyDeliveredSettlement } from "../orderSettlement.js";
+
+const SENSITIVE_HEADERS = new Set(["authorization", "token", "x-token", "x-webhook-secret", "cookie"]);
+
+function redactHeaders(headers = {}) {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [
+      key,
+      SENSITIVE_HEADERS.has(String(key).toLowerCase()) ? "[REDACTED]" : value,
+    ])
+  );
+}
+
+/**
+ * Stable id for a callback so Shadowfax retries of the same event are ignored.
+ * Push callbacks carry no event id, so AWB/order + status + event_timestamp identify one.
+ */
+function buildEventId(payload, headers, { awbNumber, clientOrderId, rawStatus }) {
+  const explicit = payload.event_id || headers["x-event-id"];
+  if (explicit) return String(explicit);
+  const ref = awbNumber || clientOrderId || "unknown";
+  if (rawStatus && payload.event_timestamp) {
+    return `${ref}:${rawStatus}:${payload.event_timestamp}`;
+  }
+  return `${ref}:${rawStatus || "unknown"}:${Date.now()}`;
+}
 
 /**
  * Processes incoming Shadowfax Webhook events (Forward & Reverse).
+ *
+ * Shadowfax push callback fields: `awb_number`, `order_id` (our client order id),
+ * `event` (status id, e.g. "ofd"), `status` (display text, e.g. "Out For Delivery"),
+ * `event_timestamp`, `comments`, `rider_name`, `rider_contact`, `type` (FWD/REV).
  */
 export async function processShadowfaxWebhook(payload = {}, headers = {}, webhookType = "forward") {
-  const eventId =
-    payload.event_id ||
-    payload.id ||
-    headers["x-event-id"] ||
-    `${payload.order_id || payload.client_order_id || payload.awb_number}-${payload.status || payload.event}-${Date.now()}`;
-
-  const providerOrderId = String(payload.order_id || payload.sfx_order_id || payload.request_id || "").trim();
-  const internalOrderId = String(payload.client_order_id || payload.client_order_number || "").trim();
   const awbNumber = String(payload.awb_number || payload.awb || "").trim();
-  const rawStatus = String(payload.status || payload.event || payload.current_status || "").trim();
+  const clientOrderId = String(payload.order_id || payload.client_order_id || payload.client_order_number || "").trim();
+  const statusId = String(payload.event || payload.status_id || "").trim();
+  const statusText = String(payload.status || payload.current_status || "").trim();
+  const rawStatus = statusId || statusText;
+  const isReversePayload = payload.type === "REV" || webhookType === "reverse";
+  const eventId = buildEventId(payload, headers, { awbNumber, clientOrderId, rawStatus });
 
   // 1. Webhook Deduplication Guard (Idempotency)
   let eventLog = null;
@@ -36,11 +62,11 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
       provider: "shadowfax",
       eventType: rawStatus || "unknown",
       eventId,
-      providerOrderId,
-      internalOrderId,
+      providerOrderId: String(payload.sfx_order_id || payload.request_id || "").trim(),
+      internalOrderId: clientOrderId,
       awbNumber,
       payload,
-      headers,
+      headers: redactHeaders(headers),
       processed: false,
     });
   } catch (err) {
@@ -51,16 +77,8 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
     logger.error(`[Shadowfax Webhook] Failed to save event log: ${err.message}`);
   }
 
-  // 2. Identify Shipment
-  const query = {
-    $or: [
-      ...(internalOrderId ? [{ internalOrderId }, { clientOrderId: internalOrderId }] : []),
-      ...(awbNumber ? [{ awbNumber }] : []),
-      ...(providerOrderId ? [{ shadowfaxOrderId: providerOrderId }, { clientRequestId: providerOrderId }] : []),
-    ],
-  };
-
-  if (query.$or.length === 0) {
+  // 2. Identify Shipment: the AWB is unique; otherwise match our order id + direction.
+  if (!awbNumber && !clientOrderId) {
     if (eventLog) {
       eventLog.error = "No identifying order/AWB fields in webhook payload";
       await eventLog.save();
@@ -68,10 +86,16 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
     return { success: false, reason: "Missing identifiers" };
   }
 
-  const shipment = await Shipment.findOne(query);
+  let shipment = awbNumber ? await Shipment.findOne({ awbNumber }) : null;
+  if (!shipment && clientOrderId) {
+    shipment = await Shipment.findOne({
+      $or: [{ internalOrderId: clientOrderId }, { clientOrderId }, { clientRequestId: clientOrderId }],
+      providerType: isReversePayload ? "reverse" : "forward",
+    });
+  }
 
   if (!shipment) {
-    logger.warn(`[Shadowfax Webhook] Shipment not found for payload`, { internalOrderId, awbNumber, providerOrderId });
+    logger.warn(`[Shadowfax Webhook] Shipment not found for payload`, { clientOrderId, awbNumber });
     if (eventLog) {
       eventLog.error = "Shipment document not found in DB";
       await eventLog.save();
@@ -80,17 +104,19 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
   }
 
   try {
-    const isReverse = shipment.providerType === "reverse" || webhookType === "reverse" || payload.type === "REV";
+    const isReverse = shipment.providerType === "reverse" || isReversePayload;
 
     if (!isReverse) {
       // ── Forward Webhook Processing ──
       const normalizedStatus = mapShadowfaxForwardStatus(rawStatus);
+      const description = `Webhook: ${statusText || rawStatus}${payload.comments ? ` (${payload.comments})` : ""}`;
 
-      if (isValidForwardStatusTransition(shipment.shipmentStatus, normalizedStatus)) {
+      if (normalizedStatus && isValidForwardStatusTransition(shipment.shipmentStatus, normalizedStatus)) {
+        applyForwardStatusTimestamps(shipment, normalizedStatus);
         shipment.shipmentStatus = normalizedStatus;
         shipment.providerStatus = rawStatus;
 
-        // Extract rider updates
+        // Rider details are sent with out-for-delivery events
         if (payload.rider_name || payload.rider_contact || payload.rider_phone || payload.rider_latitude) {
           shipment.rider = {
             id: payload.rider_id || shipment.rider?.id,
@@ -102,70 +128,46 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
           };
         }
 
-        // Set timestamps
-        if (normalizedStatus === "PICKED_UP") shipment.pickedUpAt = new Date();
-        if (normalizedStatus === "RIDER_ARRIVED") shipment.arrivedAt = new Date();
-        if (normalizedStatus === "DELIVERED") shipment.deliveredAt = new Date();
-        if (normalizedStatus === "CANCELLED") shipment.cancelledAt = new Date();
-        if (normalizedStatus === "FAILED") shipment.failedAt = new Date();
-
         shipment.timeline.push({
           status: normalizedStatus,
           providerStatus: rawStatus,
-          description: `Webhook: ${rawStatus}`,
+          description,
           source: "webhook",
           timestamp: new Date(),
           metadata: payload,
         });
-
         shipment.lastProviderSyncAt = new Date();
         shipment.lastProviderResponse = payload;
         await shipment.save();
 
-        // Sync with Order
-        const newWorkflow = mapShipmentToWorkflowStatus(normalizedStatus);
-        const order = await Order.findOne({ orderId: shipment.internalOrderId });
-
-        if (order && newWorkflow) {
-          order.workflowStatus = newWorkflow;
-          if (newWorkflow === "DELIVERED") {
-            order.status = "delivered";
-            order.deliveredAt = new Date();
-            await applyDeliveredSettlement(order);
-          } else if (newWorkflow === "CANCELLED") {
-            order.status = "cancelled";
-          }
-          await order.save();
-
-          emitOrderStatusUpdate(order.orderId, {
-            workflowStatus: order.workflowStatus,
-            status: order.status,
-            rider: shipment.rider,
-          });
-
-          // Dispatch notification
-          if (newWorkflow === "DELIVERED") {
-            emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_DELIVERED, {
-              orderId: order.orderId,
-              customerId: order.customer,
-              sellerId: order.seller,
-            });
-          } else if (newWorkflow === "OUT_FOR_DELIVERY") {
-            emitNotificationEvent(NOTIFICATION_EVENTS.OUT_FOR_DELIVERY, {
-              orderId: order.orderId,
-              customerId: order.customer,
-            });
-          }
-        }
+        await syncOrderWithShipmentStatus(shipment, normalizedStatus, {
+          rawStatus,
+          remarks: payload.comments || null,
+        });
+      } else if (!normalizedStatus && rawStatus) {
+        // Exception statuses (not contactable, on hold, ...) are recorded without changing state.
+        shipment.providerStatus = rawStatus;
+        shipment.timeline.push({
+          status: shipment.shipmentStatus,
+          providerStatus: rawStatus,
+          description,
+          source: "webhook",
+          timestamp: new Date(),
+          metadata: payload,
+        });
+        shipment.lastProviderSyncAt = new Date();
+        shipment.lastProviderResponse = payload;
+        await shipment.save();
       } else {
         logger.info(`[Shadowfax Webhook] Ignored out-of-order forward event: ${rawStatus} for current status: ${shipment.shipmentStatus}`);
       }
     } else {
       // ── Reverse Webhook Processing ──
-      const normalizedReturnStatus = mapShadowfaxReverseStatus(rawStatus);
+      const reverseRawStatus = statusText || statusId;
+      const normalizedReturnStatus = mapShadowfaxReverseStatus(reverseRawStatus);
 
       if (isValidReverseStatusTransition(shipment.providerStatus, normalizedReturnStatus)) {
-        shipment.providerStatus = rawStatus;
+        shipment.providerStatus = reverseRawStatus;
 
         // Process Doorstep QC if included
         if (payload.qc_result || payload.qc_status) {
@@ -180,8 +182,8 @@ export async function processShadowfaxWebhook(payload = {}, headers = {}, webhoo
 
         shipment.timeline.push({
           status: normalizedReturnStatus,
-          providerStatus: rawStatus,
-          description: `Reverse Webhook: ${rawStatus}`,
+          providerStatus: reverseRawStatus,
+          description: `Reverse Webhook: ${reverseRawStatus}`,
           source: "webhook",
           timestamp: new Date(),
           metadata: payload,

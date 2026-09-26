@@ -8,6 +8,7 @@ import {
   triggerForwardOrderCreation,
   triggerDispatchReady,
   triggerOrderCancellation,
+  syncShipmentTracking,
   trackShipmentUnified,
   handleForwardWebhook,
   handleReverseWebhook,
@@ -32,5 +33,6 @@ router.get("/shipments/:orderId", verifyToken, allowRoles("admin"), getShipmentB
 router.post("/shipments/:orderId/create-forward", verifyToken, allowRoles("admin", "seller"), triggerForwardOrderCreation);
 router.post("/shipments/:orderId/dispatch-ready", verifyToken, allowRoles("admin", "seller"), triggerDispatchReady);
 router.post("/shipments/:orderId/cancel", verifyToken, allowRoles("admin"), triggerOrderCancellation);
+router.post("/shipments/:orderId/sync", verifyToken, allowRoles("admin"), syncShipmentTracking);
 
 export default router;

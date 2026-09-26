@@ -4,12 +4,12 @@ import Seller from "../../models/seller.js";
 import User from "../../models/customer.js";
 import logger from "../logger.js";
 import { getShadowfaxConfig } from "./shadowfaxConfig.js";
-import { sendShadowfaxRequest } from "./shadowfaxClient.js";
+import { sendShadowfaxRequest, extractShadowfaxErrorMessage } from "./shadowfaxClient.js";
 import {
   mapShadowfaxForwardStatus,
-  mapShipmentToWorkflowStatus,
   isValidForwardStatusTransition,
 } from "./shadowfaxStatusMapper.js";
+import { syncOrderWithShipmentStatus } from "./shadowfaxOrderSync.js";
 import {
   ShadowfaxServiceabilityError,
   ShadowfaxOrderCreationFailedError,
@@ -78,6 +78,28 @@ export async function checkForwardServiceability({
   }
 }
 
+// Shipment states that mean a real, live order exists at Shadowfax.
+const LIVE_FORWARD_STATUSES = [
+  "ORDER_CREATED",
+  "DISPATCH_READY",
+  "RIDER_ASSIGNED",
+  "RIDER_ARRIVED",
+  "PICKED_UP",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+];
+
+/**
+ * Shadowfax answers a duplicate client_order_id with HTTP 200 + "Failure" and the
+ * existing AWB, either as an `AWB` field or inside the error text.
+ */
+function extractDuplicateAwb(body) {
+  if (!body || typeof body !== "object") return null;
+  if (body.AWB) return String(body.AWB);
+  const match = JSON.stringify(body.errors || "").match(/already created with AWB\s*:\s*([A-Za-z0-9]+)/i);
+  return match ? match[1] : null;
+}
+
 /**
  * Creates a forward delivery order with Shadowfax.
  * Features Idempotency Protection against duplicate shipments.
@@ -104,18 +126,22 @@ export async function createForwardOrder(orderId, options = {}) {
     providerType: "forward",
   });
 
-  if (
-    existingShipment &&
-    (existingShipment.shadowfaxOrderId ||
-      ["ORDER_CREATED", "DISPATCH_READY", "RIDER_ASSIGNED", "RIDER_ARRIVED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"].includes(existingShipment.shipmentStatus))
-  ) {
-    logger.info(`[Shadowfax] Active shipment already exists for order #${orderId}. Reusing ${existingShipment.shadowfaxOrderId || existingShipment._id}`);
+  if (existingShipment && [...LIVE_FORWARD_STATUSES, "DELIVERED"].includes(existingShipment.shipmentStatus)) {
+    logger.info(`[Shadowfax] Active shipment already exists for order #${orderId}. Reusing ${existingShipment.awbNumber || existingShipment._id}`);
     if (!order.awbNumber && existingShipment.awbNumber) {
       order.deliveryProvider = "shadowfax";
       order.awbNumber = existingShipment.awbNumber;
       if (typeof order.save === "function") await order.save().catch(() => {});
     }
     return existingShipment;
+  }
+
+  // Shadowfax keeps a cancelled client_order_id, so re-creating it would just return
+  // the cancelled AWB. Only FAILED/PENDING shipments (nothing live at Shadowfax) are retried.
+  if (existingShipment && existingShipment.shipmentStatus === "CANCELLED") {
+    throw new ShadowfaxInvalidRequestError(
+      `Order #${orderId} already has a cancelled Shadowfax shipment (AWB ${existingShipment.awbNumber || "n/a"}); it cannot be re-dispatched automatically.`
+    );
   }
 
   // 3. Extract & Validate Pickup (Seller) & Drop (Customer) Details
@@ -249,8 +275,9 @@ export async function createForwardOrder(orderId, options = {}) {
     client_code: config.clientCode || undefined,
     order_details: {
       client_order_id: String(order.orderId),
-      actual_weight: 0.5,
-      volumetric_weight: 0.5,
+      // Shadowfax weights are in grams.
+      actual_weight: config.defaultWeightGrams,
+      volumetric_weight: config.defaultWeightGrams,
       product_value: grandTotal,
       payment_mode: isCod ? "COD" : "Prepaid",
       cod_amount: isCod ? grandTotal : 0,
@@ -333,21 +360,37 @@ export async function createForwardOrder(orderId, options = {}) {
       data: payload,
     });
 
+    // Shadowfax returns HTTP 200 for rejected orders too, with {"message": "Failure", "errors": ...}.
+    // Only a response carrying data.awb_number is a created order.
     const respData = sfxResponse.data || {};
-    const sfxOrderId =
-      respData.data?.id || respData.order_id || respData.data?.order_id || respData.sfx_order_id || `SFX-${order.orderId}`;
-    const awb = respData.data?.awb_number || respData.awb_number || `AWB-${sfxOrderId}`;
+    const created = respData.data && typeof respData.data === "object" ? respData.data : {};
+    let awb = created.awb_number ? String(created.awb_number) : "";
+    const sfxOrderId = created.id != null ? String(created.id) : null;
 
-    shipment.shadowfaxOrderId = String(sfxOrderId);
-    shipment.awbNumber = String(awb);
+    if (!awb || String(respData.message || "").toLowerCase() === "failure") {
+      const duplicateAwb = extractDuplicateAwb(respData);
+      if (!duplicateAwb) {
+        throw new ShadowfaxOrderCreationFailedError(
+          extractShadowfaxErrorMessage(respData, "Shadowfax rejected the order."),
+          respData
+        );
+      }
+      // Already created earlier (e.g. a retry after a timeout): adopt the existing AWB.
+      logger.warn(`[Shadowfax] Order #${orderId} already exists at Shadowfax; reusing AWB ${duplicateAwb}`);
+      awb = duplicateAwb;
+    }
+
+    shipment.shadowfaxOrderId = sfxOrderId;
+    shipment.awbNumber = awb;
     shipment.shipmentStatus = "ORDER_CREATED";
-    shipment.providerStatus = "order_created";
+    shipment.providerStatus = created.status || "new";
+    shipment.failureReason = null;
     shipment.lastProviderResponse = respData;
     shipment.lastProviderSyncAt = new Date();
     shipment.timeline.push({
       status: "ORDER_CREATED",
-      providerStatus: "order_created",
-      description: "Shadowfax shipment successfully created",
+      providerStatus: shipment.providerStatus,
+      description: `Shadowfax shipment created (AWB ${awb})`,
       source: "api",
       timestamp: new Date(),
     });
@@ -433,7 +476,9 @@ export async function updateForwardOrder(orderId, updatePayload) {
 }
 
 /**
- * Marks order as Ready for Dispatch / RTS (Ready to Ship).
+ * Marks the shipment packed / ready for pickup. Local only: the Unified marketplace
+ * API has no dispatch-ready call (Shadowfax schedules the seller pickup itself once
+ * the order is created, and order_update only accepts rts / rto / reopen_ndr).
  */
 export async function markDispatchReady(orderId) {
   const shipment = await Shipment.findOne({
@@ -441,41 +486,31 @@ export async function markDispatchReady(orderId) {
     providerType: "forward",
   });
 
-  if (!shipment || !shipment.awbNumber) {
+  if (!shipment || !shipment.awbNumber || !LIVE_FORWARD_STATUSES.includes(shipment.shipmentStatus)) {
     throw new ShadowfaxInvalidRequestError("No active Shadowfax shipment found to mark dispatch-ready.");
   }
 
   shipment.dispatchReadyAt = new Date();
-  shipment.shipmentStatus = "DISPATCH_READY";
+  if (shipment.shipmentStatus === "ORDER_CREATED") {
+    shipment.shipmentStatus = "DISPATCH_READY";
+  }
   shipment.timeline.push({
-    status: "DISPATCH_READY",
+    status: shipment.shipmentStatus,
     description: "Seller marked shipment packed and ready for rider pickup",
     source: "api",
     timestamp: new Date(),
   });
   await shipment.save();
 
-  // Notify Shadowfax if order_update endpoint supports status
-  try {
-    await sendShadowfaxRequest({
-      method: "POST",
-      endpoint: "/api/v3/clients/order_update/",
-      type: "forward",
-      data: {
-        awb_number: shipment.awbNumber,
-        status_update: "packed",
-        ready_time: new Date().toISOString(),
-      },
-    });
-  } catch (err) {
-    logger.warn(`[Shadowfax] Dispatch ready advisory sync: ${err.message}`);
-  }
-
   return shipment;
 }
 
 /**
  * Cancels a forward order with Shadowfax.
+ * Returns null when nothing is live at Shadowfax. When Shadowfax queues the
+ * cancellation (responseCode 304, e.g. parcel out for pickup/delivery) the shipment
+ * keeps its status and gets `cancellationRequestedAt`; the final state arrives via
+ * webhook or tracking.
  */
 export async function cancelForwardOrder(orderId, cancelReason = "Cancelled by user") {
   const shipment = await Shipment.findOne({
@@ -483,20 +518,22 @@ export async function cancelForwardOrder(orderId, cancelReason = "Cancelled by u
     providerType: "forward",
   });
 
-  if (!shipment || !shipment.shadowfaxOrderId) {
-    logger.info(`[Shadowfax] No active Shadowfax shipment to cancel for order #${orderId}`);
+  if (shipment?.shipmentStatus === "DELIVERED") {
+    throw new ShadowfaxInvalidRequestError("Cannot cancel: the Shadowfax shipment is already delivered.");
+  }
+
+  if (!shipment || !shipment.awbNumber || !LIVE_FORWARD_STATUSES.includes(shipment.shipmentStatus)) {
+    logger.info(`[Shadowfax] No live Shadowfax shipment to cancel for order #${orderId}`);
     return null;
   }
 
-  if (["DELIVERED", "CANCELLED"].includes(shipment.shipmentStatus)) {
-    throw new ShadowfaxInvalidRequestError(`Cannot cancel shipment in terminal state: ${shipment.shipmentStatus}`);
-  }
-
+  // request_id must be the AWB (or our client order id), not Shadowfax's internal id.
   const payload = {
-    request_id: shipment.shadowfaxOrderId || shipment.awbNumber || orderId,
+    request_id: shipment.awbNumber,
     cancel_remarks: cancelReason,
   };
 
+  let body;
   try {
     const sfxResponse = await sendShadowfaxRequest({
       method: "POST",
@@ -504,30 +541,103 @@ export async function cancelForwardOrder(orderId, cancelReason = "Cancelled by u
       type: "forward",
       data: payload,
     });
+    body = sfxResponse.data || {};
+  } catch (err) {
+    logger.error(`[Shadowfax] Cancellation failed for order #${orderId}`, { error: err.message });
+    throw new ShadowfaxCancellationFailedError(err.message, err.details);
+  }
 
+  const responseCode = Number(body.responseCode ?? 200);
+  if (responseCode !== 200 && responseCode !== 304) {
+    const message = extractShadowfaxErrorMessage(body, "Shadowfax refused the cancellation.");
+    logger.error(`[Shadowfax] Cancellation refused for order #${orderId}`, { error: message });
+    throw new ShadowfaxCancellationFailedError(message, body);
+  }
+
+  const now = new Date();
+  shipment.lastProviderResponse = body;
+  shipment.lastProviderSyncAt = now;
+
+  if (responseCode === 304) {
+    shipment.cancellationRequestedAt = now;
+    shipment.timeline.push({
+      status: shipment.shipmentStatus,
+      providerStatus: shipment.providerStatus,
+      description: `Cancellation queued at Shadowfax (${body.responseMsg || "applies at next facility"}): ${cancelReason}`,
+      source: "api",
+      timestamp: now,
+    });
+  } else {
     shipment.shipmentStatus = "CANCELLED";
     shipment.providerStatus = "cancelled";
-    shipment.cancelledAt = new Date();
+    shipment.cancelledAt = now;
     shipment.failureReason = cancelReason;
-    shipment.lastProviderResponse = sfxResponse.data;
     shipment.timeline.push({
       status: "CANCELLED",
       providerStatus: "cancelled",
       description: `Cancelled with Shadowfax: ${cancelReason}`,
       source: "api",
-      timestamp: new Date(),
+      timestamp: now,
     });
-    await shipment.save();
-
-    return shipment;
-  } catch (err) {
-    logger.error(`[Shadowfax] Cancellation failed for order #${orderId}`, { error: err.message });
-    throw new ShadowfaxCancellationFailedError(err.message, err.details);
   }
+  await shipment.save();
+
+  return shipment;
 }
 
 /**
- * Fetches real-time tracking information from Shadowfax and syncs internal shipment.
+ * Sets the lifecycle timestamp that belongs to a newly reached shipment status.
+ */
+export function applyForwardStatusTimestamps(shipment, shipmentStatus, at = new Date()) {
+  if (shipmentStatus === "PICKED_UP" && !shipment.pickedUpAt) shipment.pickedUpAt = at;
+  if (shipmentStatus === "RIDER_ARRIVED" && !shipment.arrivedAt) shipment.arrivedAt = at;
+  if (shipmentStatus === "DELIVERED" && !shipment.deliveredAt) shipment.deliveredAt = at;
+  if (shipmentStatus === "CANCELLED" && !shipment.cancelledAt) shipment.cancelledAt = at;
+  if (shipmentStatus === "FAILED" && !shipment.failedAt) shipment.failedAt = at;
+}
+
+/**
+ * Reads the current Shadowfax status of one AWB.
+ * bulk_track carries the up-to-date status (the single-order track endpoint lags;
+ * on staging it never reflects status changes). An AWB missing from the bulk result
+ * is re-checked with the single-order endpoint, which rejects unknown AWBs with
+ * "Invalid AWB Number".
+ */
+async function fetchForwardTracking(awbNumber) {
+  const bulk = await sendShadowfaxRequest({
+    method: "POST",
+    endpoint: "/api/v4/clients/bulk_track/",
+    type: "forward",
+    data: { awb_numbers: [awbNumber] },
+  });
+  const entries = Array.isArray(bulk.data?.data) ? bulk.data.data : [];
+  const entry = entries.find((item) => String(item?.awb_number) === String(awbNumber));
+  if (entry) {
+    return {
+      raw: bulk.data,
+      status: entry.status,
+      statusDisplay: entry.status_display,
+      events: Array.isArray(entry.tracking_details) ? entry.tracking_details : [],
+    };
+  }
+
+  const single = await sendShadowfaxRequest({
+    method: "GET",
+    endpoint: `/api/v4/clients/orders/${awbNumber}/track/`,
+    type: "forward",
+  });
+  const details = single.data?.order_details || {};
+  return {
+    raw: single.data,
+    status: details.status || details.current_status,
+    statusDisplay: details.status_display,
+    events: Array.isArray(single.data?.tracking_details) ? single.data.tracking_details : [],
+  };
+}
+
+/**
+ * Fetches the latest status from Shadowfax and applies it to the shipment and
+ * the order. Used by the reconciliation job and the admin "sync" action.
  */
 export async function trackForwardOrder(orderIdOrAwb) {
   const shipment = await Shipment.findOne({
@@ -539,58 +649,82 @@ export async function trackForwardOrder(orderIdOrAwb) {
     throw new ShadowfaxInvalidRequestError(`No Shadowfax shipment found for identifier: ${orderIdOrAwb}`);
   }
 
+  const config = await getShadowfaxConfig();
+  let tracking;
   try {
-    const sfxResponse = await sendShadowfaxRequest({
-      method: "GET",
-      endpoint: `/api/v4/clients/orders/${shipment.awbNumber}/track/`,
-      type: "forward",
-    });
-
-    const trackData = sfxResponse.data || {};
-    const orderDetails = trackData.order_details || trackData.data || trackData;
-    const rawStatus = orderDetails.status || orderDetails.current_status || trackData.status;
-    const normalizedStatus = mapShadowfaxForwardStatus(rawStatus);
-
-    if (isValidForwardStatusTransition(shipment.shipmentStatus, normalizedStatus)) {
-      shipment.shipmentStatus = normalizedStatus;
-      shipment.providerStatus = rawStatus;
-    }
-
-    // Extract rider info if available (flat rider_name/rider_contact on order_details)
-    if (orderDetails.rider_name || orderDetails.rider_contact) {
-      shipment.rider = {
-        id: shipment.rider?.id,
-        name: orderDetails.rider_name || shipment.rider?.name,
-        phone: orderDetails.rider_contact || shipment.rider?.phone,
-        latitude: shipment.rider?.latitude,
-        longitude: shipment.rider?.longitude,
-        lastLocationAt: new Date(),
-      };
-    }
-
-    shipment.lastProviderResponse = trackData;
-    shipment.lastProviderSyncAt = new Date();
-    await shipment.save();
-
-    // Map to Order workflow status
-    const newWorkflow = mapShipmentToWorkflowStatus(shipment.shipmentStatus);
-    if (newWorkflow) {
-      await Order.findOneAndUpdate(
-        { orderId: shipment.internalOrderId },
-        { $set: { workflowStatus: newWorkflow } }
-      );
-    }
-
-    return {
-      shipmentId: shipment._id,
-      internalOrderId: shipment.internalOrderId,
-      awbNumber: shipment.awbNumber,
-      shipmentStatus: shipment.shipmentStatus,
-      providerStatus: shipment.providerStatus,
-      rider: shipment.rider,
-      lastSyncAt: shipment.lastProviderSyncAt,
-    };
+    tracking = await fetchForwardTracking(shipment.awbNumber);
   } catch (err) {
+    // An AWB Shadowfax does not recognise (in the environment it was created in) is not a
+    // live shipment, e.g. a placeholder AWB saved by older code. Mark it FAILED so it is
+    // no longer polled and the order can be dispatched again.
+    if (
+      /invalid awb/i.test(err.message || "") &&
+      shipment.environment === config.environment &&
+      LIVE_FORWARD_STATUSES.includes(shipment.shipmentStatus)
+    ) {
+      const reason = `Shadowfax does not recognise AWB ${shipment.awbNumber}`;
+      shipment.shipmentStatus = "FAILED";
+      shipment.failedAt = new Date();
+      shipment.failureReason = reason;
+      shipment.lastProviderSyncAt = new Date();
+      shipment.timeline.push({ status: "FAILED", description: reason, source: "reconciliation", timestamp: new Date() });
+      await shipment.save();
+      await Order.updateOne({ orderId: shipment.internalOrderId }, { $set: { deliveryFailureReason: reason } });
+    }
     throw new ShadowfaxTrackingFailedError(err.message, err.details);
   }
+
+  // `status` holds the status id (e.g. "ofd"), `status_display` the text.
+  const rawStatus = String(tracking.status || "").trim();
+  const normalizedStatus = mapShadowfaxForwardStatus(rawStatus);
+  const events = tracking.events;
+  const latestEvent = events.length ? events[events.length - 1] : null;
+  // Only use the last event's remark when it belongs to the current status.
+  const latestRemark = latestEvent && latestEvent.status_id === rawStatus ? latestEvent.remarks || null : null;
+  const description = `Tracking: ${tracking.statusDisplay || rawStatus}${latestRemark ? ` (${latestRemark})` : ""}`;
+  let reachedStatus = null;
+
+  if (normalizedStatus && isValidForwardStatusTransition(shipment.shipmentStatus, normalizedStatus)) {
+    if (shipment.shipmentStatus !== normalizedStatus || shipment.providerStatus !== rawStatus) {
+      applyForwardStatusTimestamps(shipment, normalizedStatus);
+      shipment.timeline.push({
+        status: normalizedStatus,
+        providerStatus: rawStatus,
+        description,
+        source: "reconciliation",
+        timestamp: new Date(),
+      });
+    }
+    shipment.shipmentStatus = normalizedStatus;
+    shipment.providerStatus = rawStatus;
+    reachedStatus = normalizedStatus;
+  } else if (!normalizedStatus && rawStatus && rawStatus !== shipment.providerStatus) {
+    // Exception statuses (not contactable, on hold, ...) are recorded without changing state.
+    shipment.providerStatus = rawStatus;
+    shipment.timeline.push({
+      status: shipment.shipmentStatus,
+      providerStatus: rawStatus,
+      description,
+      source: "reconciliation",
+      timestamp: new Date(),
+    });
+  }
+
+  shipment.lastProviderResponse = tracking.raw;
+  shipment.lastProviderSyncAt = new Date();
+  await shipment.save();
+
+  if (reachedStatus) {
+    await syncOrderWithShipmentStatus(shipment, reachedStatus, { rawStatus, remarks: latestRemark });
+  }
+
+  return {
+    shipmentId: shipment._id,
+    internalOrderId: shipment.internalOrderId,
+    awbNumber: shipment.awbNumber,
+    shipmentStatus: shipment.shipmentStatus,
+    providerStatus: shipment.providerStatus,
+    rider: shipment.rider,
+    lastSyncAt: shipment.lastProviderSyncAt,
+  };
 }

@@ -168,6 +168,8 @@ const shipmentSchema = new mongoose.Schema(
     arrivedAt: Date,
     deliveredAt: Date,
     cancelledAt: Date,
+    // Set when Shadowfax queues a cancellation (applied at its next facility).
+    cancellationRequestedAt: Date,
     failedAt: Date,
     failureReason: String,
     lastProviderResponse: {
