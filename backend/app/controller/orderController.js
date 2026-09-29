@@ -60,6 +60,7 @@ import logger from "../services/logger.js";
 import { validateBody as validateWithJoi } from "../middleware/validate.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
 import { cancelForwardOrder } from "../services/delhivery/delhiveryForwardService.js";
+import { cancelLocalOrder } from "../services/delhiveryLocal/delhiveryLocalService.js";
 
 function normalizePaymentMode(value) {
   const raw = String(value || "").trim().toUpperCase();
@@ -464,10 +465,16 @@ export const updateOrderStatus = async (req, res) => {
     const oldStatus = order.status;
 
     // A live Delhivery parcel must be cancelled at Delhivery first, otherwise it is
-    // still picked up and delivered after the order is cancelled here.
+    // still picked up and delivered after the order is cancelled here. Local (intracity)
+    // orders carry a CRN id and cancel through the Local API; Express orders use a waybill.
     if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "delhivery" && order.awbNumber) {
+      const isLocalOrder = /^CRN/i.test(String(order.awbNumber));
       try {
-        await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
+        if (isLocalOrder) {
+          await cancelLocalOrder(canonicalOrderId, "service is no longer required");
+        } else {
+          await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
+        }
       } catch (courierError) {
         return handleResponse(
           res,

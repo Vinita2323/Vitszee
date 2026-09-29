@@ -251,6 +251,68 @@ const settingSchema = new mongoose.Schema(
                 default: 15,
             },
         },
+        // Delhivery Direct Intracity ("Local" / quick delivery) — separate CoreOS API.
+        delhiveryLocal: {
+            // Master switch: dispatch orders via quick (intracity) delivery.
+            enabled: {
+                type: Boolean,
+                default: false,
+            },
+            environment: {
+                type: String,
+                enum: ["sandbox", "production"],
+                default: "production",
+            },
+            baseUrl: {
+                type: String,
+                default: "",
+            },
+            authUrl: {
+                type: String,
+                default: "",
+            },
+            clientId: {
+                type: String,
+                default: "",
+            },
+            clientSecret: {
+                type: String,
+                default: "",
+            },
+            clientCode: {
+                type: String,
+                default: "",
+            },
+            audience: {
+                type: String,
+                default: "platform:app:coreos",
+            },
+            webhookUrl: {
+                type: String,
+                default: "",
+            },
+            webhookApiKey: {
+                type: String,
+                default: "",
+            },
+            webhookSignatureKey: {
+                type: String,
+                default: "",
+            },
+            // Default vehicle: 2-wheeler, 3-wheeler, tata-ace, mini-3w, 8ft-pickup.
+            defaultVehicleMode: {
+                type: String,
+                default: "2-wheeler",
+            },
+            readyToShip: {
+                type: Boolean,
+                default: true,
+            },
+            autoServiceabilityCheck: {
+                type: Boolean,
+                default: true,
+            },
+        },
     },
     {
         timestamps: true,

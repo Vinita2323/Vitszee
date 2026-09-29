@@ -61,6 +61,10 @@ jest.unstable_mockModule("../app/services/delhivery/delhiveryForwardService.js",
   cancelForwardOrder: jest.fn(),
 }));
 
+jest.unstable_mockModule("../app/services/delhiveryLocal/delhiveryLocalService.js", () => ({
+  cancelLocalOrder: jest.fn(),
+}));
+
 jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () => ({
   freezeFinancialSnapshot: jest.fn((order) => order),
   reverseOrderFinanceOnCancellation: jest.fn(),

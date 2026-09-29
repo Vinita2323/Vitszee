@@ -46,6 +46,8 @@ import logger from "./logger.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import { getDelhiveryConfig } from "./delhivery/delhiveryConfig.js";
 import { createForwardOrder } from "./delhivery/delhiveryForwardService.js";
+import { getDelhiveryLocalConfig } from "./delhiveryLocal/delhiveryLocalConfig.js";
+import { createLocalOrder } from "./delhiveryLocal/delhiveryLocalService.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -186,6 +188,22 @@ import Setting from "../models/setting.js";
  */
 export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
   try {
+    // Quick (intracity) delivery takes precedence when Delhivery Local is enabled.
+    const localConfig = await getDelhiveryLocalConfig();
+    if (localConfig.enabled) {
+      if (!localConfig.hasCredentials) {
+        logger.warn(
+          `[dispatchOrderToDelhivery] Delhivery Local is enabled but credentials are missing. Order #${orderId}`
+        );
+        return null;
+      }
+      const localShipment = await createLocalOrder(orderId);
+      logger.info(`[dispatchOrderToDelhivery] Delhivery Local (quick) order created for #${orderId}`, {
+        orderId: localShipment.awbNumber,
+      });
+      return localShipment;
+    }
+
     const config = await getDelhiveryConfig();
 
     if (!config.forwardEnabled) {

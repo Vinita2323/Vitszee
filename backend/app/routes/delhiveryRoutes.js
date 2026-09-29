@@ -13,12 +13,36 @@ import {
   trackShipmentUnified,
   handleScanWebhook,
 } from "../controller/delhiveryController.js";
+import {
+  getDelhiveryLocalSettings,
+  updateDelhiveryLocalSettings,
+  testLocalConnection,
+  getLocalQuoteHandler,
+  triggerLocalOrderCreation,
+  confirmLocalOrderHandler,
+  triggerLocalCancellation,
+  syncLocalTracking,
+  handleLocalWebhook,
+} from "../controller/delhiveryLocalController.js";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // ── Inbound scan push from Delhivery (authorised with the shared webhook secret) ──
 router.post("/webhook", handleScanWebhook);
+
+// ── Inbound Delhivery Local (intracity) fulfilment webhook ──
+router.post("/local-webhook", handleLocalWebhook);
+
+// ── Delhivery Local (intracity / quick delivery) — Admin / Seller ──
+router.get("/local/config", verifyToken, allowRoles("admin"), getDelhiveryLocalSettings);
+router.put("/local/config", verifyToken, allowRoles("admin"), updateDelhiveryLocalSettings);
+router.post("/local/test-connection", verifyToken, allowRoles("admin"), testLocalConnection);
+router.post("/local/quote", verifyToken, allowRoles("admin", "seller"), getLocalQuoteHandler);
+router.post("/local/orders/:orderId/create", verifyToken, allowRoles("admin", "seller"), triggerLocalOrderCreation);
+router.post("/local/orders/:orderId/confirm", verifyToken, allowRoles("admin"), confirmLocalOrderHandler);
+router.post("/local/orders/:orderId/cancel", verifyToken, allowRoles("admin"), triggerLocalCancellation);
+router.post("/local/orders/:orderId/sync", verifyToken, allowRoles("admin"), syncLocalTracking);
 
 // ── Unified Tracking (Customer, Seller, Admin) ──
 router.get("/track/:identifier", verifyToken, trackShipmentUnified);
