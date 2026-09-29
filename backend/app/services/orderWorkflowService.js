@@ -44,8 +44,10 @@ import { requireCanonicalOrderId } from "../utils/orderLookup.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import logger from "./logger.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
-import { getShadowfaxConfig } from "./shadowfax/shadowfaxConfig.js";
-import { createForwardOrder } from "./shadowfax/shadowfaxForwardService.js";
+import { getDelhiveryConfig } from "./delhivery/delhiveryConfig.js";
+import { createForwardOrder } from "./delhivery/delhiveryForwardService.js";
+import { getDelhiveryLocalConfig } from "./delhiveryLocal/delhiveryLocalConfig.js";
+import { createLocalOrder } from "./delhiveryLocal/delhiveryLocalService.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -180,78 +182,61 @@ export async function removeReturnPickupTimeoutJob(orderId, attempt = 1) {
 import Setting from "../models/setting.js";
 
 /**
- * Automatically dispatches an eligible order to Shadowfax forward delivery.
- * Connects directly to existing createForwardOrder and respects autoShipmentCreation.
+ * Automatically dispatches an eligible order to Delhivery for delivery.
+ * Respects the autoShipmentCreation setting.
  * Does NOT broadcast to internal captains, does NOT create DeliveryAssignment, does NOT schedule captain timeouts.
  */
-async function activeCourierProvider() {
-  const { getDelhiveryConfig } = await import("./delhivery/delhiveryConfig.js");
-  const config = getDelhiveryConfig();
-  if (config.forwardEnabled && config.apiToken) return "delhivery";
-  return "shadowfax";
-}
-
-export async function dispatchOrderToCourier(orderId, orderDoc = null) {
-  const provider = await activeCourierProvider();
-  if (provider !== "delhivery") {
-    return dispatchOrderToShadowfax(orderId, orderDoc);
-  }
-
-  const { getDelhiveryConfig } = await import("./delhivery/delhiveryConfig.js");
-  const { createDelhiveryForwardShipment } = await import("./delhivery/delhiveryForwardService.js");
-  const config = getDelhiveryConfig();
-  if (!config.autoShipmentCreation) {
-    logger.info(`[dispatchOrderToCourier] Delhivery auto shipment is off. Order #${orderId} is waiting for a manual pickup request.`);
-    return null;
-  }
-
+export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
   try {
-    const shipment = await createDelhiveryForwardShipment(orderId);
-    logger.info(`[dispatchOrderToCourier] Delhivery shipment created for #${orderId}`, {
-      awbNumber: shipment?.awbNumber,
-    });
-    return shipment;
-  } catch (err) {
-    logger.error(`[dispatchOrderToCourier] Delhivery dispatch failed for #${orderId}: ${err.message}`);
-    await Order.findOneAndUpdate(
-      { orderId },
-      { $set: { deliveryProvider: "delhivery", deliveryFailureReason: err.message } },
-    ).catch(() => {});
-    return null;
-  }
-}
+    // Quick (intracity) delivery takes precedence when Delhivery Local is enabled.
+    const localConfig = await getDelhiveryLocalConfig();
+    if (localConfig.enabled) {
+      if (!localConfig.hasCredentials) {
+        logger.warn(
+          `[dispatchOrderToDelhivery] Delhivery Local is enabled but credentials are missing. Order #${orderId}`
+        );
+        return null;
+      }
+      const localShipment = await createLocalOrder(orderId);
+      logger.info(`[dispatchOrderToDelhivery] Delhivery Local (quick) order created for #${orderId}`, {
+        orderId: localShipment.awbNumber,
+      });
+      return localShipment;
+    }
 
-export async function dispatchOrderToShadowfax(orderId, orderDoc = null) {
-  try {
-    const config = await getShadowfaxConfig();
+    const config = await getDelhiveryConfig();
 
     if (!config.forwardEnabled) {
-      logger.warn(`[dispatchOrderToShadowfax] Shadowfax forward delivery is disabled in settings. Order #${orderId}`);
+      logger.warn(`[dispatchOrderToDelhivery] Delhivery delivery is disabled in settings. Order #${orderId}`);
       return null;
     }
 
     if (!config.autoShipmentCreation) {
-      logger.info(`[dispatchOrderToShadowfax] Shadowfax autoShipmentCreation is disabled in settings. Order #${orderId} awaiting manual dispatch.`);
+      logger.info(`[dispatchOrderToDelhivery] Delhivery autoShipmentCreation is disabled in settings. Order #${orderId} awaiting manual dispatch.`);
       return null;
     }
 
     const shipment = await createForwardOrder(orderId);
-    logger.info(`[dispatchOrderToShadowfax] Shadowfax shipment created successfully for #${orderId}`, {
-      shadowfaxOrderId: shipment.shadowfaxOrderId,
+    logger.info(`[dispatchOrderToDelhivery] Delhivery shipment created successfully for #${orderId}`, {
       awbNumber: shipment.awbNumber,
+      pickupLocation: shipment.pickupLocationName,
     });
     return shipment;
   } catch (err) {
-    logger.error(`[dispatchOrderToShadowfax] Shadowfax dispatch failed for #${orderId}: ${err.message}`);
-    await Order.findOneAndUpdate(
-      { orderId },
-      {
-        $set: {
-          deliveryProvider: "shadowfax",
-          deliveryFailureReason: err.message,
-        },
-      }
-    ).catch(() => {});
+    logger.error(`[dispatchOrderToDelhivery] Delhivery dispatch failed for #${orderId}: ${err.message}`);
+    try {
+      await Order.findOneAndUpdate(
+        { orderId },
+        {
+          $set: {
+            deliveryProvider: "delhivery",
+            deliveryFailureReason: err.message,
+          },
+        }
+      );
+    } catch (saveError) {
+      logger.warn(`[dispatchOrderToDelhivery] Could not save failure reason for #${orderId}: ${saveError.message}`);
+    }
     return null;
   }
 }
@@ -305,7 +290,6 @@ export async function executeOrderAcceptance({
   );
 
   const responseStatus = isAutoAccepted ? "AUTO_ACCEPTED" : "ACCEPTED";
-  const courier = await activeCourierProvider();
 
   const updatePayload = isPaymentPending
     ? {
@@ -330,7 +314,7 @@ export async function executeOrderAcceptance({
           acceptedBy,
           autoAccepted: isAutoAccepted,
           sellerResponseStatus: responseStatus,
-          deliveryProvider: courier,
+          deliveryProvider: "delhivery",
         },
         $unset: { expiresAt: 1 },
       };
@@ -354,17 +338,18 @@ export async function executeOrderAcceptance({
   await removeSellerTimeoutJob(orderId);
 
   if (!isPaymentPending) {
-    const shipment = await dispatchOrderToCourier(orderId, updated);
+    // Delhivery exclusive delivery dispatch
+    const shipment = await dispatchOrderToDelhivery(orderId, updated);
     if (shipment?.awbNumber) {
       updated.awbNumber = shipment.awbNumber;
-      updated.deliveryProvider = courier;
+      updated.deliveryProvider = "delhivery";
     }
 
     emitOrderStatusUpdate(
       updated.orderId,
       {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-        deliveryProvider: courier,
+        deliveryProvider: "delhivery",
         awbNumber: updated.awbNumber,
         autoAccepted: isAutoAccepted,
       },
@@ -451,7 +436,7 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
       $set: {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
         status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
-        deliveryProvider: await activeCourierProvider(),
+        deliveryProvider: "delhivery",
       },
       $unset: { expiresAt: 1 },
     },
@@ -462,17 +447,18 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
 
   if (!updated) return null;
 
-  const shipment = await dispatchOrderToCourier(orderId, updated);
+  // Delhivery exclusive delivery dispatch
+  const shipment = await dispatchOrderToDelhivery(orderId, updated);
   if (shipment?.awbNumber) {
     updated.awbNumber = shipment.awbNumber;
-    updated.deliveryProvider = shipment.deliveryProvider || updated.deliveryProvider;
+    updated.deliveryProvider = "delhivery";
   }
 
   emitOrderStatusUpdate(
     updated.orderId,
     {
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      deliveryProvider: updated.deliveryProvider,
+      deliveryProvider: "delhivery",
       awbNumber: updated.awbNumber,
     },
     updated.customer?._id || updated.customer,
@@ -775,9 +761,9 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
   const order = await Order.findOne({ orderId, workflowVersion: { $gte: 2 } });
   if (!order || order.workflowStatus !== WORKFLOW_STATUS.DELIVERY_SEARCH) return;
 
-  // If order is handled by Shadowfax, ignore internal captain delivery timeout
-  if (order.deliveryProvider === "shadowfax") {
-    logger.info(`[processDeliveryTimeoutJob] Order #${orderId} is handled by Shadowfax. Skipping internal delivery timeout.`);
+  // Third-party courier orders never go to internal captains, so no timeout applies
+  if (order.deliveryProvider && order.deliveryProvider !== "internal") {
+    logger.info(`[processDeliveryTimeoutJob] Order #${orderId} is handled by ${order.deliveryProvider}. Skipping internal delivery timeout.`);
     return;
   }
 

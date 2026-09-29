@@ -59,7 +59,8 @@ import { computeReturnWindowForOrder } from "../utils/returnWindow.js";
 import logger from "../services/logger.js";
 import { validateBody as validateWithJoi } from "../middleware/validate.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
-import { cancelForwardOrder } from "../services/shadowfax/shadowfaxForwardService.js";
+import { cancelForwardOrder } from "../services/delhivery/delhiveryForwardService.js";
+import { cancelLocalOrder } from "../services/delhiveryLocal/delhiveryLocalService.js";
 
 function normalizePaymentMode(value) {
   const raw = String(value || "").trim().toUpperCase();
@@ -463,16 +464,22 @@ export const updateOrderStatus = async (req, res) => {
 
     const oldStatus = order.status;
 
-    // A live Shadowfax parcel must be cancelled at Shadowfax first, otherwise it is
-    // still picked up and delivered after the order is cancelled here.
-    if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "shadowfax" && order.awbNumber) {
+    // A live Delhivery parcel must be cancelled at Delhivery first, otherwise it is
+    // still picked up and delivered after the order is cancelled here. Local (intracity)
+    // orders carry a CRN id and cancel through the Local API; Express orders use a waybill.
+    if (status === "cancelled" && oldStatus !== "cancelled" && order.deliveryProvider === "delhivery" && order.awbNumber) {
+      const isLocalOrder = /^CRN/i.test(String(order.awbNumber));
       try {
-        await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
-      } catch (sfxError) {
+        if (isLocalOrder) {
+          await cancelLocalOrder(canonicalOrderId, "service is no longer required");
+        } else {
+          await cancelForwardOrder(canonicalOrderId, `Cancelled by ${role}`);
+        }
+      } catch (courierError) {
         return handleResponse(
           res,
           409,
-          `Shadowfax shipment could not be cancelled, so the order was not cancelled: ${sfxError.message}`,
+          `Delhivery shipment could not be cancelled, so the order was not cancelled: ${courierError.message}`,
         );
       }
     }
@@ -1385,11 +1392,11 @@ export const acceptOrder = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
-    if (order.deliveryProvider === "shadowfax") {
+    if (order.deliveryProvider && order.deliveryProvider !== "internal") {
       return handleResponse(
         res,
         400,
-        "Orders are delivered exclusively through Shadowfax logistics partner.",
+        "Orders are delivered exclusively through our courier partner.",
       );
     }
 

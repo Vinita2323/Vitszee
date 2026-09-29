@@ -178,49 +178,38 @@ const settingSchema = new mongoose.Schema(
                 default: false,
             },
         },
-        shadowfax: {
+        delhivery: {
             forwardEnabled: {
                 type: Boolean,
-                default: false,
-            },
-            reverseEnabled: {
-                type: Boolean,
-                default: false,
+                default: true,
             },
             environment: {
                 type: String,
-                enum: ["sandbox", "production"],
-                default: "sandbox",
+                enum: ["staging", "production"],
+                default: "production",
             },
-            forwardBaseUrl: {
-                type: String,
-                default: "https://dale.staging.shadowfax.in",
-            },
-            reverseBaseUrl: {
-                type: String,
-                default: "https://dale.staging.shadowfax.in",
-            },
-            clientCode: {
+            baseUrl: {
                 type: String,
                 default: "",
             },
-            forwardToken: {
+            clientName: {
                 type: String,
                 default: "",
             },
-            reverseToken: {
+            prodApiToken: {
                 type: String,
                 default: "",
             },
-            forwardProdToken: {
-                type: String,
-                default: "",
-            },
-            reverseProdToken: {
+            stagingApiToken: {
                 type: String,
                 default: "",
             },
             webhookSecret: {
+                type: String,
+                default: "",
+            },
+            // Used when a seller has no pickup location of their own.
+            fallbackPickupLocation: {
                 type: String,
                 default: "",
             },
@@ -232,17 +221,96 @@ const settingSchema = new mongoose.Schema(
                 type: Boolean,
                 default: true,
             },
-            autoDispatchReady: {
+            autoRegisterSellerWarehouse: {
                 type: Boolean,
                 default: true,
             },
-            qcEnabled: {
+            autoPickupRequest: {
                 type: Boolean,
                 default: true,
+            },
+            // Delhivery expects the shipment weight in grams.
+            defaultWeightGrams: {
+                type: Number,
+                default: 500,
+            },
+            pickupTime: {
+                type: String,
+                default: "16:00:00",
+            },
+            pickupCutoffHour: {
+                type: Number,
+                default: 14,
+            },
+            shippingMode: {
+                type: String,
+                default: "Surface",
             },
             reconciliationIntervalMinutes: {
                 type: Number,
                 default: 15,
+            },
+        },
+        // Delhivery Direct Intracity ("Local" / quick delivery) — separate CoreOS API.
+        delhiveryLocal: {
+            // Master switch: dispatch orders via quick (intracity) delivery.
+            enabled: {
+                type: Boolean,
+                default: false,
+            },
+            environment: {
+                type: String,
+                enum: ["sandbox", "production"],
+                default: "production",
+            },
+            baseUrl: {
+                type: String,
+                default: "",
+            },
+            authUrl: {
+                type: String,
+                default: "",
+            },
+            clientId: {
+                type: String,
+                default: "",
+            },
+            clientSecret: {
+                type: String,
+                default: "",
+            },
+            clientCode: {
+                type: String,
+                default: "",
+            },
+            audience: {
+                type: String,
+                default: "platform:app:coreos",
+            },
+            webhookUrl: {
+                type: String,
+                default: "",
+            },
+            webhookApiKey: {
+                type: String,
+                default: "",
+            },
+            webhookSignatureKey: {
+                type: String,
+                default: "",
+            },
+            // Default vehicle: 2-wheeler, 3-wheeler, tata-ace, mini-3w, 8ft-pickup.
+            defaultVehicleMode: {
+                type: String,
+                default: "2-wheeler",
+            },
+            readyToShip: {
+                type: Boolean,
+                default: true,
+            },
+            autoServiceabilityCheck: {
+                type: Boolean,
+                default: true,
             },
         },
     },

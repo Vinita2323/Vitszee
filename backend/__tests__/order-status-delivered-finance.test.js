@@ -57,8 +57,12 @@ jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
   removeReturnPickupTimeoutJob: jest.fn(),
 }));
 
-jest.unstable_mockModule("../app/services/shadowfax/shadowfaxForwardService.js", () => ({
+jest.unstable_mockModule("../app/services/delhivery/delhiveryForwardService.js", () => ({
   cancelForwardOrder: jest.fn(),
+}));
+
+jest.unstable_mockModule("../app/services/delhiveryLocal/delhiveryLocalService.js", () => ({
+  cancelLocalOrder: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () => ({

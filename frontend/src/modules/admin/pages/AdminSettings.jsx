@@ -82,19 +82,21 @@ const AdminSettings = () => {
             sellerCreateRequiresApproval: false,
             sellerEditRequiresApproval: false,
         },
-        shadowfax: {
-            forwardEnabled: false,
-            reverseEnabled: false,
-            environment: 'sandbox',
-            forwardBaseUrl: 'https://dale.staging.shadowfax.in',
-            reverseBaseUrl: 'https://dale.staging.shadowfax.in',
-            clientCode: '',
-            forwardToken: '',
-            reverseToken: '',
+        delhivery: {
+            forwardEnabled: true,
+            environment: 'production',
+            clientName: '',
+            apiTokenMasked: '',
+            hasWebhookSecret: false,
+            fallbackPickupLocation: '',
+            shippingMode: 'Surface',
+            defaultWeightGrams: 500,
+            pickupTime: '16:00:00',
+            pickupCutoffHour: 14,
             autoServiceabilityCheck: true,
             autoShipmentCreation: true,
-            autoDispatchReady: true,
-            qcEnabled: true,
+            autoRegisterSellerWarehouse: true,
+            autoPickupRequest: true,
             reconciliationIntervalMinutes: 15,
         },
     });
@@ -102,20 +104,20 @@ const AdminSettings = () => {
     const [isTestingConnection, setIsTestingConnection] = useState(false);
     const [testResult, setTestResult] = useState(null);
 
-    const handleTestConnection = async (type = 'forward') => {
+    const handleTestConnection = async () => {
         setIsTestingConnection(true);
         setTestResult(null);
         try {
-            const res = await adminApi.testShadowfaxConnection({ type });
+            const res = await adminApi.testDelhiveryConnection({});
             const data = res.data?.result || res.data;
             setTestResult(data);
             if (data?.serviceable) {
-                showToast(`Shadowfax ${type} connection verified & serviceable!`, 'success');
+                showToast('Delhivery connection verified, route is serviceable.', 'success');
             } else {
-                showToast(data?.reason || `Shadowfax ${type} test completed.`, 'warning');
+                showToast(data?.reason || 'Delhivery connection test completed.', 'warning');
             }
         } catch (err) {
-            console.error('Shadowfax test failed', err);
+            console.error('Delhivery test failed', err);
             showToast(err.response?.data?.message || err.message || 'Connection test failed', 'error');
         } finally {
             setIsTestingConnection(false);
@@ -132,21 +134,6 @@ const AdminSettings = () => {
                         ...prev,
                         ...data,
                         productApproval: normalizeProductApprovalConfig(data || {}),
-                        shadowfax: {
-                            forwardEnabled: Boolean(data.shadowfax?.forwardEnabled),
-                            reverseEnabled: Boolean(data.shadowfax?.reverseEnabled),
-                            environment: data.shadowfax?.environment || 'sandbox',
-                            forwardBaseUrl: data.shadowfax?.forwardBaseUrl || 'https://dale.staging.shadowfax.in',
-                            reverseBaseUrl: data.shadowfax?.reverseBaseUrl || 'https://dale.staging.shadowfax.in',
-                            clientCode: data.shadowfax?.clientCode || '',
-                            forwardToken: data.shadowfax?.forwardToken || '',
-                            reverseToken: data.shadowfax?.reverseToken || '',
-                            autoServiceabilityCheck: data.shadowfax?.autoServiceabilityCheck !== undefined ? Boolean(data.shadowfax?.autoServiceabilityCheck) : true,
-                            autoShipmentCreation: data.shadowfax?.autoShipmentCreation !== undefined ? Boolean(data.shadowfax?.autoShipmentCreation) : true,
-                            autoDispatchReady: data.shadowfax?.autoDispatchReady !== undefined ? Boolean(data.shadowfax?.autoDispatchReady) : true,
-                            qcEnabled: data.shadowfax?.qcEnabled !== undefined ? Boolean(data.shadowfax?.qcEnabled) : true,
-                            reconciliationIntervalMinutes: Number(data.shadowfax?.reconciliationIntervalMinutes) || 15,
-                        },
                         keywords: Array.isArray(data.keywords) ? data.keywords : (data.metaKeywords ? data.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
                         returnWindowMinutes: data.returnWindowMinutes ?? 2880,
                         returnEligibilityDelayMinutes: data.returnEligibilityDelayMinutes ?? 2,
@@ -163,6 +150,22 @@ const AdminSettings = () => {
         fetchSettings();
     }, [showToast]);
 
+    // Delhivery settings live behind their own endpoint (the generic settings API does not carry them).
+    useEffect(() => {
+        const fetchDelhivery = async () => {
+            try {
+                const res = await adminApi.getDelhiveryConfig();
+                const data = res.data?.result ?? res.data;
+                if (data) {
+                    setSettings(prev => ({ ...prev, delhivery: { ...prev.delhivery, ...data } }));
+                }
+            } catch (error) {
+                console.error('Failed to load Delhivery settings', error);
+            }
+        };
+        fetchDelhivery();
+    }, []);
+
     const handleSave = async () => {
         try {
             setIsSaving(true);
@@ -170,6 +173,15 @@ const AdminSettings = () => {
                 ...settings,
                 keywords: Array.isArray(settings.keywords) ? settings.keywords : (settings.metaKeywords ? settings.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
             };
+            if (payload.delhivery) {
+                // Delhivery settings have their own endpoint; read-only fields are not sent back.
+                const readOnly = ['apiTokenMasked', 'hasApiToken', 'hasWebhookSecret', 'baseUrl'];
+                const delhiveryPayload = Object.fromEntries(
+                    Object.entries(payload.delhivery).filter(([key]) => !readOnly.includes(key))
+                );
+                await adminApi.updateDelhiveryConfig(delhiveryPayload);
+                delete payload.delhivery;
+            }
             const res = await adminApi.updateSettings(payload);
             const updatedData = res.data?.result ?? res.data;
             
@@ -256,11 +268,11 @@ const AdminSettings = () => {
         }
     };
 
-    const handleShadowfaxChange = (field, value) => {
+    const handleDelhiveryChange = (field, value) => {
         setSettings(prev => ({
             ...prev,
-            shadowfax: {
-                ...(prev.shadowfax || {}),
+            delhivery: {
+                ...(prev.delhivery || {}),
                 [field]: value,
             },
         }));
@@ -271,7 +283,7 @@ const AdminSettings = () => {
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'legal', label: 'Legal & Contact', icon: Building2 },
         { id: 'social', label: 'Social & Apps', icon: Share2 },
-        { id: 'shadowfax', label: 'Shadowfax Logistics', icon: Truck },
+        { id: 'delhivery', label: 'Delhivery Courier', icon: Truck },
     ];
 
     return (
@@ -747,8 +759,8 @@ const AdminSettings = () => {
                         </Card>
                     )}
 
-                    {/* Shadowfax Logistics */}
-                    {activeTab === 'shadowfax' && (
+                    {/* Delhivery Courier */}
+                    {activeTab === 'delhivery' && (
                         <div className="space-y-6">
                             <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
                                 <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -758,16 +770,16 @@ const AdminSettings = () => {
                                         </div>
                                         <div>
                                             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-                                                Shadowfax Forward Integration
+                                                Delhivery Courier Integration
                                             </h3>
-                                            <p className="text-xs text-slate-500 mt-0.5">Automated customer order dispatch & tracking</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">Automatic order dispatch, pickup and tracking</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <button
                                             type="button"
                                             disabled={isTestingConnection}
-                                            onClick={() => handleTestConnection('forward')}
+                                            onClick={handleTestConnection}
                                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
                                         >
                                             {isTestingConnection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-primary" />}
@@ -776,8 +788,8 @@ const AdminSettings = () => {
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input
                                                 type="checkbox"
-                                                checked={Boolean(settings.shadowfax?.forwardEnabled)}
-                                                onChange={(e) => handleShadowfaxChange('forwardEnabled', e.target.checked)}
+                                                checked={Boolean(settings.delhivery?.forwardEnabled)}
+                                                onChange={(e) => handleDelhiveryChange('forwardEnabled', e.target.checked)}
                                                 className="sr-only peer"
                                             />
                                             <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -785,194 +797,135 @@ const AdminSettings = () => {
                                     </div>
                                 </div>
                                 <div className="p-8 space-y-6">
+                                    {testResult && (
+                                        <div className={`p-4 rounded-2xl text-xs font-bold ${testResult.serviceable ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                            {testResult.serviceable ? 'Delhivery answered: this route is serviceable.' : (testResult.reason || 'Delhivery cannot service this route.')}
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-3">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Environment</label>
                                             <select
-                                                value={settings.shadowfax?.environment || 'sandbox'}
-                                                onChange={(e) => handleShadowfaxChange('environment', e.target.value)}
+                                                value={settings.delhivery?.environment || 'production'}
+                                                onChange={(e) => handleDelhiveryChange('environment', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
                                             >
-                                                <option value="sandbox">Sandbox / Staging (dale.staging.shadowfax.in)</option>
-                                                <option value="production">Production (dale.shadowfax.in)</option>
+                                                <option value="production">Production (track.delhivery.com)</option>
+                                                <option value="staging">Staging (staging-express.delhivery.com)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Code</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Delhivery Client Name</label>
                                             <input
                                                 type="text"
-                                                placeholder="e.g. CLIENT_CODE"
-                                                value={settings.shadowfax?.clientCode || ''}
-                                                onChange={(e) => handleShadowfaxChange('clientCode', e.target.value)}
+                                                placeholder="e.g. ZVEE COMPANY B2C"
+                                                value={settings.delhivery?.clientName || ''}
+                                                onChange={(e) => handleDelhiveryChange('clientName', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
                                             />
                                         </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Forward API Token</label>
-                                            <div className="relative group">
-                                                <Key className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                                <input
-                                                    type="password"
-                                                    placeholder="Enter Token (Leave blank to keep current)"
-                                                    value={settings.shadowfax?.forwardToken || ''}
-                                                    onChange={(e) => handleShadowfaxChange('forwardToken', e.target.value)}
-                                                    className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
-                                                />
-                                            </div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">API Token</label>
+                                            <input
+                                                type="password"
+                                                placeholder={settings.delhivery?.apiTokenMasked || 'Paste the Delhivery API token'}
+                                                onChange={(e) => handleDelhiveryChange(settings.delhivery?.environment === 'staging' ? 'stagingApiToken' : 'prodApiToken', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                            <p className="text-[11px] text-slate-500">Leave empty to keep the saved token. A token set in the server .env file always wins.</p>
                                         </div>
                                         <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Forward Base URL</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Webhook Secret</label>
                                             <input
-                                                type="url"
-                                                value={settings.shadowfax?.forwardBaseUrl || ''}
-                                                onChange={(e) => handleShadowfaxChange('forwardBaseUrl', e.target.value)}
+                                                type="password"
+                                                placeholder={settings.delhivery?.hasWebhookSecret ? 'Saved' : 'Shared secret for scan callbacks'}
+                                                onChange={(e) => handleDelhiveryChange('webhookSecret', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
                                             />
                                         </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            {/* Reverse Integration Card */}
-                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
-                                <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
-                                            <RefreshCw className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-                                                Shadowfax Reverse Pickup Integration
-                                            </h3>
-                                            <p className="text-xs text-slate-500 mt-0.5">Return logistics & Doorstep QC verification</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            type="button"
-                                            disabled={isTestingConnection}
-                                            onClick={() => handleTestConnection('reverse')}
-                                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            {isTestingConnection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />}
-                                            Test Reverse
-                                        </button>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(settings.shadowfax?.reverseEnabled)}
-                                                onChange={(e) => handleShadowfaxChange('reverseEnabled', e.target.checked)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div className="p-8 space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reverse API Token (Optional if same as forward)</label>
-                                            <div className="relative group">
-                                                <Key className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                                <input
-                                                    type="password"
-                                                    placeholder="Enter Reverse Token"
-                                                    value={settings.shadowfax?.reverseToken || ''}
-                                                    onChange={(e) => handleShadowfaxChange('reverseToken', e.target.value)}
-                                                    className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/10 transition-all"
-                                                />
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fallback Pickup Location</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Warehouse name registered with Delhivery"
+                                                value={settings.delhivery?.fallbackPickupLocation || ''}
+                                                onChange={(e) => handleDelhiveryChange('fallbackPickupLocation', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                            <p className="text-[11px] text-slate-500">Used when a seller shop is not registered as its own pickup location.</p>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shipping Mode</label>
+                                            <select
+                                                value={settings.delhivery?.shippingMode || 'Surface'}
+                                                onChange={(e) => handleDelhiveryChange('shippingMode', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            >
+                                                <option value="Surface">Surface</option>
+                                                <option value="Express">Express</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcel Weight (grams)</label>
+                                            <input
+                                                type="number"
+                                                min={50}
+                                                value={settings.delhivery?.defaultWeightGrams || 500}
+                                                onChange={(e) => handleDelhiveryChange('defaultWeightGrams', parseInt(e.target.value, 10))}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pickup Time</label>
+                                            <input
+                                                type="text"
+                                                placeholder="16:00:00"
+                                                value={settings.delhivery?.pickupTime || ''}
+                                                onChange={(e) => handleDelhiveryChange('pickupTime', e.target.value)}
+                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            />
+                                            <p className="text-[11px] text-slate-500">Orders accepted after {settings.delhivery?.pickupCutoffHour || 14}:00 are collected the next day.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[
+                                            ['autoShipmentCreation', 'Auto Dispatch', 'Send the order to Delhivery when the seller accepts'],
+                                            ['autoServiceabilityCheck', 'Check Pincode First', 'Verify Delhivery delivers there before dispatch'],
+                                            ['autoRegisterSellerWarehouse', 'Auto Register Sellers', 'Create a Delhivery pickup location per seller shop'],
+                                            ['autoPickupRequest', 'Auto Pickup Request', 'Ask Delhivery to collect the parcel from the seller'],
+                                        ].map(([key, title, help]) => (
+                                            <div key={key} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                                <div>
+                                                    <h5 className="text-xs font-black text-slate-900">{title}</h5>
+                                                    <p className="text-[11px] text-slate-500">{help}</p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Boolean(settings.delhivery?.[key])}
+                                                        onChange={(e) => handleDelhiveryChange(key, e.target.checked)}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                                </label>
                                             </div>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reverse Base URL</label>
+                                        ))}
+
+                                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                            <div>
+                                                <h5 className="text-xs font-black text-slate-900">Sync Interval (Minutes)</h5>
+                                                <p className="text-[11px] text-slate-500">How often unchanged shipments are re-checked</p>
+                                            </div>
                                             <input
-                                                type="url"
-                                                value={settings.shadowfax?.reverseBaseUrl || ''}
-                                                onChange={(e) => handleShadowfaxChange('reverseBaseUrl', e.target.value)}
-                                                className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/10 transition-all"
+                                                type="number"
+                                                min={5}
+                                                max={60}
+                                                value={settings.delhivery?.reconciliationIntervalMinutes || 15}
+                                                onChange={(e) => handleDelhiveryChange('reconciliationIntervalMinutes', parseInt(e.target.value, 10))}
+                                                className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center"
                                             />
                                         </div>
-                                    </div>
-
-                                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Doorstep Quality Check (QC)</h4>
-                                            <p className="text-xs text-slate-500 mt-0.5">Enforce return item inspection checklists during customer pickup</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(settings.shadowfax?.qcEnabled)}
-                                                onChange={(e) => handleShadowfaxChange('qcEnabled', e.target.checked)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            {/* Automation & Reconciliation Card */}
-                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-8 space-y-6">
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-                                    Operational & Automation Settings
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                        <div>
-                                            <h5 className="text-xs font-black text-slate-900">Auto Serviceability Check</h5>
-                                            <p className="text-[11px] text-slate-500">Validate pincodes before shipment creation</p>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(settings.shadowfax?.autoServiceabilityCheck)}
-                                            onChange={(e) => handleShadowfaxChange('autoServiceabilityCheck', e.target.checked)}
-                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                        <div>
-                                            <h5 className="text-xs font-black text-slate-900">Auto Shipment Creation</h5>
-                                            <p className="text-[11px] text-slate-500">Create Shadowfax order on seller acceptance</p>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(settings.shadowfax?.autoShipmentCreation)}
-                                            onChange={(e) => handleShadowfaxChange('autoShipmentCreation', e.target.checked)}
-                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                        <div>
-                                            <h5 className="text-xs font-black text-slate-900">Auto Dispatch Ready</h5>
-                                            <p className="text-[11px] text-slate-500">Notify Shadowfax when seller packs order</p>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(settings.shadowfax?.autoDispatchReady)}
-                                            onChange={(e) => handleShadowfaxChange('autoDispatchReady', e.target.checked)}
-                                            className="h-4 w-4 rounded text-primary focus:ring-primary"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                        <div>
-                                            <h5 className="text-xs font-black text-slate-900">Sync Interval (Minutes)</h5>
-                                            <p className="text-[11px] text-slate-500">Periodic status reconciliation</p>
-                                        </div>
-                                        <input
-                                            type="number"
-                                            min={5}
-                                            max={60}
-                                            value={settings.shadowfax?.reconciliationIntervalMinutes || 15}
-                                            onChange={(e) => handleShadowfaxChange('reconciliationIntervalMinutes', parseInt(e.target.value, 10))}
-                                            className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-center"
-                                        />
                                     </div>
                                 </div>
                             </Card>
