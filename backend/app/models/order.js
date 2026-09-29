@@ -389,7 +389,7 @@ const orderSchema = new mongoose.Schema(
     },
     deliveryProvider: {
       type: String,
-      enum: ["shadowfax", "internal"],
+      enum: ["shadowfax", "delhivery", "internal"],
       default: "shadowfax",
       index: true,
     },

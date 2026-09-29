@@ -227,64 +227,19 @@ export async function getNearbySellerDistancesForCustomer(lat, lng) {
 }
 
 /**
- * Checks if a specific product is available for the given customer location
+ * Customer catalog is nationwide. A product stays purchasable from any city
+ * as long as its store is active. Seller radius and city are not purchase gates.
  */
-export async function isProductAvailableAtLocation(product, locQuery = {}) {
-  const locContext = parseCustomerLocation(locQuery);
-
-  if (!locContext.hasLocation) {
-    // If no location provided, treat as available to avoid blocking non-location calls
-    return { available: true };
-  }
-
+export async function isProductAvailableAtLocation(product) {
   if (!product) {
     return { available: false, reason: "Product not found" };
   }
 
-  // 1. Check custom location restrictions on product itself if defined
-  const restriction = product.locationRestriction;
-  if (restriction && restriction.isCustom) {
-    const custCity = normalizeLocString(locContext.city);
-    const custState = normalizeLocString(locContext.state);
-    const custPincode = normalizeLocString(locContext.pincode);
-
-    if (Array.isArray(restriction.cities) && restriction.cities.length > 0) {
-      const allowedCities = restriction.cities.map(normalizeLocString);
-      if (custCity && !allowedCities.includes(custCity)) {
-        return {
-          available: false,
-          reason: "This product is not available in your city.",
-        };
-      }
-    }
-
-    if (Array.isArray(restriction.pincodes) && restriction.pincodes.length > 0) {
-      const allowedPins = restriction.pincodes.map(normalizeLocString);
-      if (custPincode && !allowedPins.includes(custPincode)) {
-        return {
-          available: false,
-          reason: "This product is not available in your area pincode.",
-        };
-      }
-    }
-
-    if (Array.isArray(restriction.states) && restriction.states.length > 0) {
-      const allowedStates = restriction.states.map(normalizeLocString);
-      if (custState && !allowedStates.includes(custState)) {
-        return {
-          available: false,
-          reason: "This product is not available in your state.",
-        };
-      }
-    }
-  }
-
-  // 2. Check seller store location & coverage
   let seller = product.sellerId;
   if (seller && typeof seller === "object" && seller._id) {
     // Already populated
   } else if (seller) {
-    seller = await Seller.findById(seller).select("_id location serviceRadius city state pincode locality isActive").lean();
+    seller = await Seller.findById(seller).select("_id isActive").lean();
   }
 
   if (!seller) {
@@ -293,27 +248,6 @@ export async function isProductAvailableAtLocation(product, locQuery = {}) {
 
   if (seller.isActive === false) {
     return { available: false, reason: "Store is currently inactive" };
-  }
-
-  // Check geo range if coordinates available
-  if (locContext.coords.valid) {
-    const inGeo = isSellerInGeoRange(seller, locContext.lat, locContext.lng, locContext);
-    if (!inGeo) {
-      return {
-        available: false,
-        reason: "This product is not available in your location.",
-      };
-    }
-    return { available: true };
-  }
-
-  // Check hierarchy if text location available
-  const inHierarchy = matchesLocationHierarchy(seller, locContext);
-  if (!inHierarchy) {
-    return {
-      available: false,
-      reason: "This product is not available in your location.",
-    };
   }
 
   return { available: true };

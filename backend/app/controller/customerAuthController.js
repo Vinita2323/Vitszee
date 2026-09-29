@@ -28,7 +28,7 @@ export const signupCustomer = async (req, res) => {
     try {
         const payload = validateSchema(sendSignupOtpSchema, req.body || {});
 
-        await issueCustomerOtp({
+        const issued = await issueCustomerOtp({
             name: payload.name,
             rawPhone: payload.phone,
             flow: "signup",
@@ -37,7 +37,12 @@ export const signupCustomer = async (req, res) => {
             bloodGroup: payload.bloodGroup,
         });
 
-        return handleResponse(res, 200, "If the number is eligible, OTP has been sent");
+        return handleResponse(
+            res,
+            200,
+            "If the number is eligible, OTP has been sent",
+            issued.mockOtp ? { mockOtp: issued.mockOtp } : {},
+        );
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);
     }
@@ -50,13 +55,18 @@ export const loginCustomer = async (req, res) => {
     try {
         const payload = validateSchema(sendLoginOtpSchema, req.body || {});
 
-        await issueCustomerOtp({
+        const issued = await issueCustomerOtp({
             rawPhone: payload.phone,
             flow: "login",
             ipAddress: req.ip,
         });
 
-        return handleResponse(res, 200, "If the number is eligible, OTP has been sent");
+        return handleResponse(
+            res,
+            200,
+            "If the number is eligible, OTP has been sent",
+            issued.mockOtp ? { mockOtp: issued.mockOtp } : {},
+        );
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);
     }

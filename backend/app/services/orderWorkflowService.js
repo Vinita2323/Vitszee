@@ -184,6 +184,43 @@ import Setting from "../models/setting.js";
  * Connects directly to existing createForwardOrder and respects autoShipmentCreation.
  * Does NOT broadcast to internal captains, does NOT create DeliveryAssignment, does NOT schedule captain timeouts.
  */
+async function activeCourierProvider() {
+  const { getDelhiveryConfig } = await import("./delhivery/delhiveryConfig.js");
+  const config = getDelhiveryConfig();
+  if (config.forwardEnabled && config.apiToken) return "delhivery";
+  return "shadowfax";
+}
+
+export async function dispatchOrderToCourier(orderId, orderDoc = null) {
+  const provider = await activeCourierProvider();
+  if (provider !== "delhivery") {
+    return dispatchOrderToShadowfax(orderId, orderDoc);
+  }
+
+  const { getDelhiveryConfig } = await import("./delhivery/delhiveryConfig.js");
+  const { createDelhiveryForwardShipment } = await import("./delhivery/delhiveryForwardService.js");
+  const config = getDelhiveryConfig();
+  if (!config.autoShipmentCreation) {
+    logger.info(`[dispatchOrderToCourier] Delhivery auto shipment is off. Order #${orderId} is waiting for a manual pickup request.`);
+    return null;
+  }
+
+  try {
+    const shipment = await createDelhiveryForwardShipment(orderId);
+    logger.info(`[dispatchOrderToCourier] Delhivery shipment created for #${orderId}`, {
+      awbNumber: shipment?.awbNumber,
+    });
+    return shipment;
+  } catch (err) {
+    logger.error(`[dispatchOrderToCourier] Delhivery dispatch failed for #${orderId}: ${err.message}`);
+    await Order.findOneAndUpdate(
+      { orderId },
+      { $set: { deliveryProvider: "delhivery", deliveryFailureReason: err.message } },
+    ).catch(() => {});
+    return null;
+  }
+}
+
 export async function dispatchOrderToShadowfax(orderId, orderDoc = null) {
   try {
     const config = await getShadowfaxConfig();
@@ -268,6 +305,7 @@ export async function executeOrderAcceptance({
   );
 
   const responseStatus = isAutoAccepted ? "AUTO_ACCEPTED" : "ACCEPTED";
+  const courier = await activeCourierProvider();
 
   const updatePayload = isPaymentPending
     ? {
@@ -292,7 +330,7 @@ export async function executeOrderAcceptance({
           acceptedBy,
           autoAccepted: isAutoAccepted,
           sellerResponseStatus: responseStatus,
-          deliveryProvider: "shadowfax",
+          deliveryProvider: courier,
         },
         $unset: { expiresAt: 1 },
       };
@@ -316,18 +354,17 @@ export async function executeOrderAcceptance({
   await removeSellerTimeoutJob(orderId);
 
   if (!isPaymentPending) {
-    // Shadowfax exclusive delivery dispatch
-    const shipment = await dispatchOrderToShadowfax(orderId, updated);
+    const shipment = await dispatchOrderToCourier(orderId, updated);
     if (shipment?.awbNumber) {
       updated.awbNumber = shipment.awbNumber;
-      updated.deliveryProvider = "shadowfax";
+      updated.deliveryProvider = courier;
     }
 
     emitOrderStatusUpdate(
       updated.orderId,
       {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-        deliveryProvider: "shadowfax",
+        deliveryProvider: courier,
         awbNumber: updated.awbNumber,
         autoAccepted: isAutoAccepted,
       },
@@ -414,7 +451,7 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
       $set: {
         workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
         status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
-        deliveryProvider: "shadowfax",
+        deliveryProvider: await activeCourierProvider(),
       },
       $unset: { expiresAt: 1 },
     },
@@ -425,18 +462,17 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
 
   if (!updated) return null;
 
-  // Shadowfax exclusive delivery dispatch
-  const shipment = await dispatchOrderToShadowfax(orderId, updated);
+  const shipment = await dispatchOrderToCourier(orderId, updated);
   if (shipment?.awbNumber) {
     updated.awbNumber = shipment.awbNumber;
-    updated.deliveryProvider = "shadowfax";
+    updated.deliveryProvider = shipment.deliveryProvider || updated.deliveryProvider;
   }
 
   emitOrderStatusUpdate(
     updated.orderId,
     {
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      deliveryProvider: "shadowfax",
+      deliveryProvider: updated.deliveryProvider,
       awbNumber: updated.awbNumber,
     },
     updated.customer?._id || updated.customer,

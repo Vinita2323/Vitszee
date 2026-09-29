@@ -1,11 +1,6 @@
 import LowestPriceConfig from "../models/lowestPriceConfig.js";
 import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
-import {
-  parseCustomerCoordinates,
-  parseCustomerLocation,
-  getNearbySellerIdsForCustomer,
-} from "../services/customerVisibilityService.js";
 import { getApprovedOrLegacyFilter } from "../services/productModerationService.js";
 import { invalidate } from "../services/cacheService.js";
 
@@ -95,13 +90,6 @@ export const getPublicLowestPriceConfig = async (req, res) => {
     }
 
     let products = [];
-    const locContext = parseCustomerLocation(req.query || {});
-    let nearbySellerSet = null;
-
-    if (locContext.hasLocation) {
-      const nearbySellerIds = await getNearbySellerIdsForCustomer(locContext);
-      nearbySellerSet = new Set(nearbySellerIds.map(String));
-    }
 
     if (config.mode === "curated" && Array.isArray(config.productIds) && config.productIds.length > 0) {
       const populated = await LowestPriceConfig.findById(config._id)
@@ -116,17 +104,9 @@ export const getPublicLowestPriceConfig = async (req, res) => {
         })
         .lean();
 
-      let candidateProducts = (populated?.productIds || [])
+      const candidateProducts = (populated?.productIds || [])
         .filter(Boolean)
         .filter((p) => p.price && p.salePrice && p.price > p.salePrice);
-
-      // Location filter if user coordinates provided
-      if (nearbySellerSet) {
-        candidateProducts = candidateProducts.filter((p) => {
-          const sid = String(p.sellerId?._id || p.sellerId || "");
-          return !sid || nearbySellerSet.has(sid);
-        });
-      }
 
       products = candidateProducts.map((p) => ({
         id: p._id,
@@ -151,10 +131,6 @@ export const getPublicLowestPriceConfig = async (req, res) => {
         ...getApprovedOrLegacyFilter(),
         $expr: { $gt: ["$price", "$salePrice"] },
       };
-
-      if (nearbySellerSet) {
-        filter.sellerId = { $in: Array.from(nearbySellerSet) };
-      }
 
       const rawProducts = await Product.find(filter)
         .sort({ createdAt: -1 })

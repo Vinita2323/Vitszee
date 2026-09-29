@@ -1,4 +1,4 @@
-cs/**
+/**
  * Distributed Scheduler Service
  * 
  * Executes scheduled jobs with distributed locking to ensure single execution

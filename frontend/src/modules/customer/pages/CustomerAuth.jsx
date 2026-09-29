@@ -19,6 +19,7 @@ const CustomerAuth = () => {
   const [isLogin, setIsLogin] = useState(location.pathname !== "/signup");
   const [isLoading, setIsLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
+  const [mockOtp, setMockOtp] = useState("");
   const [timer, setTimer] = useState(0);
   const { login } = useAuth();
   const { settings } = useSettings();
@@ -59,19 +60,23 @@ const CustomerAuth = () => {
 
     setIsLoading(true);
     try {
-      if (isLogin) {
-        await customerApi.sendLoginOtp({ phone: formData.phone });
-      } else {
-        await customerApi.sendSignupOtp({
-          name: formData.name.trim(),
-          phone: formData.phone,
-          dob: formData.dob || undefined,
-          bloodGroup: formData.bloodGroup || undefined,
-        });
-      }
+      const response = isLogin
+        ? await customerApi.sendLoginOtp({ phone: formData.phone })
+        : await customerApi.sendSignupOtp({
+            name: formData.name.trim(),
+            phone: formData.phone,
+            dob: formData.dob || undefined,
+            bloodGroup: formData.bloodGroup || undefined,
+          });
+      const issuedMockOtp = response?.data?.result?.mockOtp || "";
+      setMockOtp(issuedMockOtp);
       setShowOtp(true);
       setTimer(60);
-      toast.success(`OTP sent to +91 ${formData.phone}`);
+      toast.success(
+        issuedMockOtp
+          ? `Mock OTP for +91 ${formData.phone} is ${issuedMockOtp}`
+          : `OTP sent to +91 ${formData.phone}`,
+      );
     } catch (error) {
       const apiMessage = error?.response?.data?.message || "";
       const match = apiMessage.match(/wait (\d+)s/);
@@ -324,6 +329,11 @@ const CustomerAuth = () => {
                       <p className="text-xs font-bold text-slate-400 mt-1">
                         Code sent to +91 {formData.phone}
                       </p>
+                      {mockOtp ? (
+                        <p className="text-xs font-black text-emerald-700 mt-1">
+                          Mock OTP: {mockOtp}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 

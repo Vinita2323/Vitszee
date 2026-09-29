@@ -3,10 +3,7 @@ import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
 import { getApprovedOrLegacyFilter } from "../services/productModerationService.js";
 import { getIO } from "../socket/socketManager.js";
-import {
-  parseCustomerLocation,
-  isProductAvailableAtLocation,
-} from "../services/customerVisibilityService.js";
+import { isProductAvailableAtLocation } from "../services/customerVisibilityService.js";
 
 const CART_POPULATE_FIELDS =
   "name slug price salePrice mainImage stock status headerId categoryId sellerId variants";
@@ -82,38 +79,14 @@ export const addToCart = async (req, res) => {
       return handleResponse(res, 404, "Product is not available for purchase");
     }
 
-    // Validate location availability if customer location is supplied in body or query
-    const locQuery = { ...req.query, ...req.body };
-    const locContext = parseCustomerLocation(locQuery);
-    if (locContext.hasLocation) {
-      const fullProd = await Product.findById(productId)
-        .populate("sellerId", "location serviceRadius city state pincode locality isActive")
-        .lean();
-      const availability = await isProductAvailableAtLocation(fullProd, locContext);
-      if (!availability.available) {
-        return handleResponse(res, 400, availability.reason || "This product is not available in your location.");
-      }
+    const fullProd = await Product.findById(productId)
+      .populate("sellerId", "isActive")
+      .lean();
+    const availability = await isProductAvailableAtLocation(fullProd);
+    if (!availability.available) {
+      return handleResponse(res, 400, availability.reason || "This product is not available for purchase.");
     }
 
-    let cart = await Cart.findOne({ customerId }).populate("items.productId", "sellerId").lean();
-
-    if (!cart) {
-      cart = { customerId, items: [] };
-    }
-
-    // Validate that the new product belongs to the same seller as existing items in the cart
-    if (cart.items && cart.items.length > 0) {
-      const existingItem = cart.items.find(item => item.productId && item.productId.sellerId);
-      if (existingItem) {
-        const existingSellerId = existingItem.productId.sellerId.toString();
-        const newSellerId = customerVisibleProduct.sellerId.toString();
-        if (existingSellerId !== newSellerId) {
-          return handleResponse(res, 400, "You can only add items from the same store. Please clear your cart to add items from a different store.");
-        }
-      }
-    }
-
-    // Since we used .lean() to populate, we need to fetch the mongoose document to save it
     let cartDoc = await Cart.findOne({ customerId });
     if (!cartDoc) {
       cartDoc = new Cart({ customerId, items: [] });

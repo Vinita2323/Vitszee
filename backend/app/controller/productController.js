@@ -15,7 +15,6 @@ async function getAdminIds() {
 import {
   parseCustomerCoordinates,
   parseCustomerLocation,
-  getNearbySellerIdsForCustomer,
   isProductAvailableAtLocation,
   getNearbySellerDistancesForCustomer,
 } from "../services/customerVisibilityService.js";
@@ -264,7 +263,6 @@ export const getProducts = async (req, res) => {
     if (finalHeaderId && finalHeaderId !== "all") query.headerId = finalHeaderId;
     if (finalCategoryId && finalCategoryId !== "all") query.categoryId = finalCategoryId;
 
-    const requestedSellerIds = parseSellerIdFilters({ sellerId, sellerIds });
     const locContext = parseCustomerLocation({
       lat,
       lng,
@@ -274,58 +272,8 @@ export const getProducts = async (req, res) => {
       pincode,
       area,
     });
-    const shouldApplyLocationFilter = enforceRadius || locContext.hasLocation;
-
-    if (enforceRadius && !locContext.hasLocation) {
-      return handleResponse(
-        res,
-        400,
-        "Location parameters (coordinates or city/pincode) are required for customer product visibility",
-      );
-    }
-
-    if (shouldApplyLocationFilter) {
-      const nearbySellerIds = await getNearbySellerIdsForCustomer(locContext);
-
-      const nearbySet = new Set(nearbySellerIds.map(String));
-      const finalSellerIds = requestedSellerIds.length
-        ? requestedSellerIds.filter((id) => nearbySet.has(String(id)))
-        : nearbySellerIds;
-
-      if (finalSellerIds.length === 0) {
-        // No sellers serve the customer's location -> return empty list
-        return handleResponse(res, 200, "Products fetched", {
-          items: [],
-          page: Number(req.query?.page) || 1,
-          limit: Number(req.query?.limit) || 24,
-          total: 0,
-          totalPages: 1,
-        });
-      }
-
-      query.sellerId = { $in: finalSellerIds };
-
-      // Also respect custom product-level location restrictions if user has city/pincode
-      if (locContext.city || locContext.pincode) {
-        const normCity = String(locContext.city || "").trim().toLowerCase();
-        const normPin = String(locContext.pincode || "").trim();
-        const restrictionClauses = [
-          { "locationRestriction.isCustom": { $ne: true } },
-          { locationRestriction: { $exists: false } },
-        ];
-        if (normCity) {
-          restrictionClauses.push({
-            "locationRestriction.cities": { $regex: new RegExp(`^${normCity}$`, "i") },
-          });
-        }
-        if (normPin) {
-          restrictionClauses.push({
-            "locationRestriction.pincodes": normPin,
-          });
-        }
-        query.$or = restrictionClauses;
-      }
-    }
+    // Nationwide catalog: customer location is used only for optional "nearest"
+    // sorting. It does not hide products from other cities or outside a seller radius.
 
     if (categoryIds && typeof categoryIds === "string") {
       const ids = categoryIds

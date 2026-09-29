@@ -201,7 +201,11 @@ export async function issueCustomerOtp({
     });
   }
 
-  return { sent: true, phone };
+  return {
+    sent: true,
+    phone,
+    ...(useRealSMS() ? {} : { mockOtp: otp }),
+  };
 }
 
 export async function verifyCustomerOtpCode({
