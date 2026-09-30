@@ -33,14 +33,24 @@ export const updateDelhiveryLocalSettings = async (req, res) => {
       "baseUrl",
       "authUrl",
       "clientId",
+      "prodClientId",
+      "stagingClientId",
       "clientCode",
       "audience",
       "webhookUrl",
       "defaultVehicleMode",
       "readyToShip",
       "autoServiceabilityCheck",
+      "cityPincodePrefixes",
+      "cityPincodes",
     ];
-    const secrets = ["clientSecret", "webhookApiKey", "webhookSignatureKey"];
+    const secrets = [
+      "clientSecret",
+      "prodClientSecret",
+      "stagingClientSecret",
+      "webhookApiKey",
+      "webhookSignatureKey",
+    ];
 
     const settingDoc = (await Setting.findOne()) || new Setting();
     if (!settingDoc.delhiveryLocal) settingDoc.delhiveryLocal = {};

@@ -48,6 +48,7 @@ import { getDelhiveryConfig } from "./delhivery/delhiveryConfig.js";
 import { createForwardOrder } from "./delhivery/delhiveryForwardService.js";
 import { getDelhiveryLocalConfig } from "./delhiveryLocal/delhiveryLocalConfig.js";
 import { createLocalOrder } from "./delhiveryLocal/delhiveryLocalService.js";
+import { resolveLocalEligibility } from "./delhiveryLocal/delhiveryLocalRouting.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -188,20 +189,23 @@ import Setting from "../models/setting.js";
  */
 export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
   try {
-    // Quick (intracity) delivery takes precedence when Delhivery Local is enabled.
+    // Routing: an Ahmedabad intracity order (seller + customer both in the city) goes via
+    // quick (Local) delivery; everything else goes via the courier (Express) flow below.
     const localConfig = await getDelhiveryLocalConfig();
-    if (localConfig.enabled) {
-      if (!localConfig.hasCredentials) {
-        logger.warn(
-          `[dispatchOrderToDelhivery] Delhivery Local is enabled but credentials are missing. Order #${orderId}`
-        );
-        return null;
+    if (localConfig.enabled && localConfig.hasCredentials) {
+      const eligibility = await resolveLocalEligibility(orderId, orderDoc);
+      if (eligibility.eligible) {
+        // Quick lane. If Local cannot fulfil it, createLocalOrder marks the order failed
+        // for manual handling — we deliberately do NOT fall back to courier here.
+        const localShipment = await createLocalOrder(orderId);
+        logger.info(`[dispatchOrderToDelhivery] Delhivery Local (quick) order created for #${orderId}`, {
+          orderId: localShipment.awbNumber,
+        });
+        return localShipment;
       }
-      const localShipment = await createLocalOrder(orderId);
-      logger.info(`[dispatchOrderToDelhivery] Delhivery Local (quick) order created for #${orderId}`, {
-        orderId: localShipment.awbNumber,
-      });
-      return localShipment;
+      logger.info(
+        `[dispatchOrderToDelhivery] Order #${orderId} routed to courier (${eligibility.reason}).`
+      );
     }
 
     const config = await getDelhiveryConfig();

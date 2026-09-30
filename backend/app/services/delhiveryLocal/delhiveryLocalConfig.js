@@ -39,10 +39,46 @@ export async function getDelhiveryLocalConfig() {
 
   const authUrl = (process.env.DELHIVERY_LOCAL_AUTH_URL || dbSettings.authUrl || baseUrl).replace(/\/+$/, "");
 
-  const clientId = process.env.DELHIVERY_LOCAL_CLIENT_ID || dbSettings.clientId || "";
-  const clientSecret = process.env.DELHIVERY_LOCAL_CLIENT_SECRET || dbSettings.clientSecret || "";
+  // Client id + secret are tenant-specific (prod vs staging differ). The client code
+  // is the same for both. Env wins over DB; a generic var is the last-resort fallback.
+  const clientId = isProduction
+    ? process.env.DELHIVERY_LOCAL_PROD_CLIENT_ID ||
+      process.env.DELHIVERY_LOCAL_CLIENT_ID ||
+      dbSettings.prodClientId ||
+      dbSettings.clientId ||
+      ""
+    : process.env.DELHIVERY_LOCAL_STAGING_CLIENT_ID ||
+      process.env.DELHIVERY_LOCAL_CLIENT_ID ||
+      dbSettings.stagingClientId ||
+      dbSettings.clientId ||
+      "";
+  const clientSecret = isProduction
+    ? process.env.DELHIVERY_LOCAL_PROD_CLIENT_SECRET ||
+      process.env.DELHIVERY_LOCAL_CLIENT_SECRET ||
+      dbSettings.prodClientSecret ||
+      dbSettings.clientSecret ||
+      ""
+    : process.env.DELHIVERY_LOCAL_STAGING_CLIENT_SECRET ||
+      process.env.DELHIVERY_LOCAL_CLIENT_SECRET ||
+      dbSettings.stagingClientSecret ||
+      dbSettings.clientSecret ||
+      "";
   const clientCode = process.env.DELHIVERY_LOCAL_CLIENT_CODE || dbSettings.clientCode || "";
   const audience = process.env.DELHIVERY_LOCAL_AUDIENCE || dbSettings.audience || "platform:app:coreos";
+
+  // Quick (intracity) delivery is gated to Ahmedabad: an order qualifies only when BOTH
+  // the seller pickup and customer drop pincodes are within these prefixes/pincodes.
+  // Default prefix "380" = Ahmedabad city proper. Extend via env as Local coverage grows.
+  const parseList = (value) =>
+    String(value || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  const cityPincodePrefixes = (() => {
+    const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES || dbSettings.cityPincodePrefixes);
+    return list.length ? list : ["380"];
+  })();
+  const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
 
   // Public URL Delhivery calls with fulfilment webhooks. A webhook URL is mandatory
   // on every create-order request, so this must be reachable from the internet.
@@ -92,8 +128,21 @@ export async function getDelhiveryLocalConfig() {
     defaultVehicleMode,
     readyToShip,
     autoServiceabilityCheck,
+    cityPincodePrefixes,
+    cityPincodes,
     hasCredentials: Boolean(clientId && clientSecret && clientCode),
   };
+}
+
+/**
+ * True when a pincode is inside the quick-delivery (Ahmedabad) service area:
+ * an exact match in `cityPincodes` or a prefix match in `cityPincodePrefixes`.
+ */
+export function isLocalCityPincode(pincode, config) {
+  const pin = String(pincode || "").trim();
+  if (!/^\d{6}$/.test(pin)) return false;
+  if (Array.isArray(config?.cityPincodes) && config.cityPincodes.includes(pin)) return true;
+  return Array.isArray(config?.cityPincodePrefixes) && config.cityPincodePrefixes.some((p) => pin.startsWith(p));
 }
 
 function maskSecret(secret) {
@@ -121,5 +170,7 @@ export async function getAdminDelhiveryLocalConfig() {
     defaultVehicleMode: config.defaultVehicleMode,
     readyToShip: config.readyToShip,
     autoServiceabilityCheck: config.autoServiceabilityCheck,
+    cityPincodePrefixes: config.cityPincodePrefixes,
+    cityPincodes: config.cityPincodes,
   };
 }

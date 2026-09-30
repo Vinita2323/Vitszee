@@ -279,6 +279,23 @@ const settingSchema = new mongoose.Schema(
                 type: String,
                 default: "",
             },
+            // Per-tenant service credentials (client code is shared across tenants).
+            prodClientId: {
+                type: String,
+                default: "",
+            },
+            prodClientSecret: {
+                type: String,
+                default: "",
+            },
+            stagingClientId: {
+                type: String,
+                default: "",
+            },
+            stagingClientSecret: {
+                type: String,
+                default: "",
+            },
             clientCode: {
                 type: String,
                 default: "",
@@ -286,6 +303,15 @@ const settingSchema = new mongoose.Schema(
             audience: {
                 type: String,
                 default: "platform:app:coreos",
+            },
+            // Ahmedabad quick-delivery service gate (comma-separated).
+            cityPincodePrefixes: {
+                type: String,
+                default: "380",
+            },
+            cityPincodes: {
+                type: String,
+                default: "",
             },
             webhookUrl: {
                 type: String,
