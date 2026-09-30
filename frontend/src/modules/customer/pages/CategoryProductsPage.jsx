@@ -133,10 +133,10 @@ const CategoryProductsPage = () => {
         : category?.name || sidebarCategories.find(c => c.id === activeCatId)?.name || 'Category';
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#F8FAF8] w-full font-sans">
+        <div className="flex flex-col bg-[#F8FAF8] w-full font-sans md:min-h-screen max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:bottom-[70px] max-md:z-20 max-md:overflow-hidden">
             {/* Top Compact Header */}
             <header className={cn(
-                "sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-3 md:px-6 py-2.5 flex items-center justify-between gap-3 shadow-xs",
+                "shrink-0 sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-3 md:px-6 py-2.5 flex items-center justify-between gap-3 shadow-xs",
                 isProductDetailOpen && "hidden md:flex"
             )}>
                 <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -180,9 +180,9 @@ const CategoryProductsPage = () => {
                 </div>
             </header>
 
-            <div className="flex flex-1 relative items-start w-full">
+            <div className="flex flex-1 min-h-0 relative items-stretch md:items-start w-full">
                 {/* Responsive Left Sidebar */}
-                <aside className="w-[72px] sm:w-20 md:w-56 lg:w-64 border-r border-slate-200/70 flex flex-col bg-white overflow-y-auto hide-scrollbar sticky top-[45px] md:top-[49px] h-[calc(100vh-45px)] md:h-[calc(100vh-49px)] pb-28 flex-shrink-0 transition-all">
+                <aside className="w-[72px] sm:w-20 md:w-56 lg:w-64 border-r border-slate-200/70 flex flex-col bg-white overflow-y-auto overscroll-y-contain touch-pan-y hide-scrollbar min-h-0 pb-4 md:sticky md:top-[49px] md:h-[calc(100vh-49px)] md:pb-8 flex-shrink-0 transition-all">
                     <div className="p-1 md:p-2 space-y-1">
                         {sidebarCategories.map((cat) => {
                             const isActive = cat.id === activeCatId || (activeCatId === 'all' && cat.id === 'all');
@@ -235,7 +235,7 @@ const CategoryProductsPage = () => {
                 </aside>
 
                 {/* Right Product Grid Column */}
-                <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAF8]">
+                <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#F8FAF8] max-md:overflow-y-auto max-md:overscroll-y-contain max-md:touch-pan-y">
                     {/* Mobile Search Bar (hidden on md+) */}
                     <div className="md:hidden px-3 py-2 bg-white border-b border-slate-100">
                         <div className="relative flex items-center">

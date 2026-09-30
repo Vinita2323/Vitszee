@@ -88,6 +88,23 @@ function makeProductSku(name, index = 1) {
   return `${prefix}-${String(index).padStart(3, "0")}`;
 }
 
+function duplicateProductMessage(error) {
+  const patternField = error?.keyPattern ? Object.keys(error.keyPattern)[0] : "";
+  const raw = String(error?.message || "");
+  const field =
+    patternField ||
+    (/\bslug/i.test(raw) ? "slug" : "") ||
+    (/\bsku/i.test(raw) ? "sku" : "");
+
+  if (field === "slug") {
+    return "This product name is already used by another product. Open General Info, change the product title, and save again.";
+  }
+  if (field === "sku") {
+    return "This product code is already used by another product. Open General Info, change the Product Code, and save again.";
+  }
+  return "This product name or product code is already used. Open General Info, change the title or Product Code, and save again.";
+}
+
 function parseJsonIfString(value) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -768,7 +785,7 @@ export const createProduct = async (req, res) => {
   } catch (error) {
     logger.error("Create Product Error", { scope: "createProduct", error });
     if (error.code === 11000) {
-      return handleResponse(res, 400, "Slug or SKU already exists");
+      return handleResponse(res, 400, duplicateProductMessage(error));
     }
     return handleResponse(res, 500, error.message);
   }
@@ -973,7 +990,7 @@ export const updateProduct = async (req, res) => {
       return handleResponse(res, 400, `Invalid ${error.path}: ${error.value}`);
     }
     if (error.code === 11000) {
-      return handleResponse(res, 400, "Slug or SKU already exists");
+      return handleResponse(res, 400, duplicateProductMessage(error));
     }
     return handleResponse(res, 500, error.message);
   }

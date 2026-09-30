@@ -10,7 +10,6 @@ import { useCartAnimation } from "../../context/CartAnimationContext";
 import { applyCloudinaryTransform, handleImageError, DEFAULT_PRODUCT_IMAGE } from "@/core/utils/imageUtils";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock } from "lucide-react";
 
 import { useProductDetail } from "../../context/ProductDetailContext";
 
@@ -326,18 +325,6 @@ const ProductCard = React.memo(
               </div>
             ) : null;
           })()}
-
-          {/* Delivery Time & Unit info */}
-          <div className="flex items-center gap-1 text-gray-500 mt-0.5 mb-1 sm:gap-1.5 sm:mt-1 sm:mb-2">
-            <Clock size={compact ? 9 : 10} className="text-[#1A4516]/80" />
-            <span
-              className={cn(
-                "font-semibold",
-                compact ? "text-[8px]" : "text-[9px] sm:text-[10px]",
-              )}>
-              {product.deliveryTime || "8-12 mins"}
-            </span>
-          </div>
 
           {/* Price Row / ADD Button Combination for compact */}
           <div className="mt-auto flex items-center justify-between gap-1">

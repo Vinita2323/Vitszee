@@ -391,7 +391,14 @@ const ProductManagement = () => {
       setEditingItem(null);
       fetchProducts();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save product");
+      const message =
+        error.response?.data?.message || "Could not save this product. Please try again.";
+      if (/already used/i.test(message)) {
+        setModalTab("general");
+        toast.warning(message, { duration: 8000 });
+      } else {
+        toast.error(message);
+      }
     }
   };
 

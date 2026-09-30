@@ -20,17 +20,17 @@ const AccordionItem = ({ title, children, id, icon, expandedSections, toggleSect
         <div className="border-b border-slate-100 last:border-0">
             <button
                 onClick={() => toggleSection(id)}
-                className="w-full py-4 flex items-center justify-between transition-all hover:bg-slate-50/50 rounded-lg group px-2"
+                className="w-full py-2.5 flex items-center justify-between transition-all hover:bg-slate-50/50 rounded-lg group px-1"
             >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                        "w-6 h-6 rounded-md flex items-center justify-center transition-all",
                         isOpen ? "bg-brand-50 text-primary" : "bg-slate-50 text-slate-400 group-hover:bg-slate-100"
                     )}>
                         {icon}
                     </div>
                     <span className={cn(
-                        "font-bold text-[13px] uppercase tracking-wider",
+                        "font-medium text-[12px] tracking-wide",
                         isOpen ? "text-[#1A1A1A]" : "text-slate-500"
                     )}>{title}</span>
                 </div>
@@ -38,7 +38,7 @@ const AccordionItem = ({ title, children, id, icon, expandedSections, toggleSect
                     animate={{ rotate: isOpen ? 180 : 0 }}
                     className={cn("transition-colors", isOpen ? "text-primary" : "text-slate-300")}
                 >
-                    <ChevronDown size={18} strokeWidth={3} />
+                    <ChevronDown size={16} strokeWidth={2} />
                 </motion.div>
             </button>
             <AnimatePresence initial={false}>
@@ -50,7 +50,7 @@ const AccordionItem = ({ title, children, id, icon, expandedSections, toggleSect
                         transition={{ duration: 0.3, ease: "easeInOut" }}
                         className="overflow-hidden"
                     >
-                        <div className="pt-2 pb-6 px-2">
+                        <div className="pt-1 pb-3 px-1">
                             {children}
                         </div>
                     </motion.div>
@@ -465,15 +465,6 @@ const ProductDetailSheet = () => {
 
                                         {/* Top badges row */}
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <motion.div
-                                                initial={{ opacity: 0, x: -10 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: 0.1 }}
-                                                className="inline-flex items-center gap-1.5 bg-[#ecfeff] border border-brand-200/50 text-primary px-3 py-1.5 rounded-lg text-[10px] font-[700] uppercase tracking-wider"
-                                            >
-                                                <Clock size={12} strokeWidth={2.5} className="text-primary" />
-                                                {selectedProduct.deliveryTime || '8-15 MINS'}
-                                            </motion.div>
                                             {selectedProduct.originalPrice > selectedProduct.price && (
                                                 <motion.div
                                                     initial={{ opacity: 0, x: -10 }}
@@ -681,7 +672,6 @@ const ProductDetailSheet = () => {
                                             >
                                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                                     {[
-                                                        { label: 'Shelf Life', value: '3 Days', emoji: '📅' },
                                                         { label: 'Country of Origin', value: 'India', emoji: '🇮🇳' },
                                                         { label: 'FSSAI License', value: '1001234567890', emoji: '🛡️' },
                                                         { label: 'Customer Care', value: supportEmail, emoji: '📧' }
@@ -697,7 +687,7 @@ const ProductDetailSheet = () => {
                                             {/* Customer Reviews */}
                                             <AccordionItem expandedSections={expandedSections} toggleSection={toggleSection}
                                                 id="reviews" 
-                                                title={`Customer Reviews (${reviews.length > 0 ? reviews.length : '120+'})`}
+                                                title={reviews.length > 0 ? `Customer Reviews (${reviews.length})` : "Customer Reviews"}
                                                 icon={<Star size={16} />}
                                             >
                                                 <div className="space-y-6 mt-2">
@@ -840,13 +830,13 @@ const ProductDetailSheet = () => {
                         )}
 
                         {/* Header Actions (Absolute & Sticky) */}
-                        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-40 pointer-events-none">
+                        <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-center z-40 pointer-events-none">
                             <motion.button
                                 onClick={closeProduct}
                                 whileTap={{ scale: 0.9 }}
-                                className="w-10 h-10 bg-white shadow-lg rounded-full flex items-center justify-center border border-gray-100 pointer-events-auto"
+                                className="w-8 h-8 bg-white shadow-md rounded-full flex items-center justify-center border border-gray-100 pointer-events-auto"
                             >
-                                <ArrowLeft size={24} className="text-primary" strokeWidth={3} />
+                                <ArrowLeft size={18} className="text-primary" strokeWidth={2} />
                             </motion.button>
                             <div className="flex gap-3 pointer-events-auto invisible">
                                 {/* Hidden as per request to simplify the view */}
@@ -863,7 +853,7 @@ const ProductDetailSheet = () => {
                             onWheel={handleWheel}
                         >
                             {/* Product Image Carousel */}
-                            <div className="relative w-full bg-gradient-to-b from-[#F5F7F8] to-white pt-0 pb-4 h-[52vh] min-h-[320px] max-h-[560px]">
+                            <div className="relative w-full bg-gradient-to-b from-[#F5F7F8] to-white pt-14 pb-2 h-[236px]">
                                 <div
                                     ref={scrollRef}
                                     className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-full w-full"
@@ -873,15 +863,14 @@ const ProductDetailSheet = () => {
                                     }}
                                 >
                                     {allImages.map((img, i) => (
-                                        <div key={i} className="flex-shrink-0 w-full h-full snap-center flex items-center justify-center px-0 sm:px-4">
+                                        <div key={i} className="flex-shrink-0 w-full h-full snap-center flex items-center justify-center px-6">
                                             <motion.img
                                                 initial={{ scale: 0.8, opacity: 0 }}
                                                 animate={{ scale: 1, opacity: 1 }}
                                                 transition={{ duration: 0.4 }}
                                                 src={applyCloudinaryTransform(img, "f_auto,q_auto:best,w_1200,dpr_auto")}
                                                 alt={`${selectedProduct.name} ${i + 1}`}
-                                                className="w-full h-full object-contain mix-blend-multiply drop-shadow-xl"
-                                                style={{ objectPosition: 'center calc(50% - 40px)' }}
+                                                className="max-h-full w-full object-contain object-center"
                                             />
                                         </div>
                                     ))}
@@ -889,7 +878,7 @@ const ProductDetailSheet = () => {
 
                                 {/* Carousel Dots */}
                                 {allImages.length > 1 && (
-                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10">
+                                    <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-1.5 z-10">
                                         {allImages.map((_, i) => (
                                             <div
                                                 key={i}
@@ -904,32 +893,26 @@ const ProductDetailSheet = () => {
                             </div>
 
                             {/* Product Info Container */}
-                            <div className="px-5 pt-2 pb-6">
-                                {/* Delivery Time Badge */}
-                                <div className="inline-flex items-center gap-1.5 bg-[#F0FDF4] border border-brand-100 text-primary px-2.5 py-1 rounded-lg text-[10px] font-black uppercase mb-3">
-                                    <Clock size={12} strokeWidth={3} />
-                                    {selectedProduct.deliveryTime || "8 Mins"}
-                                </div>
-
-                                <h2 className="text-xl font-black text-[#1A1A1A] leading-tight mb-2">
+                            <div className="px-4 pt-1 pb-3">
+                                <h2 className="text-base font-semibold text-[#1A1A1A] leading-snug mb-1">
                                     {selectedProduct.name}
                                 </h2>
 
                                 {/* Variants Selection (Mobile) */}
                                 {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                                    <div className="mt-4 mb-2">
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Select Variant</h4>
-                                        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                    <div className="mt-2 mb-1">
+                                        <h4 className="text-[10px] font-medium text-slate-400 tracking-wide mb-1.5">Select variant</h4>
+                                        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                                             {selectedProduct.variants.map((v, idx) => (
                                                 <motion.button
                                                     key={idx}
                                                     whileTap={{ scale: 0.95 }}
                                                     onClick={() => setSelectedVariant(v)}
                                                     className={cn(
-                                                        "flex-shrink-0 px-5 py-2.5 font-bold rounded-xl text-sm transition-all relative border-2",
+                                                        "flex-shrink-0 px-3 py-1.5 font-medium rounded-lg text-xs transition-all relative border",
                                                         selectedVariant?.sku === v.sku
-                                                            ? "bg-[#ecfeff] border-primary text-primary shadow-sm shadow-brand-100"
-                                                            : "bg-slate-50 border-slate-100 text-slate-500"
+                                                            ? "bg-[#ecfeff] border-primary text-primary"
+                                                            : "bg-slate-50 border-slate-200 text-slate-500"
                                                     )}
                                                 >
                                                     {v.name}
@@ -943,13 +926,13 @@ const ProductDetailSheet = () => {
                                 )}
 
                                 {/* Product Information Accordion (Mobile) */}
-                                <div className="mt-4 border-t border-slate-100">
+                                <div className="mt-2 border-t border-slate-100">
                                     {/* Description */}
                                     {cleanDesc && (
                                         <AccordionItem expandedSections={expandedSections} toggleSection={toggleSection}
                                             id="description" 
                                             title="Product Description" 
-                                            icon={<Clock size={18} strokeWidth={2.5} />}
+                                            icon={<Clock size={14} strokeWidth={2} />}
                                         >
                                             <div
                                                 className="text-sm text-slate-500 font-medium leading-relaxed whitespace-pre-line"
@@ -962,11 +945,10 @@ const ProductDetailSheet = () => {
                                     <AccordionItem expandedSections={expandedSections} toggleSection={toggleSection}
                                         id="details" 
                                         title="Product Details" 
-                                        icon={<Search size={18} strokeWidth={2.5} />}
+                                        icon={<Search size={14} strokeWidth={2} />}
                                     >
                                         <div className="grid grid-cols-2 gap-3 mt-1">
                                             {[
-                                                { label: 'Shelf Life', value: '3 Days' },
                                                 { label: 'Country of Origin', value: 'India' },
                                                 { label: 'FSSAI License', value: '1001234567890' },
                                                 { label: 'Customer Care', value: supportEmail }
@@ -982,8 +964,8 @@ const ProductDetailSheet = () => {
                                     {/* Customer Reviews */}
                                     <AccordionItem expandedSections={expandedSections} toggleSection={toggleSection}
                                         id="reviews" 
-                                        title={`Customer Reviews (${reviews.length > 0 ? reviews.length : '120+'})`}
-                                        icon={<Star size={18} strokeWidth={2.5} />}
+                                        title={reviews.length > 0 ? `Customer Reviews (${reviews.length})` : "Customer Reviews"}
+                                        icon={<Star size={14} strokeWidth={2} />}
                                     >
                                         <div className="space-y-6 mt-2">
                                             <div className="flex items-center justify-between mb-4">
@@ -1066,9 +1048,9 @@ const ProductDetailSheet = () => {
                         </div>
 
                         {/* Sticky Bottom Action Bar */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50">
-                            <div className="flex flex-col gap-3">
-                                <div className="flex items-center justify-between gap-4">
+                        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 py-2.5 shadow-[0_-6px_20px_rgba(0,0,0,0.04)] z-50">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between gap-3">
                                     <div className="flex flex-col min-w-[80px]">
                                         {((selectedVariant?.salePrice && selectedVariant.salePrice < selectedVariant.price) || 
                                            (!selectedVariant && selectedProduct.originalPrice > selectedProduct.price)) && (
@@ -1076,14 +1058,14 @@ const ProductDetailSheet = () => {
                                                 <span className="text-sm font-medium text-gray-400 line-through decoration-gray-400/50">
                                                     ₹{selectedVariant?.price || selectedProduct.originalPrice}
                                                 </span>
-                                                <span className="bg-red-50 text-red-500 text-[10px] font-black px-1.5 py-0.5 rounded leading-none">
+                                                <span className="bg-red-50 text-red-500 text-[10px] font-medium px-1.5 py-0.5 rounded leading-none">
                                                     {selectedVariant
                                                         ? Math.round(((selectedVariant.price - selectedVariant.salePrice) / selectedVariant.price) * 100)
                                                         : Math.round(((selectedProduct.originalPrice - selectedProduct.price) / selectedProduct.originalPrice) * 100)}% OFF
                                                 </span>
                                             </div>
                                         )}
-                                        <div className="text-2xl font-black text-[#1A1A1A] leading-none mt-1">
+                                        <div className="text-lg font-semibold text-[#1A1A1A] leading-none mt-0.5">
                                             ₹{selectedVariant?.salePrice || selectedVariant?.price || selectedProduct.price}
                                         </div>
                                         {currentStock <= 0 ? (
@@ -1113,7 +1095,7 @@ const ProductDetailSheet = () => {
                                             </motion.button>
                                         </div>
                                     ) : currentStock <= 0 ? (
-                                        <div className="flex-1 bg-gray-100 text-gray-400 h-[56px] rounded-2xl font-black text-sm flex items-center justify-center gap-2 border border-gray-200 uppercase tracking-[0.05em] whitespace-nowrap px-4">
+                                        <div className="flex-1 bg-gray-100 text-gray-400 h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border border-gray-200 whitespace-nowrap px-3">
                                             OUT OF STOCK
                                         </div>
                                     ) : (
@@ -1121,10 +1103,10 @@ const ProductDetailSheet = () => {
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.95 }}
                                             onClick={handleAddToCart}
-                                            className="flex-1 bg-gradient-to-r from-primary to-[var(--brand-400)] text-white h-[56px] rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-brand-100 transition-all border border-white/20 uppercase tracking-[0.05em] whitespace-nowrap px-4"
+                                            className="flex-1 bg-gradient-to-r from-primary to-[var(--brand-400)] text-white h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5 shadow-md shadow-brand-100 transition-all border border-white/20 whitespace-nowrap px-3"
                                         >
-                                            <ShoppingBag size={18} strokeWidth={3} />
-                                            ADD TO CART
+                                            <ShoppingBag size={16} strokeWidth={2} />
+                                            Add to cart
                                         </motion.button>
                                     )}
                                 </div>
