@@ -76,7 +76,7 @@ export async function getDelhiveryLocalConfig() {
       .filter(Boolean);
   const cityPincodePrefixes = (() => {
     const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES || dbSettings.cityPincodePrefixes);
-    return list.length ? list : ["380"];
+    return list.length ? list : ["380", "382"];
   })();
   const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
 

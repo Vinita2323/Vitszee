@@ -42,22 +42,23 @@ beforeEach(() => {
 });
 
 describe("Ahmedabad pincode gate", () => {
-  it("accepts 380xxx and rejects other cities by default", async () => {
+  it("accepts Ahmedabad 380xxx + 382xxx, rejects other cities by default", async () => {
     const config = await getDelhiveryLocalConfig();
-    expect(isLocalCityPincode("380015", config)).toBe(true); // Ahmedabad
+    expect(isLocalCityPincode("380015", config)).toBe(true); // central Ahmedabad
     expect(isLocalCityPincode("380001", config)).toBe(true);
+    expect(isLocalCityPincode("382470", config)).toBe(true); // Ranip (greater Ahmedabad)
     expect(isLocalCityPincode("395007", config)).toBe(false); // Surat
-    expect(isLocalCityPincode("382010", config)).toBe(false); // Gandhinagar (382, not in gate)
+    expect(isLocalCityPincode("400001", config)).toBe(false); // Mumbai
     expect(isLocalCityPincode("", config)).toBe(false);
     expect(isLocalCityPincode("38001", config)).toBe(false); // not 6 digits
   });
 
-  it("honours explicit extra pincodes from config", async () => {
-    process.env.DELHIVERY_LOCAL_CITY_PINCODES = "382210,382481";
+  it("honours explicit extra pincodes outside the prefix gate", async () => {
+    process.env.DELHIVERY_LOCAL_CITY_PINCODES = "395007,110001";
     const config = await getDelhiveryLocalConfig();
-    expect(isLocalCityPincode("382210", config)).toBe(true);
-    expect(isLocalCityPincode("382481", config)).toBe(true);
-    expect(isLocalCityPincode("382010", config)).toBe(false);
+    expect(isLocalCityPincode("395007", config)).toBe(true); // explicitly added Surat
+    expect(isLocalCityPincode("110001", config)).toBe(true); // explicitly added Delhi
+    expect(isLocalCityPincode("400001", config)).toBe(false); // not listed, not in prefixes
   });
 });
 

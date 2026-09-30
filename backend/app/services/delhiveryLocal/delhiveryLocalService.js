@@ -58,6 +58,22 @@ function geo(lat, lng) {
 }
 
 /**
+ * Extracts { latitude, longitude } from any location shape we store:
+ *  - GeoJSON Point:  { type:"Point", coordinates:[lng, lat] }  (seller.location)
+ *  - plain object:   { lat, lng } or { latitude, longitude }   (order.address.location)
+ * Delhivery Local is geo-based, so sending coordinates is what makes hyperlocal
+ * serviceability resolve reliably (a bare pincode often cannot pinpoint the stop).
+ */
+function extractGeo(loc) {
+  if (!loc || typeof loc !== "object") return null;
+  if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+    // GeoJSON stores [longitude, latitude].
+    return geo(loc.coordinates[1], loc.coordinates[0]);
+  }
+  return geo(loc.lat ?? loc.latitude, loc.lng ?? loc.longitude);
+}
+
+/**
  * Builds the customer (drop) block from an order.
  */
 function resolveDropDetails(order) {
@@ -78,8 +94,7 @@ function resolveDropDetails(order) {
     pinCode = match ? match[0] : "";
   }
 
-  const location = address.location || {};
-  const geoLocation = geo(location.lat, location.lng);
+  const geoLocation = extractGeo(address.location);
 
   // Address OR geolocation must be present; pinCode is optional when geo is supplied.
   if (!/^\d{6}$/.test(pinCode) && !geoLocation) {
@@ -115,8 +130,7 @@ function resolvePickupDetails(seller) {
   const address1 = str(pickup.address, 250);
   if (!address1) throw new DelhiveryLocalInvalidRequestError("Seller pickup address is missing.");
 
-  const loc = seller.location || {};
-  const geoLocation = geo(loc.lat ?? loc.latitude, loc.lng ?? loc.longitude);
+  const geoLocation = extractGeo(seller.location);
 
   if (!/^\d{6}$/.test(String(pickup.pin || "")) && !geoLocation) {
     throw new DelhiveryLocalInvalidRequestError(
