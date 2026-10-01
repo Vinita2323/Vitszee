@@ -15,6 +15,7 @@ import {
 } from "../services/delhivery/delhiveryForwardService.js";
 import { ensureSellerPickupLocation } from "../services/delhivery/delhiveryWarehouseService.js";
 import { processDelhiveryWebhook } from "../services/delhivery/delhiveryWebhookService.js";
+import { localStatusLabel } from "../services/delhiveryLocal/delhiveryLocalStatusMapper.js";
 
 /**
  * GET /api/delhivery/config (Admin only)
@@ -232,13 +233,30 @@ export const trackShipmentUnified = async (req, res) => {
       return handleResponse(res, 404, "Tracking details not found");
     }
 
+    const isQuick = /^CRN/i.test(String(shipment.awbNumber || ""));
+    const rider = shipment.rider && (shipment.rider.name || shipment.rider.phone || shipment.rider.vehicleNumber || shipment.rider.id)
+      ? {
+          name: shipment.rider.name || null,
+          phone: shipment.rider.phone || null,
+          vehicleNumber: shipment.rider.vehicleNumber || shipment.rider.id || null,
+          vehicleType: shipment.rider.vehicleType || null,
+          latitude: shipment.rider.latitude ?? null,
+          longitude: shipment.rider.longitude ?? null,
+          lastLocationAt: shipment.rider.lastLocationAt || null,
+        }
+      : null;
+
     return handleResponse(res, 200, "Tracking information", {
-      provider: "delhivery",
+      provider: isQuick ? "delhivery-local" : "delhivery",
+      deliveryType: isQuick ? "quick" : "courier",
       internalOrderId: shipment.internalOrderId,
       awbNumber: shipment.awbNumber,
       shipmentStatus: shipment.shipmentStatus,
       status: shipment.shipmentStatus,
       providerStatus: shipment.providerStatus,
+      statusLabel: isQuick ? localStatusLabel(shipment.providerStatus) : undefined,
+      rider,
+      trackingUrl: shipment.trackingUrl || null,
       timeline: shipment.timeline?.map((t) => ({
         status: t.status,
         description: t.description,
