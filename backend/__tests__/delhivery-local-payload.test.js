@@ -68,7 +68,7 @@ jest.unstable_mockModule("../app/services/delhivery/delhiveryWarehouseService.js
   ensureSellerPickupLocation: async () => "Test Shop 470",
 }));
 jest.unstable_mockModule("../app/services/delhivery/delhiveryOrderSync.js", () => ({ syncOrderWithShipmentStatus: jest.fn(async () => null) }));
-jest.unstable_mockModule("../app/services/orderSocketEmitter.js", () => ({ emitOrderStatusUpdate: jest.fn() }));
+jest.unstable_mockModule("../app/services/orderSocketEmitter.js", () => ({ emitOrderStatusUpdate: jest.fn(), emitToCustomer: jest.fn(), emitToSeller: jest.fn(), emitToOrder: jest.fn() }));
 
 const { createLocalOrder } = await import("../app/services/delhiveryLocal/delhiveryLocalService.js");
 

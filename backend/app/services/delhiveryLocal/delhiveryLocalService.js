@@ -6,6 +6,7 @@ import { sendDelhiveryLocalRequest, extractLocalErrorMessage } from "./delhivery
 import {
   mapLocalStatus,
   normalizeCancellationReason,
+  localStatusLabel,
   LOCAL_VEHICLE_MODES,
 } from "./delhiveryLocalStatusMapper.js";
 import {
@@ -18,7 +19,9 @@ import {
 import { syncOrderWithShipmentStatus } from "../delhivery/delhiveryOrderSync.js";
 import { isValidForwardStatusTransition } from "../delhivery/delhiveryStatusMapper.js";
 import { resolveSellerPickupDetails, ensureSellerPickupLocation } from "../delhivery/delhiveryWarehouseService.js";
-import { emitOrderStatusUpdate } from "../orderSocketEmitter.js";
+import { emitOrderStatusUpdate, emitToCustomer, emitToSeller, emitToOrder } from "../orderSocketEmitter.js";
+import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
 // Endpoints (contract V6, all under the CoreOS gateway base URL).
 const PATHS = {
@@ -487,13 +490,16 @@ export async function applyLocalFulfilment(shipment, { fulfilmentStatus, orderSt
   const normalized = mapLocalStatus(fulfilmentStatus, orderStatus);
   const providerText = fulfilmentStatus || orderStatus || "";
   const now = new Date();
+  const prevStatus = shipment.shipmentStatus;
   let reached = null;
 
-  if (partnerInfo && (partnerInfo.name || partnerInfo.mobile)) {
+  if (partnerInfo && (partnerInfo.name || partnerInfo.mobile || partnerInfo.vehicleNumber)) {
     shipment.rider = {
       id: partnerInfo.vehicleNumber || shipment.rider?.id,
       name: partnerInfo.name || shipment.rider?.name,
       phone: partnerInfo.mobile?.mobileNumber || shipment.rider?.phone,
+      vehicleNumber: partnerInfo.vehicleNumber || shipment.rider?.vehicleNumber,
+      vehicleType: partnerInfo.vehicleType || shipment.rider?.vehicleType,
       latitude: partnerInfo.location?.lat ?? shipment.rider?.latitude,
       longitude: partnerInfo.location?.long ?? shipment.rider?.longitude,
       lastLocationAt: now,
@@ -526,6 +532,7 @@ export async function applyLocalFulfilment(shipment, { fulfilmentStatus, orderSt
   }
 
   if (trackingUrl) {
+    shipment.trackingUrl = trackingUrl;
     shipment.serviceabilityDetails = { ...(shipment.serviceabilityDetails || {}), quote: { trackingUrl } };
   }
   shipment.lastProviderResponse = raw || shipment.lastProviderResponse;
@@ -535,7 +542,76 @@ export async function applyLocalFulfilment(shipment, { fulfilmentStatus, orderSt
   if (reached) {
     await syncOrderWithShipmentStatus(shipment, reached, { rawStatus: providerText });
   }
+
+  const transitioned = Boolean(reached) && reached !== prevStatus;
+  await emitQuickDeliveryUpdate(shipment, { reached, providerText, transitioned });
   return reached;
+}
+
+/** Rider details safe to show the seller and customer. */
+function sanitizeRider(r) {
+  if (!r || (!r.name && !r.phone && !r.vehicleNumber && !r.id)) return null;
+  return {
+    name: r.name || null,
+    phone: r.phone || null,
+    vehicleNumber: r.vehicleNumber || r.id || null,
+    vehicleType: r.vehicleType || null,
+    latitude: r.latitude ?? null,
+    longitude: r.longitude ?? null,
+  };
+}
+
+/**
+ * Pushes a quick-delivery update (status label + rider + tracking link) to the
+ * customer, seller and order rooms, and fires in-app + FCM notifications on the
+ * key transitions. Delivered/cancelled notifications are handled by the shared
+ * order sync, so here we only add rider-assigned / reached-shop / picked-up.
+ */
+async function emitQuickDeliveryUpdate(shipment, { reached, providerText, transitioned }) {
+  let order = null;
+  try {
+    order = await Order.findOne({ orderId: shipment.internalOrderId })
+      .select("orderId seller customer")
+      .lean();
+  } catch {
+    order = null;
+  }
+  if (!order) return;
+
+  const rider = sanitizeRider(shipment.rider);
+  const customerId = order.customer?.toString?.() || order.customer || null;
+  const sellerId = order.seller?.toString?.() || order.seller || null;
+  const payload = {
+    orderId: order.orderId,
+    provider: "delhivery-local",
+    deliveryType: "quick",
+    shipmentStatus: shipment.shipmentStatus,
+    statusLabel: localStatusLabel(providerText),
+    rider,
+    trackingUrl: shipment.trackingUrl || null,
+    at: new Date().toISOString(),
+  };
+
+  try { emitToCustomer(customerId, { event: "order:quick:update", payload }); } catch { /* socket optional */ }
+  try { emitToSeller(sellerId, { event: "order:quick:update", payload }); } catch { /* socket optional */ }
+  try { emitToOrder(order.orderId, { event: "order:quick:update", payload }); } catch { /* socket optional */ }
+
+  if (!transitioned) return;
+  const base = {
+    orderId: order.orderId,
+    customerId,
+    userId: customerId,
+    sellerId,
+    data: { rider, trackingUrl: shipment.trackingUrl || null },
+  };
+  if (reached === "RIDER_ASSIGNED") {
+    emitNotificationEvent(NOTIFICATION_EVENTS.CUSTOMER_RIDER_ASSIGNED, base);
+    emitNotificationEvent(NOTIFICATION_EVENTS.SELLER_RIDER_ASSIGNED, base);
+  } else if (reached === "RIDER_ARRIVED") {
+    emitNotificationEvent(NOTIFICATION_EVENTS.SELLER_DELIVERY_ARRIVED, base);
+  } else if (reached === "OUT_FOR_DELIVERY") {
+    emitNotificationEvent(NOTIFICATION_EVENTS.SELLER_DELIVERY_PICKED, base);
+  }
 }
 
 /**
