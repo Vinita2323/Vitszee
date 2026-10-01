@@ -297,3 +297,15 @@ export function onDeliveryOtpValidated(getToken, handler) {
     s.off("delivery:otp:validated", wrappedHandler);
   };
 }
+
+/**
+ * Delhivery Local (quick delivery) live update: status label + rider
+ * (name / phone / vehicle) + tracking link. Emitted to the customer, seller
+ * and order rooms as the rider is assigned, picks up and delivers.
+ */
+export function onOrderQuickUpdate(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("order:quick:update", handler);
+  return () => s.off("order:quick:update", handler);
+}

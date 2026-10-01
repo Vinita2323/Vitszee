@@ -33,6 +33,7 @@ import ShimmerButton from '@/components/ui/shimmer-button';
 import { sellerApi } from '../services/sellerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import { getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
+import QuickDeliveryCard from '@shared/components/QuickDeliveryCard';
 import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
@@ -941,6 +942,8 @@ const Orders = () => {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {selectedOrder?.id ? <QuickDeliveryCard orderId={selectedOrder.id} role="seller" /> : null}
 
                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Items Ordered ({selectedOrder.items.length})</h4>
                                         <div className="space-y-3 max-h-52 sm:max-h-64 overflow-y-auto pr-1">

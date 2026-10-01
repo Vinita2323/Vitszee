@@ -197,6 +197,41 @@ function eventDefinition(eventType) {
             ? `The delivery partner has arrived at your store to pickup order #${payload.orderId}.`
             : "The delivery partner has arrived at your store for pickup.",
       };
+    case NOTIFICATION_EVENTS.CUSTOMER_RIDER_ASSIGNED:
+      return {
+        role: NOTIFICATION_ROLES.CUSTOMER,
+        recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+        title: () => "Rider Assigned 🛵",
+        body: (payload) => {
+          const r = payload.data?.rider || {};
+          return r.name
+            ? `${r.name}${r.vehicleNumber ? ` (${r.vehicleNumber})` : ""} is assigned to deliver your order${r.phone ? `. Call ${r.phone}` : ""}.`
+            : "A rider has been assigned to your order.";
+        },
+      };
+    case NOTIFICATION_EVENTS.SELLER_RIDER_ASSIGNED:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId),
+        title: () => "Rider Assigned 🛵",
+        body: (payload) => {
+          const r = payload.data?.rider || {};
+          const ord = payload.orderId ? ` for order #${payload.orderId}` : "";
+          return r.name
+            ? `${r.name}${r.vehicleNumber ? ` (${r.vehicleNumber})` : ""} will pick up${ord}${r.phone ? `. Call ${r.phone}` : ""}.`
+            : `A rider has been assigned${ord}.`;
+        },
+      };
+    case NOTIFICATION_EVENTS.SELLER_DELIVERY_PICKED:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId),
+        title: () => "Order Picked Up 📦",
+        body: (payload) =>
+          payload.orderId
+            ? `The rider has picked up order #${payload.orderId}.`
+            : "The rider has picked up the order.",
+      };
     case NOTIFICATION_EVENTS.SELLER_PICKUP_OTP:
       return {
         role: NOTIFICATION_ROLES.SELLER,

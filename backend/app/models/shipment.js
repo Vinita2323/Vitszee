@@ -138,9 +138,16 @@ const shipmentSchema = new mongoose.Schema(
       id: String,
       name: String,
       phone: String,
+      vehicleNumber: String,
+      vehicleType: String,
       latitude: Number,
       longitude: Number,
       lastLocationAt: Date,
+    },
+    // Delhivery Local public tracking page URL.
+    trackingUrl: {
+      type: String,
+      trim: true,
     },
     qcDetails: {
       qcRequired: {

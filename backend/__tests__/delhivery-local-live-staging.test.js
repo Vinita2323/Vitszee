@@ -99,6 +99,9 @@ jest.unstable_mockModule("../app/services/delhivery/delhiveryOrderSync.js", () =
 }));
 jest.unstable_mockModule("../app/services/orderSocketEmitter.js", () => ({
   emitOrderStatusUpdate: jest.fn(),
+  emitToCustomer: jest.fn(),
+  emitToSeller: jest.fn(),
+  emitToOrder: jest.fn(),
 }));
 
 const { createLocalOrder, trackLocalOrder } = await import(

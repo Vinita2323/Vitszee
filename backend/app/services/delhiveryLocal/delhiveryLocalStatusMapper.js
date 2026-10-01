@@ -84,3 +84,45 @@ export function normalizeCancellationReason(reason) {
   const match = LOCAL_CANCELLATION_REASONS.find((allowed) => allowed === r);
   return match || "service is no longer required";
 }
+
+/**
+ * Human, quick-delivery status label shown to the seller and customer.
+ */
+export function localStatusLabel(fulfilmentStatus, orderStatus = "") {
+  const f = String(fulfilmentStatus || "").trim().toLowerCase();
+  if (/^at_stop\d+$/.test(f)) return "Out for delivery";
+  switch (f) {
+    case "pending":
+    case "searching_for_agent":
+      return "Searching for a rider";
+    case "agent_assigned":
+      return "Rider assigned";
+    case "at_pickup":
+      return "Rider reached the shop";
+    case "out_for_delivery":
+      return "Out for delivery";
+    case "at_delivery":
+      return "Rider arriving";
+    case "order_delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      break;
+  }
+  switch (String(orderStatus || "").trim().toLowerCase()) {
+    case "creating":
+    case "created":
+      return "Order placed";
+    case "assigned":
+      return "Rider assigned";
+    case "inprogress":
+      return "Out for delivery";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return "Processing";
+  }
+}

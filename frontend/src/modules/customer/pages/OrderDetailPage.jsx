@@ -49,6 +49,7 @@ import {
   onReturnDropOtp,
 } from "@/core/services/orderSocket";
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
+import QuickDeliveryCard from "@/shared/components/QuickDeliveryCard";
 import { createSocketTokenReader } from "@core/utils/authStorage";
 import { STORAGE_KEYS } from "@core/utils/storage";
 
@@ -1011,6 +1012,8 @@ const OrderDetailPage = () => {
             />
           </motion.div>
         )}
+
+        {order?.orderId ? <QuickDeliveryCard orderId={order.orderId} role="customer" /> : null}
 
         {/* Order Progress Tracker - New Component */}
         {!isAwaitingOnlinePayment && !isAwaitingPaymentSelection && (
