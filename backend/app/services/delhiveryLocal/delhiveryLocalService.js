@@ -52,9 +52,27 @@ function tenDigitPhone(...candidates) {
 }
 
 function geo(lat, lng) {
-  const latitude = lat != null && lat !== "" ? String(lat) : null;
-  const longitude = lng != null && lng !== "" ? String(lng) : null;
+  // Delhivery Local requires at most 6 decimal places on coordinates.
+  const round = (v) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(6) : null;
+  };
+  const latitude = round(lat);
+  const longitude = round(lng);
   return latitude && longitude ? { latitude, longitude } : null;
+}
+
+/**
+ * Normalises a city/state to a format Delhivery accepts (letters + spaces only).
+ * Stored values are sometimes a whole address dumped into one field
+ * ("Ranip, Gujarat, 382470"), which Delhivery rejects as "Invalid city format".
+ * Takes the first comma-segment and strips digits/punctuation.
+ */
+function cleanCity(value) {
+  if (!value) return "";
+  const first = String(value).split(",")[0];
+  return first.replace(/[^A-Za-z\s]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
 }
 
 /**
@@ -111,8 +129,8 @@ function resolveDropDetails(order) {
     },
     address1,
     ...(address.landmark ? { address2: str(address.landmark, 200) } : {}),
-    ...(address.city ? { city: str(address.city, 60) } : {}),
-    ...(address.state ? { state: str(address.state, 60) } : {}),
+    ...(cleanCity(address.city) ? { city: cleanCity(address.city) } : {}),
+    ...(cleanCity(address.state) ? { state: cleanCity(address.state) } : {}),
     ...(/^\d{6}$/.test(pinCode) ? { pinCode } : {}),
     ...(geoLocation ? { geoLocation } : {}),
   };
@@ -145,8 +163,8 @@ function resolvePickupDetails(seller) {
       phoneNumber,
     },
     address1,
-    ...(pickup.city ? { city: str(pickup.city, 60) } : {}),
-    ...(pickup.state ? { state: str(pickup.state, 60) } : {}),
+    ...(cleanCity(pickup.city) ? { city: cleanCity(pickup.city) } : {}),
+    ...(cleanCity(pickup.state) ? { state: cleanCity(pickup.state) } : {}),
     ...(/^\d{6}$/.test(String(pickup.pin || "")) ? { pinCode: String(pickup.pin) } : {}),
     ...(geoLocation ? { geoLocation } : {}),
   };
