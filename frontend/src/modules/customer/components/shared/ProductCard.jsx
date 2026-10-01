@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Heart, Plus, Minus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,7 @@ import { applyCloudinaryTransform, handleImageError, DEFAULT_PRODUCT_IMAGE } fro
 
 import { motion, AnimatePresence } from "framer-motion";
 
-import { useProductDetail } from "../../context/ProductDetailContext";
+import { productSkuPath } from "../../utils/productSku";
 
 const ProductCard = React.memo(
   ({ product, badge, className, compact = false, neutralBg = false }) => {
@@ -21,7 +21,7 @@ const ProductCard = React.memo(
     const { showToast } = useToast();
     const { animateAddToCart, animateRemoveFromCart } = useCartAnimation();
 
-    const { openProduct } = useProductDetail();
+    const navigate = useNavigate();
     const [showHeartPopup, setShowHeartPopup] = React.useState(false);
     
     const location = useLocation();
@@ -84,15 +84,9 @@ const ProductCard = React.memo(
     const quantity = cartItem ? cartItem.quantity : 0;
     const isWishlisted = isInWishlist(product.id || product._id);
 
-    const handleProductClick = React.useCallback(
-      (e) => {
-        if (openProduct) {
-          e.preventDefault();
-          openProduct(product);
-        }
-      },
-      [openProduct, product],
-    );
+    const handleProductClick = React.useCallback(() => {
+      navigate(productSkuPath(product));
+    }, [navigate, product]);
 
     const toggleWishlist = React.useCallback(
       (e) => {
@@ -123,8 +117,8 @@ const ProductCard = React.memo(
         // If the product has multiple variants, open the product detail sheet
         // so the user can select which variant they want to add.
         const variants = Array.isArray(product?.variants) ? product.variants : [];
-        if (variants.length > 1 && openProduct) {
-          openProduct(product);
+        if (variants.length > 1) {
+          navigate(productSkuPath(product));
           return;
         }
 
@@ -150,7 +144,7 @@ const ProductCard = React.memo(
           toggleWishlistGlobal(product);
         }
       },
-      [animateAddToCart, product, addToCart, variantKey, defaultVariant?.name, openProduct, isWishlistPage, isWishlisted, toggleWishlistGlobal],
+      [animateAddToCart, product, addToCart, variantKey, defaultVariant?.name, navigate, isWishlistPage, isWishlisted, toggleWishlistGlobal],
     );
 
     const handleIncrement = React.useCallback(

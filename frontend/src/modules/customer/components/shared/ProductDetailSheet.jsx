@@ -11,6 +11,7 @@ import { useLocation as useAppLocation } from '../../context/LocationContext';
 import { cn } from '@/lib/utils';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { customerApi } from '../../services/customerApi';
+import { buildDisplaySku } from '../../utils/productSku';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
@@ -59,6 +60,41 @@ const AccordionItem = ({ title, children, id, icon, expandedSections, toggleSect
         </div>
     );
 };
+
+let backgroundScrollLocks = 0;
+let lockedScrollY = 0;
+
+function lockBackgroundScroll() {
+    backgroundScrollLocks += 1;
+    if (backgroundScrollLocks > 1) return;
+
+    lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+}
+
+function unlockBackgroundScroll() {
+    backgroundScrollLocks = Math.max(0, backgroundScrollLocks - 1);
+    if (backgroundScrollLocks > 0) return;
+
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.width = "";
+    window.scrollTo(0, lockedScrollY);
+}
+
+function isInsideOpenSheet(target) {
+    return target instanceof Element && Boolean(target.closest("[data-product-sheet]"));
+}
 
 const ProductDetailSheet = () => {
     const { selectedProduct, isOpen, closeProduct } = useProductDetail();
@@ -232,24 +268,31 @@ const ProductDetailSheet = () => {
     useEffect(() => {
         if (isOpen) {
             controls.start("visible");
-            document.body.style.overflow = "hidden"; // Prevent background scroll
-            document.body.style.touchAction = "none"; // Disable swipe background panning
-            document.documentElement.style.overflow = "hidden";
         } else {
             controls.start("hidden");
-            document.body.style.overflow = "unset";
-            document.body.style.touchAction = "auto";
-            document.documentElement.style.overflow = "unset";
             setIsExpanded(false);
         }
-
-        // Cleanup function to ensure scroll is restored if component unmounts
-        return () => {
-            document.body.style.overflow = "unset";
-            document.body.style.touchAction = "auto";
-            document.documentElement.style.overflow = "unset";
-        }
     }, [isOpen, controls]);
+
+    useEffect(() => {
+        if (!isOpen) return undefined;
+
+        lockBackgroundScroll();
+
+        const blockBackgroundScroll = (event) => {
+            if (isInsideOpenSheet(event.target)) return;
+            event.preventDefault();
+        };
+
+        document.addEventListener("wheel", blockBackgroundScroll, { passive: false });
+        document.addEventListener("touchmove", blockBackgroundScroll, { passive: false });
+
+        return () => {
+            document.removeEventListener("wheel", blockBackgroundScroll);
+            document.removeEventListener("touchmove", blockBackgroundScroll);
+            unlockBackgroundScroll();
+        };
+    }, [isOpen]);
 
     const handleDragEnd = (event, info) => {
         const offset = info.offset.y;
@@ -334,6 +377,7 @@ const ProductDetailSheet = () => {
 
     const cleanDesc = cleanDescription(selectedProduct?.description);
     const currentStock = selectedVariant?.stock !== undefined ? selectedVariant.stock : selectedProduct?.stock || 0;
+    const displaySku = buildDisplaySku(extendedProduct || selectedProduct);
 
     return (
         <AnimatePresence>
@@ -356,10 +400,10 @@ const ProductDetailSheet = () => {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.96, y: 30 }}
                         transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+                        data-product-sheet
                         className="hidden md:flex fixed z-[230] top-[72px] bottom-[16px] left-[3%] right-[3%] lg:left-[6%] lg:right-[6%] xl:left-[12%] xl:right-[12%] bg-white rounded-3xl shadow-[0_40px_100px_rgba(0,0,0,0.25)] overflow-hidden"
                     >
-                        {/* Parent flex container that holds both sides together so the whole modal scrolls */}
-                        <div className="flex w-full min-h-full">
+                        <div className="flex w-full h-full min-h-0 overflow-hidden">
                                 {/* Left: Image Gallery — sticky to window so it doesn't scroll out of view if you want */}
                                 <div className="relative w-[42%] lg:w-[44%] flex-shrink-0 flex flex-col min-h-full sticky top-0" style={{ background: 'linear-gradient(145deg, #f9fafb 0%, #f1f8f2 50%, #fafbfc 100%)' }}>
                                     {/* Top bar with back + wishlist */}
@@ -460,7 +504,7 @@ const ProductDetailSheet = () => {
                                 </div>
 
                                 {/* Right: Product Info (scrollable naturally) */}
-                                <div className="flex-1 flex flex-col bg-white">
+                                <div className="flex-1 flex flex-col bg-white min-h-0 overflow-y-auto overscroll-contain">
                                     <div className="flex-1 px-7 py-6 lg:px-8 lg:py-7 space-y-3">
 
                                         {/* Top badges row */}
@@ -496,6 +540,9 @@ const ProductDetailSheet = () => {
                                             <h1 className="text-[19px] lg:text-[22px] font-black text-[#111827] leading-[1.2] tracking-tight mb-1">
                                                 {selectedProduct.name}
                                             </h1>
+                                            {displaySku && (
+                                                <p className="inline-flex items-center mt-1 mb-1 px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-semibold tracking-wider text-slate-700">SKU {displaySku}</p>
+                                            )}
                                             {selectedProduct.weight && (
                                                 <span className="text-[13px] text-gray-400 font-bold uppercase tracking-wider">{selectedProduct.weight}</span>
                                             )}
@@ -820,6 +867,7 @@ const ProductDetailSheet = () => {
                         className={cn(
                             "md:hidden fixed z-[230] bg-white shadow-2xl overflow-hidden flex flex-col",
                         )}
+                        data-product-sheet
                         style={{ willChange: "transform, top, bottom, left, width, border-radius" }}
                     >
                         {/* Drag Handle (Visible only when not fully expanded) */}
@@ -897,6 +945,9 @@ const ProductDetailSheet = () => {
                                 <h2 className="text-base font-semibold text-[#1A1A1A] leading-snug mb-1">
                                     {selectedProduct.name}
                                 </h2>
+                                {displaySku && (
+                                    <p className="inline-flex items-center mb-1 px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-semibold tracking-wider text-slate-700">SKU {displaySku}</p>
+                                )}
 
                                 {/* Variants Selection (Mobile) */}
                                 {selectedProduct.variants && selectedProduct.variants.length > 0 && (

@@ -42,6 +42,7 @@ const CustomerRoutes = () => {
                             <Route path="categories" element={<CategoriesPage />} />
                             <Route path="category/:categoryName" element={<CategoryProductsPage />} />
                             <Route path="product/:id" element={<ProductDetailPage />} />
+                            <Route path="products/:sku" element={<ProductDetailPage />} />
                             <Route path="terms" element={<TermsPage />} />
                             <Route path="privacy" element={<PrivacyPage />} />
                             <Route path="about" element={<AboutPage />} />

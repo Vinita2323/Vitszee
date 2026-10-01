@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Button from "@shared/components/ui/Button";
 import Badge from "@shared/components/ui/Badge";
 import {
@@ -21,24 +21,14 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { sellerApi } from "../services/sellerApi";
+import { useProductSkuPreview } from "@shared/hooks/useProductSkuPreview";
 
 
 const AddProduct = () => {
   const navigate = useNavigate();
   const [modalTab, setModalTab] = useState("general");
   const [isSaving, setIsSaving] = useState(false);
-
-  const makeSku = (name, index = 1) => {
-    const prefix =
-      String(name || "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .slice(0, 5) || "item";
-    return `${prefix}-${String(index).padStart(3, "0")}`;
-  };
-
-  const isAutoSku = (sku, name, index = 1) =>
-    String(sku || "").toLowerCase() === makeSku(name, index);
+  const [skuManual, setSkuManual] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -88,31 +78,14 @@ const AddProduct = () => {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setFormData((prev) => {
-      if (!prev.name) return prev;
-
-      const nextSku =
-        !prev.sku || isAutoSku(prev.sku, prev.name, 1)
-          ? makeSku(prev.name, 1)
-          : prev.sku;
-
-      const nextVariants = prev.variants.map((variant, idx) => {
-        const variantIndex = idx + 1;
-        const shouldAuto =
-          !variant.sku || isAutoSku(variant.sku, prev.name, variantIndex);
-        return shouldAuto
-          ? { ...variant, sku: makeSku(prev.name, variantIndex) }
-          : variant;
-      });
-
-      const changed =
-        nextSku !== prev.sku ||
-        nextVariants.some((variant, idx) => variant !== prev.variants[idx]);
-
-      return changed ? { ...prev, sku: nextSku, variants: nextVariants } : prev;
-    });
-  }, [formData.name]);
+  const loadSkuPreview = useCallback(async (productName) => {
+    const res = await sellerApi.previewProductSku(productName);
+    return res.data?.result?.sku || "";
+  }, []);
+  const skuPreview = useProductSkuPreview(formData.name, {
+    enabled: !skuManual,
+    loadPreview: loadSkuPreview,
+  });
 
   React.useEffect(() => {
     const fetchCats = async () => {
@@ -158,7 +131,7 @@ const AddProduct = () => {
       // Basic fields
       data.append("name", formData.name);
       data.append("slug", formData.slug);
-      data.append("sku", formData.sku);
+      data.append("sku", skuManual ? formData.sku.trim() : "");
       data.append("description", formData.description);
       data.append("brand", formData.brand);
       data.append("weight", formData.weight);
@@ -364,26 +337,9 @@ const AddProduct = () => {
                 </label>
                 <input
                   value={formData.name}
-                  onChange={(e) => {
-                    const nextName = e.target.value;
-                    setFormData((prev) => ({
-                      ...prev,
-                      name: nextName,
-                      sku:
-                        !prev.sku || isAutoSku(prev.sku, prev.name, 1)
-                          ? makeSku(nextName, 1)
-                          : prev.sku,
-                      variants: prev.variants.map((variant, idx) => {
-                        const variantIndex = idx + 1;
-                        const shouldAuto =
-                          !variant.sku ||
-                          isAutoSku(variant.sku, prev.name, variantIndex);
-                        return shouldAuto
-                          ? { ...variant, sku: makeSku(nextName, variantIndex) }
-                          : variant;
-                      }),
-                    }));
-                  }}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
                   placeholder="e.g. Premium Basmati Rice"
                 />
@@ -422,13 +378,23 @@ const AddProduct = () => {
                     Product Code
                   </label>
                   <input
-                    value={formData.sku}
-                    onChange={(e) =>
-                      setFormData({ ...formData, sku: e.target.value })
-                    }
+                    value={skuManual ? formData.sku : skuPreview}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (!next.trim()) {
+                        setSkuManual(false);
+                        setFormData((prev) => ({ ...prev, sku: "" }));
+                        return;
+                      }
+                      setSkuManual(true);
+                      setFormData((prev) => ({ ...prev, sku: next }));
+                    }}
                     className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-mono font-bold outline-none ring-primary/5 focus:ring-2 transition-all"
-                    placeholder="AUTO-GENERATED"
+                    placeholder="Generated from the product name"
                   />
+                  <p className="text-[10px] text-slate-500 ml-1">
+                    Leave this as the suggestion to let the server assign the next unique SKU. Type a code only if you want to set it yourself.
+                  </p>
                 </div>
               </div>
             </div>
@@ -457,7 +423,7 @@ const AddProduct = () => {
                           price: "",
                           salePrice: "",
                           stock: "",
-                          sku: makeSku(prev.name, prev.variants.length + 1),
+                          sku: "",
                         },
                       ],
                     }))
@@ -579,7 +545,7 @@ const AddProduct = () => {
                           newVariants[index].sku = e.target.value;
                           setFormData({ ...formData, variants: newVariants });
                         }}
-                        placeholder={makeSku(formData.name, index + 1)}
+                        placeholder="Auto"
                         className="w-full px-3 py-2 bg-white ring-1 ring-slate-200 border-none rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-primary/10"
                       />
                     </div>
@@ -587,20 +553,10 @@ const AddProduct = () => {
                       <button
                         onClick={() => {
                           if (formData.variants.length > 1) {
-                            setFormData((prev) => {
-                              const remaining = prev.variants
-                                .map((variant, idx) => ({ variant, oldIndex: idx + 1 }))
-                                .filter((item) => item.oldIndex !== index + 1)
-                                .map((item, newIdx) => {
-                                  const shouldAuto =
-                                    !item.variant.sku ||
-                                    isAutoSku(item.variant.sku, prev.name, item.oldIndex);
-                                  return shouldAuto
-                                    ? { ...item.variant, sku: makeSku(prev.name, newIdx + 1) }
-                                    : item.variant;
-                                });
-                              return { ...prev, variants: remaining };
-                            });
+                            setFormData((prev) => ({
+                              ...prev,
+                              variants: prev.variants.filter((_, itemIndex) => itemIndex !== index),
+                            }));
                           }
                         }}
                         className="p-2 text-slate-300 hover:text-rose-500 transition-colors">

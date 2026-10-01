@@ -14,6 +14,7 @@ export const sellerApi = {
     resetPassword: (data) => axiosInstance.post('/seller/reset-password', data),
     // Products
     getProducts: (params) => axiosInstance.get('/products/seller/me', { params }),
+    previewProductSku: (name) => axiosInstance.get('/products/sku-preview', { params: { name } }),
     getProductById: (id) => axiosInstance.get(`/products/${id}`),
     createProduct: (data) => axiosInstance.post('/products', data),
     updateProduct: (id, data) => axiosInstance.put(`/products/${id}`, data),

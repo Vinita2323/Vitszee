@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
 import { adminApi } from '../services/adminApi';
+import { useProductSkuPreview } from '@shared/hooks/useProductSkuPreview';
 import { toast } from 'sonner';
 import {
     HiOutlinePlus,
@@ -60,6 +61,7 @@ const ProductManagement = () => {
     const [itemToReject, setItemToReject] = useState(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [editingItem, setEditingItem] = useState(null);
+    const [skuManual, setSkuManual] = useState(false);
     const [modalTab, setModalTab] = useState('general');
 
     const [formData, setFormData] = useState({
@@ -84,6 +86,15 @@ const ProductManagement = () => {
         variants: [
             { id: Date.now(), name: 'Default', price: '', salePrice: '', stock: '', sku: '' }
         ]
+    });
+
+    const loadSkuPreview = useCallback(async (productName) => {
+        const res = await adminApi.previewProductSku(productName);
+        return res.data?.result?.sku || '';
+    }, []);
+    const skuPreview = useProductSkuPreview(formData.name, {
+        enabled: !skuManual && !editingItem,
+        loadPreview: loadSkuPreview,
     });
 
     const [viewingVariants, setViewingVariants] = useState(null);
@@ -186,7 +197,7 @@ const ProductManagement = () => {
         try {
             const data = new FormData();
             const calculatedSlug = formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '');
-            const calculatedSku = formData.sku || (firstVariant?.sku ? firstVariant.sku : 'SKU-' + Date.now());
+            const calculatedSku = skuManual ? String(formData.sku || '').trim() : '';
 
             data.append('name', formData.name);
             data.append('slug', calculatedSlug);
@@ -367,6 +378,7 @@ const ProductManagement = () => {
                 ]
             });
             setEditingItem(item);
+            setSkuManual(true);
         } else {
             setFormData({
                 name: '', slug: '', sku: '', description: '', price: '',
@@ -379,6 +391,7 @@ const ProductManagement = () => {
                 ]
             });
             setEditingItem(null);
+            setSkuManual(false);
         }
         setModalTab('general');
         setIsProductModalOpen(true);
@@ -876,11 +889,28 @@ const ProductManagement = () => {
                                                 <div className="space-y-1.5 flex flex-col">
                                                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Product Code</label>
                                                     <input
-                                                        value={formData.sku}
-                                                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                                                        value={skuManual ? formData.sku : skuPreview}
+                                                        onChange={(e) => {
+                                                            const next = e.target.value;
+                                                            if (!next.trim()) {
+                                                                if (editingItem) {
+                                                                    setSkuManual(true);
+                                                                    setFormData((prev) => ({ ...prev, sku: editingItem.sku || '' }));
+                                                                    return;
+                                                                }
+                                                                setSkuManual(false);
+                                                                setFormData((prev) => ({ ...prev, sku: '' }));
+                                                                return;
+                                                            }
+                                                            setSkuManual(true);
+                                                            setFormData((prev) => ({ ...prev, sku: next }));
+                                                        }}
                                                         className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-mono font-bold outline-none ring-primary/5 focus:ring-2"
-                                                        placeholder="AUTO-GENERATED"
+                                                        placeholder="Generated from the product name"
                                                     />
+                                                    <p className="text-[10px] text-slate-500 ml-1">
+                                                        New products get the next unique SKU from the server. An existing product keeps its SKU unless you type a different code.
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
@@ -999,7 +1029,7 @@ const ProductManagement = () => {
                                                                             news[i].sku = e.target.value;
                                                                             setFormData({ ...formData, variants: news });
                                                                         }}
-                                                                        placeholder="mango-001"
+                                                                        placeholder="Auto"
                                                                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none ring-0 focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
                                                                     />
                                                                     <button

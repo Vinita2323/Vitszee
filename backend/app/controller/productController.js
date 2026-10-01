@@ -3,6 +3,15 @@ import Order from "../models/order.js";
 import Review from "../models/review.js";
 import { handleResponse } from "../utils/helper.js";
 import { slugify } from "../utils/slugify.js";
+import {
+  SkuConflictError,
+  SKU_ALREADY_EXISTS_MESSAGE,
+  allocateNextSku,
+  assertSkuAvailable,
+  fillMissingVariantSkus,
+  insertUniqueProduct,
+  resolveSkuForUpdate,
+} from "../services/productSkuService.js";
 import getPagination from "../utils/pagination.js";
 import Admin from "../models/admin.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
@@ -80,14 +89,6 @@ function parseSellerIdFilters({ sellerId, sellerIds }) {
   return [];
 }
 
-function makeProductSku(name, index = 1) {
-  const prefix = String(name || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 5) || "item";
-  return `${prefix}-${String(index).padStart(3, "0")}`;
-}
-
 function duplicateProductMessage(error) {
   const patternField = error?.keyPattern ? Object.keys(error.keyPattern)[0] : "";
   const raw = String(error?.message || "");
@@ -100,7 +101,7 @@ function duplicateProductMessage(error) {
     return "This product name is already used by another product. Open General Info, change the product title, and save again.";
   }
   if (field === "sku") {
-    return "This product code is already used by another product. Open General Info, change the Product Code, and save again.";
+    return SKU_ALREADY_EXISTS_MESSAGE;
   }
   return "This product name or product code is already used. Open General Info, change the title or Product Code, and save again.";
 }
@@ -682,22 +683,10 @@ export const createProduct = async (req, res) => {
       return handleResponse(res, 400, "Product name is required");
     }
     
-    // Auto-generate slug
-    if (!productData.slug || productData.slug.trim() === "") {
-      productData.slug = slugify(productData.name);
-    } else {
-      productData.slug = slugify(productData.slug);
-    }
-
     productData.description =
       typeof productData.description === "string"
         ? productData.description.trim()
         : productData.description || "";
-
-    // Auto-generate product SKU if missing
-    if (!productData.sku || String(productData.sku).trim() === "") {
-      productData.sku = makeProductSku(productData.name, 1);
-    }
 
     applyMediaFields(productData);
 
@@ -713,16 +702,6 @@ export const createProduct = async (req, res) => {
       } catch (e) {
         productData.variants = [];
       }
-    }
-
-    if (Array.isArray(productData.variants)) {
-      productData.variants = productData.variants.map((variant, idx) => ({
-        ...variant,
-        sku:
-          variant?.sku && String(variant.sku).trim()
-            ? variant.sku
-            : makeProductSku(productData.name, idx + 1),
-      }));
     }
 
     let moderationUpdate = {};
@@ -743,7 +722,7 @@ export const createProduct = async (req, res) => {
     }
     Object.assign(productData, moderationUpdate);
 
-    const product = await Product.create(productData);
+    const product = await insertUniqueProduct(Product, productData);
     
     if (isPendingApproval && product && product._id) {
       try {
@@ -784,6 +763,9 @@ export const createProduct = async (req, res) => {
     );
   } catch (error) {
     logger.error("Create Product Error", { scope: "createProduct", error });
+    if (error?.name === "SkuConflictError" || error instanceof SkuConflictError) {
+      return handleResponse(res, 400, error.message || SKU_ALREADY_EXISTS_MESSAGE);
+    }
     if (error.code === 11000) {
       return handleResponse(res, 400, duplicateProductMessage(error));
     }
@@ -879,9 +861,14 @@ export const updateProduct = async (req, res) => {
           : productData.description || "";
     }
 
-    const skuBaseName = productData.name || product.name;
-    if (!productData.sku || String(productData.sku).trim() === "") {
-      productData.sku = product.sku || makeProductSku(skuBaseName, 1);
+    if (!Object.prototype.hasOwnProperty.call(productData, "sku") || productData.sku == null) {
+      productData.sku = product.sku;
+    } else {
+      const resolvedSku = resolveSkuForUpdate(product.sku, productData.sku);
+      if (resolvedSku.changed) {
+        await assertSkuAvailable(Product, resolvedSku.sku, product._id);
+      }
+      productData.sku = resolvedSku.sku;
     }
 
     applyMediaFields(productData);
@@ -907,13 +894,10 @@ export const updateProduct = async (req, res) => {
     }
 
     if (Array.isArray(productData.variants)) {
-      productData.variants = productData.variants.map((variant, idx) => ({
-        ...variant,
-        sku:
-          variant?.sku && String(variant.sku).trim()
-            ? variant.sku
-            : makeProductSku(skuBaseName, idx + 1),
-      }));
+      productData.variants = fillMissingVariantSkus(
+        productData.variants,
+        productData.sku || product.sku,
+      );
     }
 
     let moderationUpdate = {};
@@ -977,6 +961,9 @@ export const updateProduct = async (req, res) => {
     );
   } catch (error) {
     logger.error("Update Product Error", { scope: "updateProduct", error });
+    if (error?.name === "SkuConflictError" || error instanceof SkuConflictError) {
+      return handleResponse(res, 400, error.message || SKU_ALREADY_EXISTS_MESSAGE);
+    }
     if (error.name === "ValidationError") {
       return handleResponse(
         res,
@@ -992,6 +979,20 @@ export const updateProduct = async (req, res) => {
     if (error.code === 11000) {
       return handleResponse(res, 400, duplicateProductMessage(error));
     }
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const previewProductSku = async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) {
+      return handleResponse(res, 400, "Product name is required");
+    }
+    const sku = await allocateNextSku(Product, name);
+    return handleResponse(res, 200, "SKU preview", { sku });
+  } catch (error) {
+    logger.error("SKU preview error", { scope: "previewProductSku", error });
     return handleResponse(res, 500, error.message);
   }
 };
@@ -1036,12 +1037,93 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+function isCodeSku(value) {
+  const text = String(value || "").trim();
+  return Boolean(text) && !/\s/.test(text) && /^[a-z0-9]+(?:-[a-z0-9]+)+$/i.test(text);
+}
+
+function generatedSkuFromProduct(product) {
+  const prefix =
+    String(product?.name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 5) || "item";
+  const id = String(product?._id || "").replace(/[^a-z0-9]/gi, "");
+  const suffix = (id.slice(-4) || "001").toLowerCase();
+  return `${prefix}-${suffix}`;
+}
+
+function publicSkuFromProduct(product) {
+  const stored = String(product?.sku || "").trim();
+  if (isCodeSku(stored)) return stored.toLowerCase();
+  return generatedSkuFromProduct(product);
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function findProductByPublicSku(rawSku) {
+  const normalized = decodeURIComponent(String(rawSku || "").trim()).toLowerCase();
+  if (!normalized) return null;
+
+  const exact = new RegExp(`^${escapeRegex(normalized)}$`, "i");
+  const direct = await Product.findOne({
+    $or: [{ sku: exact }, { slug: normalized }, { "variants.sku": exact }],
+  }).select("_id");
+  if (direct) return direct;
+
+  const generated = normalized.match(/^([a-z0-9]{1,5})-([a-f0-9]{4})$/);
+  if (!generated) return null;
+
+  const suffix = generated[2];
+  const candidates = await Product.find({
+    $expr: {
+      $regexMatch: {
+        input: { $toString: "$_id" },
+        regex: `${suffix}$`,
+        options: "i",
+      },
+    },
+  })
+    .select("name sku")
+    .limit(25)
+    .lean();
+
+  const match = candidates.find(
+    (item) =>
+      publicSkuFromProduct(item) === normalized ||
+      generatedSkuFromProduct(item) === normalized,
+  );
+  return match ? { _id: match._id } : null;
+}
+
+/* ===============================
+   GET PRODUCT BY SKU
+================================ */
+export const getProductBySku = async (req, res) => {
+  try {
+    const found = await findProductByPublicSku(req.params.sku);
+    if (!found) return handleResponse(res, 404, "Product not found");
+    req.params.id = String(found._id);
+    return getProductById(req, res);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
 /* ===============================
    GET SINGLE PRODUCT
 ================================ */
 export const getProductById = async (req, res) => {
   try {
-    const { id } = req.params;
+    let { id } = req.params;
+    if (!/^[a-f0-9]{24}$/i.test(String(id || ""))) {
+      const found = await findProductByPublicSku(id);
+      if (!found) return handleResponse(res, 404, "Product not found");
+      id = String(found._id);
+      req.params.id = id;
+    }
     const enforceRadius = isCustomerVisibilityRequest(req);
 
     const cacheKey = buildKey("catalog", "product", id);

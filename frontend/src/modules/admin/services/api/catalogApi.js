@@ -30,6 +30,7 @@ export const adminCatalogApi = {
         axiosInstance.patch(`/products/moderation/${id}/approve`, data),
     rejectProductModeration: (id, data = {}) =>
         axiosInstance.patch(`/products/moderation/${id}/reject`, data),
+    previewProductSku: (name) => axiosInstance.get('/products/sku-preview', { params: { name } }),
     createProduct: (formData) => axiosInstance.post('/products', formData),
     updateProduct: (id, formData) =>
         axiosInstance.put(`/products/${id}`, formData),

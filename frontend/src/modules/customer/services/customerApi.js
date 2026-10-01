@@ -33,6 +33,8 @@ export const customerApi = {
     getWithDedupe("/header-categories", {}, { ttl: 5000 }), // 5 seconds for header categories to reflect admin changes fast
   getProducts: (params) => getWithDedupe("/products", getActiveLocationParams(params)),
   getProductById: (id, params) => getWithDedupe(`/products/${id}`, getActiveLocationParams(params)),
+  getProductBySku: (sku, params) =>
+    getWithDedupe(`/products/sku/${encodeURIComponent(sku)}`, getActiveLocationParams(params)),
 
   // Sellers & Location
   getNearbySellers: (params) => getWithDedupe("/seller/nearby", getActiveLocationParams(params)),

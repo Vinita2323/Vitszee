@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Card from "@shared/components/ui/Card";
 import Badge from "@shared/components/ui/Badge";
 import {
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { sellerApi } from "../services/sellerApi";
+import { useProductSkuPreview } from "@shared/hooks/useProductSkuPreview";
 import { toast } from "sonner";
 import Pagination from "@shared/components/ui/Pagination";
 
@@ -134,23 +135,10 @@ const ProductManagement = () => {
   const [viewingVariants, setViewingVariants] = useState(null);
   const [isVariantsViewModalOpen, setIsVariantsViewModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [skuManual, setSkuManual] = useState(false);
   const [modalTab, setModalTab] = useState("general");
 
-  const makeSku = (name, index = 1) => {
-    const prefix = String(name || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "")
-      .slice(0, 5) || "item";
-    return `${prefix}-${String(index).padStart(3, "0")}`;
-  };
-
-  const isAutoSku = (sku, name, index = 1) =>
-    String(sku || "").toLowerCase() === makeSku(name, index);
-
-  const displaySku = (product) =>
-    product.sku ||
-    (Array.isArray(product.variants) && product.variants.length > 0 && product.variants[0]?.sku) ||
-    makeSku(product.name, 1);
+  const displaySku = (product) => product.sku || "—";
 
   const resolveLowStockThreshold = (product) => {
     const parsed = Number(product?.lowStockAlert);
@@ -217,6 +205,15 @@ const ProductManagement = () => {
       cities: "",
       pincodes: "",
     },
+  });
+
+  const loadSkuPreview = useCallback(async (productName) => {
+    const res = await sellerApi.previewProductSku(productName);
+    return res.data?.result?.sku || "";
+  }, []);
+  const skuPreview = useProductSkuPreview(formData.name, {
+    enabled: !skuManual && !editingItem,
+    loadPreview: loadSkuPreview,
   });
 
   const safeProducts = useMemo(
@@ -327,7 +324,7 @@ const ProductManagement = () => {
       const data = new FormData();
       data.append("name", formData.name);
       data.append("slug", formData.slug);
-      data.append("sku", formData.sku);
+      data.append("sku", skuManual ? String(formData.sku || "").trim() : "");
       data.append("description", formData.description);
       data.append("price", Number(formData.price));
       data.append("salePrice", Number(formData.salePrice) || 0);
@@ -506,6 +503,7 @@ const ProductManagement = () => {
         },
       });
       setEditingItem(item);
+      setSkuManual(true);
     } else {
       setFormData({
         name: "",
@@ -542,6 +540,7 @@ const ProductManagement = () => {
         },
       });
       setEditingItem(null);
+      setSkuManual(false);
     }
     setModalTab("general");
     setIsProductModalOpen(true);
@@ -1053,26 +1052,9 @@ const ProductManagement = () => {
                           </label>
                           <input
                             value={formData.name}
-                            onChange={(e) => {
-                              const nextName = e.target.value;
-                              setFormData((prev) => ({
-                                ...prev,
-                                name: nextName,
-                                sku:
-                                  !prev.sku || isAutoSku(prev.sku, prev.name, 1)
-                                    ? makeSku(nextName, 1)
-                                    : prev.sku,
-                                variants: prev.variants.map((variant, idx) => {
-                                  const variantIndex = idx + 1;
-                                  const shouldAuto =
-                                    !variant.sku ||
-                                    isAutoSku(variant.sku, prev.name, variantIndex);
-                                  return shouldAuto
-                                    ? { ...variant, sku: makeSku(nextName, variantIndex) }
-                                    : variant;
-                                }),
-                              }));
-                            }}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, name: e.target.value }))
+                            }
                             className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2"
                             placeholder="e.g. Premium Basmati Rice"
                           />
@@ -1139,13 +1121,28 @@ const ProductManagement = () => {
                             Product Code
                           </label>
                           <input
-                            value={formData.sku}
-                            onChange={(e) =>
-                              setFormData({ ...formData, sku: e.target.value })
-                            }
+                            value={skuManual ? formData.sku : skuPreview}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              if (!next.trim()) {
+                                if (editingItem) {
+                                  setSkuManual(true);
+                                  setFormData((prev) => ({ ...prev, sku: editingItem.sku || "" }));
+                                  return;
+                                }
+                                setSkuManual(false);
+                                setFormData((prev) => ({ ...prev, sku: "" }));
+                                return;
+                              }
+                              setSkuManual(true);
+                              setFormData((prev) => ({ ...prev, sku: next }));
+                            }}
                             className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-mono font-bold outline-none ring-primary/5 focus:ring-2"
-                            placeholder="AUTO-GENERATED"
+                            placeholder="Generated from the product name"
                           />
+                          <p className="text-[10px] text-slate-500 ml-1">
+                            New products get the next unique SKU from the server. An existing product keeps its SKU unless you type a different code.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1360,7 +1357,7 @@ const ProductManagement = () => {
                                   price: "",
                                   salePrice: "",
                                   stock: "",
-                                  sku: makeSku(prev.name, prev.variants.length + 1),
+                                  sku: "",
                                 },
                               ],
                             }))
@@ -1412,20 +1409,10 @@ const ProductManagement = () => {
                                 }} placeholder="SKU" className="w-full bg-white px-3 py-2 rounded-xl text-[10px] ring-1 ring-slate-100 outline-none" />
                               </div>
                               <button type="button" onClick={() => {
-                                setFormData((prev) => {
-                                  const remaining = prev.variants
-                                    .map((variant, idx) => ({ variant, oldIndex: idx + 1 }))
-                                    .filter((item, idx) => idx !== i)
-                                    .map((item, newIdx) => {
-                                      const shouldAuto =
-                                        !item.variant.sku ||
-                                        isAutoSku(item.variant.sku, prev.name, item.oldIndex);
-                                      return shouldAuto
-                                        ? { ...item.variant, sku: makeSku(prev.name, newIdx + 1) }
-                                        : item.variant;
-                                    });
-                                  return { ...prev, variants: remaining };
-                                });
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  variants: prev.variants.filter((_, itemIndex) => itemIndex !== i),
+                                }));
                               }} className="text-rose-500 p-2 hover:bg-rose-50 rounded-lg shrink-0 mb-0.5">
                                 <HiOutlineTrash className="h-4 w-4" />
                               </button>

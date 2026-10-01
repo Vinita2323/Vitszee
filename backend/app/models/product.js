@@ -14,6 +14,9 @@ const productSchema = new mongoose.Schema(
             trim: true,
             lowercase: true,
         },
+        // Unique product code. Blank values are assigned on create as
+        // `{full-product-name}-{001}`. This unique index is the last guard
+        // against two products saving the same SKU.
         sku: {
             type: String,
             unique: true,

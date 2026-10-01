@@ -20,6 +20,8 @@ const mapProduct = (p) => ({
   price: p.salePrice ?? p.price,
   originalPrice: p.price,
   weight: p.weight || "1 unit",
+  sku: p.sku,
+  variants: p.variants,
   deliveryTime: "8-15 mins",
 });
 

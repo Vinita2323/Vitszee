@@ -28,7 +28,7 @@ export const getAdminLowestPriceConfig = async (req, res) => {
     const config = await getOrCreateDefaultConfig();
     const populated = await LowestPriceConfig.findById(config._id).populate({
       path: "productIds",
-      select: "name slug price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId",
+      select: "name slug sku price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId variants",
       populate: [
         { path: "sellerId", select: "shopName name isVerified isActive" },
         { path: "categoryId", select: "name slug" },
@@ -64,7 +64,7 @@ export const updateAdminLowestPriceConfig = async (req, res) => {
 
     const populated = await LowestPriceConfig.findById(config._id).populate({
       path: "productIds",
-      select: "name slug price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId",
+      select: "name slug sku price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId variants",
       populate: [
         { path: "sellerId", select: "shopName name isVerified isActive" },
         { path: "categoryId", select: "name slug" },
@@ -95,7 +95,7 @@ export const getPublicLowestPriceConfig = async (req, res) => {
       const populated = await LowestPriceConfig.findById(config._id)
         .populate({
           path: "productIds",
-          select: "name slug price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId",
+          select: "name slug sku price salePrice mainImage image stock weight unit sellerId status approvalStatus categoryId variants",
           match: {
             status: "active",
             ...getApprovedOrLegacyFilter(),
@@ -113,6 +113,7 @@ export const getPublicLowestPriceConfig = async (req, res) => {
         _id: p._id,
         name: p.name,
         slug: p.slug,
+        sku: p.sku,
         image: p.mainImage || p.image || "",
         mainImage: p.mainImage || p.image || "",
         price: p.salePrice ?? p.price,
@@ -150,6 +151,7 @@ export const getPublicLowestPriceConfig = async (req, res) => {
         _id: p._id,
         name: p.name,
         slug: p.slug,
+        sku: p.sku,
         image: p.mainImage || p.image || "",
         mainImage: p.mainImage || p.image || "",
         price: p.salePrice ?? p.price,

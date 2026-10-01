@@ -28,6 +28,8 @@ const OfferSections = ({ sections, noServiceData }) => {
               price: p.salePrice ?? p.price,
               originalPrice: p.price ?? p.salePrice,
               weight: p.weight,
+              sku: p.sku,
+              variants: p.variants,
               deliveryTime: p.deliveryTime,
             }));
 

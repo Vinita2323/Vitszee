@@ -6,6 +6,8 @@ import {
     updateProduct,
     deleteProduct,
     getProductById,
+    getProductBySku,
+    previewProductSku,
     getModerationProducts,
     approveProduct,
     rejectProduct,
@@ -34,6 +36,14 @@ router.post("/adjust-stock", verifyToken, allowRoles("seller"), requireApprovedS
 router.get("/moderation", verifyToken, allowRoles("admin"), getModerationProducts);
 router.patch("/moderation/:id/approve", verifyToken, allowRoles("admin"), approveProduct);
 router.patch("/moderation/:id/reject", verifyToken, allowRoles("admin"), rejectProduct);
+router.get(
+    "/sku-preview",
+    verifyToken,
+    allowRoles("seller", "admin"),
+    requireApprovedSeller,
+    previewProductSku,
+);
+router.get("/sku/:sku", optionalVerifyToken, getProductBySku);
 router.get("/:id", optionalVerifyToken, getProductById);
 
 router.post(
