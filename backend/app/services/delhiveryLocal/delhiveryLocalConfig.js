@@ -76,7 +76,7 @@ export async function getDelhiveryLocalConfig() {
       .filter(Boolean);
   const cityPincodePrefixes = (() => {
     const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES || dbSettings.cityPincodePrefixes);
-    return list.length ? list : ["380", "382"];
+    return list.length ? list : ["380"]; // clean Ahmedabad prefix (382 overlaps Gandhinagar; add exact 382xxx via DELHIVERY_LOCAL_CITY_PINCODES)
   })();
   const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
 

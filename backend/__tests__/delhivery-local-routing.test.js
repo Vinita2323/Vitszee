@@ -21,7 +21,7 @@ function orderQuery(doc) {
 const ENV = [
   "DELHIVERY_LOCAL_ENABLED", "DELHIVERY_LOCAL_ENVIRONMENT",
   "DELHIVERY_LOCAL_STAGING_CLIENT_ID", "DELHIVERY_LOCAL_STAGING_CLIENT_SECRET",
-  "DELHIVERY_LOCAL_CLIENT_CODE", "DELHIVERY_LOCAL_CITY_NAMES",
+  "DELHIVERY_LOCAL_CLIENT_CODE", "DELHIVERY_LOCAL_CITY_NAMES", "DELHIVERY_LOCAL_CITY_PINCODES", "DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES",
 ];
 const saved = {};
 
@@ -92,12 +92,29 @@ describe("resolveLocalEligibility (city-name gate)", () => {
     expect((await resolveLocalEligibility("ORD-4")).eligible).toBe(false);
   });
 
-  it("routes to COURIER when the customer address never mentions Ahmedabad (known gap)", async () => {
+  it("routes to COURIER for a 382xxx customer with no city name and not in the pincode list", async () => {
     mockOrderFindOne.mockReturnValue(orderQuery({
       address: { city: "Ranip, Gujarat, 382470" },
       seller: { city: "Ahmedabad", address: "New Ranip Ahmedabad" },
     }));
     expect((await resolveLocalEligibility("ORD-5")).eligible).toBe(false);
+  });
+
+  it("catches a 380xxx customer via the pincode backup even without the city name", async () => {
+    mockOrderFindOne.mockReturnValue(orderQuery({
+      address: { city: "Vastrapur", address: "Near Lake Garden, 380015" }, // no "Ahmedabad", pin 380015
+      seller: { city: "Ahmedabad", address: "New Ranip Ahmedabad" },
+    }));
+    expect((await resolveLocalEligibility("ORD-7")).eligible).toBe(true);
+  });
+
+  it("catches an exact 382xxx customer pincode when it is added to the config list", async () => {
+    process.env.DELHIVERY_LOCAL_CITY_PINCODES = "382470";
+    mockOrderFindOne.mockReturnValue(orderQuery({
+      address: { city: "Ranip, Gujarat, 382470" }, // no "Ahmedabad" text, pin 382470 (listed)
+      seller: { city: "Ahmedabad", address: "New Ranip Ahmedabad" },
+    }));
+    expect((await resolveLocalEligibility("ORD-8")).eligible).toBe(true);
   });
 
   it("is not eligible when Local is disabled (no order lookup)", async () => {

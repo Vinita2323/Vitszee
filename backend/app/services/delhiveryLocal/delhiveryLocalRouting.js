@@ -1,6 +1,6 @@
 import Order from "../../models/order.js";
 import logger from "../logger.js";
-import { getDelhiveryLocalConfig, matchesLocalCity } from "./delhiveryLocalConfig.js";
+import { getDelhiveryLocalConfig, matchesLocalCity, isLocalCityPincode } from "./delhiveryLocalConfig.js";
 
 /** Combined address text we scan for the configured city name(s). */
 function sellerCityText(seller = {}) {
@@ -13,17 +13,27 @@ function customerCityText(order = {}) {
   return [a.city, a.fullAddress, a.address, a.landmark].filter(Boolean).join(" ");
 }
 
+/** Extracts a 6-digit pincode from the delivery address (field or embedded in text). */
+function dropPincode(order = {}) {
+  const a = order.address || {};
+  const pin = String(a.pincode || "").trim();
+  if (/^\d{6}$/.test(pin)) return pin;
+  const text = `${a.fullAddress || ""} ${a.address || ""} ${a.city || ""} ${a.landmark || ""}`;
+  const m = text.match(/\b\d{6}\b/);
+  return m ? m[0] : "";
+}
+
 /**
  * Decides whether an order should go via Delhivery Local (quick / intracity) delivery.
  *
- * Gate (per product decision): quick delivery applies only when BOTH the seller and the
- * customer address text mention the configured city (Ahmedabad by default). This covers the
- * whole city regardless of pincode — customer pincodes are often missing or garbled — so any
- * seller registered in the city serves quick orders to any customer in the city. Everything
- * else goes via the courier (Express) flow.
+ * An end (seller or customer) counts as "in the city" when its address TEXT mentions a
+ * configured city name (Ahmedabad by default) OR its pincode is in the configured set
+ * (clean 380xxx by default; add exact 382xxx pins via DELHIVERY_LOCAL_CITY_PINCODES).
+ * Quick delivery applies only when BOTH ends are in the city; everything else goes courier.
+ * This covers the whole city even when a customer's pincode is missing/garbled or the
+ * address omits the city name.
  *
- * Live rider availability is confirmed by the Local quote/create call; an in-city order that
- * Local cannot fulfil is held for manual handling rather than falling back to courier.
+ * An in-city order that Local cannot fulfil is held for manual handling (not couriered).
  *
  * @returns {Promise<{eligible: boolean, sellerOk: boolean, customerOk: boolean, reason: string}>}
  */
@@ -44,8 +54,12 @@ export async function resolveLocalEligibility(orderId, orderDoc = null) {
   if (!order) return { eligible: false, sellerOk: false, customerOk: false, reason: "order not found" };
 
   const seller = order.seller || {};
-  const sellerOk = matchesLocalCity(sellerCityText(seller), config);
-  const customerOk = matchesLocalCity(customerCityText(order), config);
+  const sellerPin = String(seller.pincode || "").trim();
+  const customerPin = dropPincode(order);
+
+  // City-name match OR pincode backup, for each end.
+  const sellerOk = matchesLocalCity(sellerCityText(seller), config) || isLocalCityPincode(sellerPin, config);
+  const customerOk = matchesLocalCity(customerCityText(order), config) || isLocalCityPincode(customerPin, config);
   const eligible = sellerOk && customerOk;
 
   const city = (config.cityNames && config.cityNames[0]) || "city";
