@@ -80,6 +80,14 @@ export async function getDelhiveryLocalConfig() {
   })();
   const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
 
+  // City-name gate (chosen method): an order qualifies for quick delivery only when BOTH
+  // the seller and the customer address text mention one of these city names. Default
+  // covers Ahmedabad and its common spellings; extend via DELHIVERY_LOCAL_CITY_NAMES.
+  const cityNames = (() => {
+    const list = parseList(process.env.DELHIVERY_LOCAL_CITY_NAMES || dbSettings.cityNames).map((c) => c.toLowerCase());
+    return list.length ? list : ["ahmedabad", "ahmadabad", "amdavad", "ahmdabad", "ahemdabad"];
+  })();
+
   // Public URL Delhivery calls with fulfilment webhooks. A webhook URL is mandatory
   // on every create-order request, so this must be reachable from the internet.
   const webhookUrl =
@@ -130,6 +138,7 @@ export async function getDelhiveryLocalConfig() {
     autoServiceabilityCheck,
     cityPincodePrefixes,
     cityPincodes,
+    cityNames,
     hasCredentials: Boolean(clientId && clientSecret && clientCode),
   };
 }
@@ -143,6 +152,17 @@ export function isLocalCityPincode(pincode, config) {
   if (!/^\d{6}$/.test(pin)) return false;
   if (Array.isArray(config?.cityPincodes) && config.cityPincodes.includes(pin)) return true;
   return Array.isArray(config?.cityPincodePrefixes) && config.cityPincodePrefixes.some((p) => pin.startsWith(p));
+}
+
+/**
+ * True when free-text address content mentions one of the configured quick-delivery
+ * city names (case-insensitive substring). Used to gate quick delivery to the city.
+ */
+export function matchesLocalCity(text, config) {
+  const t = String(text || "").toLowerCase();
+  if (!t) return false;
+  const names = Array.isArray(config?.cityNames) ? config.cityNames : [];
+  return names.some((n) => n && t.includes(n));
 }
 
 function maskSecret(secret) {
@@ -172,5 +192,6 @@ export async function getAdminDelhiveryLocalConfig() {
     autoServiceabilityCheck: config.autoServiceabilityCheck,
     cityPincodePrefixes: config.cityPincodePrefixes,
     cityPincodes: config.cityPincodes,
+    cityNames: config.cityNames,
   };
 }
