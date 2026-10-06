@@ -1,7 +1,7 @@
 import Shipment from "../../models/shipment.js";
 import Order from "../../models/order.js";
 import logger from "../logger.js";
-import { getDelhiveryLocalConfig } from "./delhiveryLocalConfig.js";
+import { getDelhiveryLocalConfig, isWithinCityBounds } from "./delhiveryLocalConfig.js";
 import { sendDelhiveryLocalRequest, extractLocalErrorMessage } from "./delhiveryLocalClient.js";
 import {
   mapLocalStatus,
@@ -85,19 +85,29 @@ function cleanCity(value) {
  * Delhivery Local is geo-based, so sending coordinates is what makes hyperlocal
  * serviceability resolve reliably (a bare pincode often cannot pinpoint the stop).
  */
-function extractGeo(loc) {
+function extractGeo(loc, config) {
   if (!loc || typeof loc !== "object") return null;
-  if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
-    // GeoJSON stores [longitude, latitude].
-    return geo(loc.coordinates[1], loc.coordinates[0]);
+  const g = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2
+    ? geo(loc.coordinates[1], loc.coordinates[0]) // GeoJSON stores [longitude, latitude]
+    : geo(loc.lat ?? loc.latitude, loc.lng ?? loc.longitude);
+  if (!g) return null;
+  // Drop coordinates that fall outside the quick-delivery city. Sellers/customers are
+  // sometimes saved with a placeholder from another city; sending those makes Delhivery
+  // reject the order as unserviceable. Omitting them lets Delhivery geocode the address.
+  if (config && !isWithinCityBounds(g.latitude, g.longitude, config)) {
+    logger.warn("[DelhiveryLocal] Ignoring out-of-city coordinates; geocoding from address instead", {
+      latitude: g.latitude,
+      longitude: g.longitude,
+    });
+    return null;
   }
-  return geo(loc.lat ?? loc.latitude, loc.lng ?? loc.longitude);
+  return g;
 }
 
 /**
  * Builds the customer (drop) block from an order.
  */
-function resolveDropDetails(order) {
+function resolveDropDetails(order, config) {
   const address = order.address || {};
   const customer = order.customer || {};
 
@@ -115,7 +125,7 @@ function resolveDropDetails(order) {
     pinCode = match ? match[0] : "";
   }
 
-  const geoLocation = extractGeo(address.location);
+  const geoLocation = extractGeo(address.location, config);
 
   // Address OR geolocation must be present; pinCode is optional when geo is supplied.
   if (!/^\d{6}$/.test(pinCode) && !geoLocation) {
@@ -142,7 +152,7 @@ function resolveDropDetails(order) {
 /**
  * Builds the seller (pickup) block from a seller doc.
  */
-function resolvePickupDetails(seller) {
+function resolvePickupDetails(seller, config) {
   const pickup = resolveSellerPickupDetails(seller); // { phone, address, city, state, pin }
   const phoneNumber = tenDigitPhone(pickup.phone, seller.phone);
   if (!phoneNumber) {
@@ -151,7 +161,7 @@ function resolvePickupDetails(seller) {
   const address1 = str(pickup.address, 250);
   if (!address1) throw new DelhiveryLocalInvalidRequestError("Seller pickup address is missing.");
 
-  const geoLocation = extractGeo(seller.location);
+  const geoLocation = extractGeo(seller.location, config);
 
   if (!/^\d{6}$/.test(String(pickup.pin || "")) && !geoLocation) {
     throw new DelhiveryLocalInvalidRequestError(
@@ -245,8 +255,8 @@ export async function createLocalOrder(orderId) {
   }
 
   const seller = order.seller || {};
-  const dropDetails = resolveDropDetails(order);
-  const pickupDetails = resolvePickupDetails(seller);
+  const dropDetails = resolveDropDetails(order, config);
+  const pickupDetails = resolvePickupDetails(seller, config);
 
   // Make sure the seller has a registered pickup location name (kept in sync with Express).
   try {

@@ -88,6 +88,18 @@ export async function getDelhiveryLocalConfig() {
     return list.length ? list : ["ahmedabad", "ahmadabad", "amdavad", "ahmdabad", "ahemdabad"];
   })();
 
+  // Geo sanity box for the quick-delivery city ("minLat,maxLat,minLng,maxLng").
+  // A stored coordinate outside this box is treated as bad/placeholder data (e.g. a
+  // default from another city) and is dropped from the Delhivery payload, so Delhivery
+  // geocodes from the address instead of rejecting the order as unserviceable.
+  const cityGeoBounds = (() => {
+    const raw = parseList(process.env.DELHIVERY_LOCAL_CITY_BOUNDS || dbSettings.cityGeoBounds).map(Number);
+    if (raw.length === 4 && raw.every((n) => Number.isFinite(n))) {
+      return { minLat: raw[0], maxLat: raw[1], minLng: raw[2], maxLng: raw[3] };
+    }
+    return { minLat: 22.8, maxLat: 23.3, minLng: 72.2, maxLng: 72.9 }; // Ahmedabad
+  })();
+
   // Public URL Delhivery calls with fulfilment webhooks. A webhook URL is mandatory
   // on every create-order request, so this must be reachable from the internet.
   const webhookUrl =
@@ -139,6 +151,7 @@ export async function getDelhiveryLocalConfig() {
     cityPincodePrefixes,
     cityPincodes,
     cityNames,
+    cityGeoBounds,
     hasCredentials: Boolean(clientId && clientSecret && clientCode),
   };
 }
@@ -163,6 +176,18 @@ export function matchesLocalCity(text, config) {
   if (!t) return false;
   const names = Array.isArray(config?.cityNames) ? config.cityNames : [];
   return names.some((n) => n && t.includes(n));
+}
+
+/**
+ * True when a coordinate falls inside the quick-delivery city's bounding box.
+ * Used to reject placeholder/wrong coordinates before sending them to Delhivery.
+ */
+export function isWithinCityBounds(lat, lng, config) {
+  const b = config?.cityGeoBounds;
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!b || !Number.isFinite(la) || !Number.isFinite(ln)) return false;
+  return la >= b.minLat && la <= b.maxLat && ln >= b.minLng && ln <= b.maxLng;
 }
 
 function maskSecret(secret) {
@@ -193,5 +218,6 @@ export async function getAdminDelhiveryLocalConfig() {
     cityPincodePrefixes: config.cityPincodePrefixes,
     cityPincodes: config.cityPincodes,
     cityNames: config.cityNames,
+    cityGeoBounds: config.cityGeoBounds,
   };
 }
