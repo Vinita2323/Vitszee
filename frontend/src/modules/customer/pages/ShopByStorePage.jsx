@@ -22,7 +22,8 @@ const mapProduct = (p) => ({
   weight: p.weight || "1 unit",
   sku: p.sku,
   variants: p.variants,
-  deliveryTime: "8-15 mins",
+  deliveryTime: p.delivery?.etaText || "8-15 mins",
+  delivery: p.delivery || null,
 });
 
 const ShopByStorePage = () => {

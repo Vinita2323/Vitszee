@@ -13,6 +13,7 @@ import {
   hydrateOrderItems,
 } from "./finance/pricingService.js";
 import { computeOrderDiscount } from "./finance/couponService.js";
+import { resolveDeliveryEstimateForSellers } from "./deliveryEstimate.js";
 
 function normalizeLocation(location = null) {
   const lat = Number(location?.lat);
@@ -519,6 +520,14 @@ export async function buildCheckoutPricingSnapshot({
   }, 0);
   const estimatedTimeMins = maxDurationSeconds > 0 ? Math.ceil(maxDurationSeconds / 60) + 15 : 15;
   aggregateBreakdown.estimatedTimeMins = estimatedTimeMins;
+
+  // Quick (intracity) orders are quoted in minutes; courier orders take days, so the
+  // backend decides the mode once and ships ready-made text every surface renders.
+  aggregateBreakdown.delivery = await resolveDeliveryEstimateForSellers({
+    sellerIds: sellerBreakdownEntries.map((entry) => entry.sellerId),
+    address,
+    estimatedTimeMins,
+  });
 
   return {
     hydratedItems,

@@ -1046,28 +1046,61 @@ const CheckoutPage = () => {
           {/* Left Column */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-4 sm:space-y-6 pb-6">
             {/* Delivery Time Banner */}
-            <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-50 border border-emerald-100/60 flex items-center justify-center text-[#1A4516] shrink-0">
-                  <Clock size={22} className="text-[#1A4516]" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-black text-slate-800 text-sm sm:text-base tracking-tight">
-                      Delivery in {pricingPreview?.estimatedTimeMins ? `${pricingPreview.estimatedTimeMins}-${pricingPreview.estimatedTimeMins + 5}` : "12-15"} mins
-                    </h3>
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
+            {(() => {
+              // Quick (intracity) orders are quoted in minutes; courier orders in days.
+              // The backend decides the mode; this fallback keeps the UI sane if it is absent.
+              const mins = pricingPreview?.estimatedTimeMins;
+              const d =
+                pricingPreview?.delivery ||
+                (mins >= 180
+                  ? { isQuick: false, etaText: "3-5 days", subtitle: "Standard courier delivery", badge: "Courier" }
+                  : {
+                      isQuick: true,
+                      etaText: mins ? `${mins}-${mins + 5} mins` : "12-15 mins",
+                      subtitle: "Instant quick-commerce dispatch",
+                      badge: "Express",
+                    });
+              const quick = d.isQuick !== false;
+              return (
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                        quick
+                          ? "bg-emerald-50 border-emerald-100/60 text-[#1A4516]"
+                          : "bg-slate-50 border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      <Clock size={22} className={quick ? "text-[#1A4516]" : "text-slate-600"} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-slate-800 text-sm sm:text-base tracking-tight">
+                          Delivery in {d.etaText}
+                        </h3>
+                        {quick && (
+                          <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 font-medium">{d.subtitle}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">Instant quick-commerce dispatch</p>
+                  <span
+                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border hidden sm:inline-block ${
+                      quick
+                        ? "text-emerald-800 bg-emerald-50 border-emerald-100/80"
+                        : "text-slate-700 bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    {quick ? "⚡ " : "📦 "}
+                    {d.badge}
+                  </span>
                 </div>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100/80 hidden sm:inline-block">
-                ⚡ Express
-              </span>
-            </div>
+              );
+            })()}
 
             {/* Address Section */}
             <CheckoutAddressSection

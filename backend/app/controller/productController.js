@@ -45,6 +45,7 @@ import {
   resolveProductApprovalStatus,
 } from "../services/productModerationService.js";
 import { buildSearchRegex } from "../utils/regex.js";
+import { resolveDeliveryMapForSellers } from "../services/deliveryEstimate.js";
 
 // Phase 3 P3-5: when search term is reasonably specific and the env flag
 // is enabled, prefer Mongo's `name + tags` text index over case-insensitive
@@ -430,8 +431,20 @@ export const getProducts = async (req, res) => {
           : null,
       }));
 
+      // Attach the delivery mode per product so listing cards show minutes for
+      // quick (intracity) sellers and days for courier ones, instead of a fixed label.
+      const deliveryMap = await resolveDeliveryMapForSellers({
+        sellerIds: [...sellerIdSet],
+        address: { city, pincode, address: area },
+        estimatedTimeMins: 10,
+      });
+      const withDelivery = normalizeProductListModeration(products).map((p) => ({
+        ...p,
+        delivery: deliveryMap.get(String(p.sellerId?._id || p.sellerId || "")) || null,
+      }));
+
       return {
-        items: normalizeProductListModeration(products),
+        items: withDelivery,
         page,
         limit,
         total,
