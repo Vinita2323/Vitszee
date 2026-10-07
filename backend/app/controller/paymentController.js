@@ -145,6 +145,7 @@ export const handleRazorpayWebhook = async (req, res) => {
       rawBody,
       authorization,
       correlationId: req.correlationId || null,
+      webhookEventId: req.headers["x-razorpay-event-id"] || null,
     });
 
     if (result.accepted) {
@@ -153,6 +154,10 @@ export const handleRazorpayWebhook = async (req, res) => {
     
     return res.status(400).send("Bad Request");
   } catch (error) {
+    const statusCode = Number(error?.statusCode || 500);
+    if (statusCode === 401 || statusCode === 400) {
+      return res.status(statusCode).send(statusCode === 401 ? "Unauthorized" : "Bad Request");
+    }
     logger.error("Razorpay webhook processing failed", {
       scope: "PaymentController.handleRazorpayWebhook",
       correlationId: req.correlationId || null,

@@ -102,7 +102,7 @@ function parseAllowedOrigins() {
   const raw =
     process.env.CORS_ALLOWED_ORIGINS ||
     process.env.FRONTEND_URL ||
-    "http://localhost:5173,http://localhost:3000";
+    "http://localhost:5174,http://localhost:3000";
   const parsed = raw
     .split(",")
     .map((origin) => origin.trim())
@@ -175,9 +175,10 @@ function createApp() {
   app.use(cors(corsOptions));
   app.use(globalApiRateLimiter);
 
-  // PhonePe webhook needs raw body for signature verification
+  // Payment webhooks need the original request bytes for signature checks.
+  // This must run before express.json(), which would replace the body with an object.
   app.use(
-    "/api/payments/webhook/phonepe",
+    ["/api/payments/webhook/phonepe", "/api/payments/webhook/razorpay"],
     express.raw({
       type: "application/json",
       limit: process.env.PAYMENT_WEBHOOK_MAX_PAYLOAD || "1mb",

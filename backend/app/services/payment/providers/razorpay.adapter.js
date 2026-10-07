@@ -41,7 +41,10 @@ export class RazorpayAdapter extends PaymentProviderPort {
       reference_id: merchantOrderId,
       description: "Order Payment",
       callback_url: redirectUrl,
-      callback_method: "get"
+      callback_method: "get",
+      notes: {
+        merchantOrderId: String(merchantOrderId),
+      },
     });
 
     return {
@@ -74,49 +77,87 @@ export class RazorpayAdapter extends PaymentProviderPort {
   }
 
   async validateWebhook({ rawBody, authorization }) {
-    const secret = String(process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET || "").trim();
-    return Razorpay.validateWebhookSignature(rawBody.toString("utf8"), authorization, secret);
+    const secret = String(process.env.RAZORPAY_WEBHOOK_SECRET || "").trim();
+    if (!secret) {
+      const err = new Error("Razorpay webhook secret is not configured");
+      err.statusCode = 500;
+      throw err;
+    }
+    const payload = rawWebhookBody(rawBody);
+    return Razorpay.validateWebhookSignature(payload, String(authorization || ""), secret);
   }
 
   async decodeWebhookPayload({ rawBody }) {
+    const payload = rawWebhookBody(rawBody);
     let jsonPayload;
     try {
-      jsonPayload = JSON.parse(rawBody.toString("utf8"));
+      jsonPayload = JSON.parse(payload);
     } catch {
       const err = new Error("Invalid format: Webhook body must be JSON");
       err.statusCode = 400;
       throw err;
     }
-    
-    const paymentLink = jsonPayload.payload?.payment_link?.entity;
-    if (!paymentLink) {
-        // Just return a generic parsed response if payment link is not present
-        // (Could be another type of event).
-        return {
-           eventId: crypto.randomUUID(), // Fallback
-           raw: jsonPayload
-        };
-    }
 
-    const stableEventId = jsonPayload.id || crypto.randomUUID();
+    const eventName = String(jsonPayload.event || "");
+    const paymentLink = jsonPayload.payload?.payment_link?.entity || null;
+    const payment = jsonPayload.payload?.payment?.entity || null;
+    const order = jsonPayload.payload?.order?.entity || null;
+    const notes = payment?.notes || paymentLink?.notes || {};
+    const merchantOrderId = String(
+      paymentLink?.reference_id ||
+      notes.merchantOrderId ||
+      notes.merchant_order_id ||
+      order?.receipt ||
+      "",
+    ).trim();
+    const state = webhookState(eventName, paymentLink, payment);
+    const transactionId = String(payment?.id || paymentLink?.id || order?.id || "");
+    const eventId = crypto
+      .createHash("sha256")
+      .update(`${eventName}|${merchantOrderId}|${state}|${transactionId}|${jsonPayload.created_at || ""}`)
+      .digest("hex");
 
     return {
-      eventId: stableEventId,
-      merchantOrderId: paymentLink.reference_id,
-      state: paymentLink.status,
-      transactionId: paymentLink.id,
-      responseCode: paymentLink.status,
+      eventId,
+      merchantOrderId,
+      state,
+      transactionId,
+      responseCode: state || eventName,
       raw: jsonPayload,
     };
   }
 
   mapStatusToInternal(gatewayState) {
     const normalized = String(gatewayState || "").toUpperCase();
-    if (normalized === "PAID") return PAYMENT_STATUS.CAPTURED;
-    if (normalized === "FAILED" || normalized === "CANCELLED") return PAYMENT_STATUS.FAILED;
-    if (normalized === "CREATED" || normalized === "ISSUED" || normalized === "PENDING") return PAYMENT_STATUS.PENDING;
+    if (normalized === "PAID" || normalized === "CAPTURED") return PAYMENT_STATUS.CAPTURED;
+    if (normalized === "AUTHORIZED") return PAYMENT_STATUS.AUTHORIZED;
+    if (normalized === "REFUNDED") return PAYMENT_STATUS.REFUNDED;
+    if (normalized === "FAILED") return PAYMENT_STATUS.FAILED;
+    if (normalized === "CANCELLED" || normalized === "EXPIRED") return PAYMENT_STATUS.CANCELLED;
     return PAYMENT_STATUS.PENDING;
   }
+}
+
+function rawWebhookBody(rawBody) {
+  if (Buffer.isBuffer(rawBody)) return rawBody.toString("utf8");
+  if (typeof rawBody === "string") return rawBody;
+  const err = new Error("Razorpay webhook body must be the raw request bytes");
+  err.statusCode = 400;
+  throw err;
+}
+
+function webhookState(eventName, paymentLink, payment) {
+  if (eventName.startsWith("payment_link.")) {
+    if (eventName === "payment_link.paid" || paymentLink?.status === "paid") return "paid";
+    if (eventName === "payment_link.cancelled" || paymentLink?.status === "cancelled") return "cancelled";
+    if (eventName === "payment_link.expired" || paymentLink?.status === "expired") return "expired";
+    return String(paymentLink?.status || "");
+  }
+  if (eventName === "payment.captured" || payment?.status === "captured") return "captured";
+  if (eventName === "payment.failed" || payment?.status === "failed") return "failed";
+  if (eventName === "payment.authorized" || payment?.status === "authorized") return "authorized";
+  if (eventName === "refund.processed" || payment?.status === "refunded") return "refunded";
+  return String(paymentLink?.status || payment?.status || "");
 }
 
 export default RazorpayAdapter;

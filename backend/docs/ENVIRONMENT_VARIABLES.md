@@ -124,12 +124,16 @@ Redis is **mandatory in production** (`NODE_ENV=production`). Startup fails if n
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| `FRONTEND_URL` | `http://localhost:5173` | No | Frontend URL for CORS |
+| `FRONTEND_URL` | `http://localhost:5174` | No | Frontend URL for CORS |
 | `CORS_ALLOWED_ORIGINS` | — | No | Comma-separated allowed origins (overrides `FRONTEND_URL`) |
 | `TRUST_PROXY` | — | No | Trust proxy hops (`true` = 1 hop, number = N hops) |
 | `API_JSON_LIMIT` | `1mb` | No | JSON body size limit |
 | `API_URLENCODED_LIMIT` | `1mb` | No | URL-encoded body size limit |
 | `PAYMENT_WEBHOOK_MAX_PAYLOAD` | `1mb` | No | Webhook payload size limit |
+| `PAYMENT_PROVIDER` | `razorpay` | No | Active checkout gateway (`razorpay` or `phonepe`) |
+| `RAZORPAY_KEY_ID` | — | Yes for Razorpay | Razorpay key id |
+| `RAZORPAY_KEY_SECRET` | — | Yes for Razorpay | Razorpay key secret |
+| `RAZORPAY_WEBHOOK_SECRET` | — | Yes for Razorpay webhooks | Secret configured on `POST /api/payments/webhook/razorpay` in the Razorpay dashboard |
 
 ## Production Validation Rules
 

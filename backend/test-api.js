@@ -14,7 +14,7 @@ async function main() {
 
   const token = jwt.sign({ id: delivery._id, role: 'delivery' }, process.env.JWT_SECRET || 'Truebuy@123', { expiresIn: '1d' });
 
-  const req = http.request('http://localhost:5000/api/delivery/orders/available?type=all', {
+  const req = http.request('http://localhost:7000/api/delivery/orders/available?type=all', {
     headers: { 'Authorization': `Bearer ${token}` }
   }, (res) => {
     let data = '';

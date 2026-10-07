@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import Lottie from "lottie-react";
 import LocationDrawer from "./LocationDrawer";
 import { useLocation } from "../../context/LocationContext";
+import { useCart } from "../../context/CartContext";
 import { useProductDetail } from "../../context/ProductDetailContext";
 import { useSettings } from "@core/context/SettingsContext";
 import { cn } from "@/lib/utils";
@@ -101,6 +102,7 @@ const MainLocationHeader = ({
   const appName = settings?.appName || "App";
   const logoUrl = "/LogoVitszee.png";
   const navigate = useNavigate();
+  const { cartCount } = useCart();
 
   // Search Logic
   const handleSearchClick = () => {
@@ -129,8 +131,6 @@ const MainLocationHeader = ({
   const navOpacity = useTransform(scrollY, [0, 200], [1, 0]);
   const navMargin = useTransform(scrollY, [0, 200], [4, 0]);
   const categorySpacing = useTransform(scrollY, [0, 200], [3, 0]);
-  const cartOpacity = useTransform(scrollY, [0, 110, 150], [1, 0.7, 0]);
-  const cartScale = useTransform(scrollY, [0, 110, 150], [1, 0.9, 0.75]);
 
   // Helper to hide elements completely when collapsed to prevent clicks
   const displayContent = useTransform(scrollY, (value) =>
@@ -138,9 +138,6 @@ const MainLocationHeader = ({
   );
   const displayNav = useTransform(scrollY, (value) =>
     value > 200 ? "none" : "flex",
-  );
-  const displayCart = useTransform(scrollY, (value) =>
-    value > 150 ? "none" : "block",
   );
 
   const baseHeaderColor = "#FFFFFF";
@@ -181,26 +178,6 @@ const MainLocationHeader = ({
           className="px-4 shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden transform-gpu will-change-transform">
           {/* Subtle Glow Overlay */}
           <div className="absolute inset-0 bg-white/8 pointer-events-none" />
-
-          {/* Corner Cart */}
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-            style={{
-              opacity: cartOpacity,
-              scale: cartScale,
-              display: displayCart,
-            }}
-            type="button"
-            aria-label="Open cart"
-            onClick={() => navigate("/checkout")}
-            className="absolute top-2 right-3 z-20 w-9 h-9 bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-slate-100 flex items-center justify-center cursor-pointer group hover:shadow-md transition-shadow">
-            <ShoppingCartOutlinedIcon sx={{ color: "#1A5C16", fontSize: 20 }} className="group-hover:scale-110 transition-transform" />
-            <div className="absolute -top-1.5 -right-1.5 bg-[#0F52BA] text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-sm border border-white">
-              2
-            </div>
-          </motion.button>
 
           {/* Desktop/Tablet Header Layout (md and above) */}
           <div className="hidden md:flex items-center justify-between relative z-20 px-2 lg:px-6 mb-4 mt-1">
@@ -280,6 +257,9 @@ const MainLocationHeader = ({
               </motion.button>
 
               <motion.button
+                id="header-cart-icon"
+                type="button"
+                aria-label="Open cart"
                 whileHover={{ scale: 1.15, rotate: -5 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => navigate("/checkout")}
@@ -287,9 +267,11 @@ const MainLocationHeader = ({
                 style={{ color: headerFontColor }}
               >
                 <ShoppingCartOutlinedIcon sx={{ fontSize: 24 }} />
-                <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-brand-900 text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-brand-800 shadow-sm transition-transform group-hover:-translate-y-0.5">
-                  0
-                </span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-[#1A8CFF] px-1 text-[9px] font-black text-white">
+                    {cartCount}
+                  </span>
+                )}
               </motion.button>
 
               <motion.button

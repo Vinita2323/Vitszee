@@ -543,7 +543,7 @@ export async function createPaymentOrderForOrderRef({
 
   const provider = getActivePaymentProvider();
   const redirectUrl = `${process.env.FRONTEND_URL}/payment-status?merchantOrderId=${merchantOrderId}`;
-  const callbackUrl = `${process.env.FRONTEND_URL.replace('5173', process.env.PORT || '7000')}/api/payments/webhook/${provider.providerName.toLowerCase()}`;
+  const callbackUrl = `${String(process.env.FRONTEND_URL || "").replace(/:(5173|5174)(?=\/|$)/, `:${process.env.PORT || "7000"}`)}/api/payments/webhook/${provider.providerName.toLowerCase()}`;
 
   const initResult = await provider.initiatePayment({
     merchantOrderId,
@@ -653,6 +653,7 @@ export async function processWebhook({
   rawBody,
   authorization,
   correlationId = null,
+  webhookEventId = null,
 }) {
   const provider = getActivePaymentProvider();
 
@@ -665,7 +666,12 @@ export async function processWebhook({
 
   const decoded = await provider.decodeWebhookPayload({ rawBody });
 
-  const eventId = decoded.eventId;
+  const eventId = String(webhookEventId || decoded.eventId || "").trim();
+  if (!eventId) {
+    const err = new Error("Webhook event id is missing");
+    err.statusCode = 400;
+    throw err;
+  }
   const payloadHash = crypto
     .createHash("sha256")
     .update(JSON.stringify(decoded.raw))

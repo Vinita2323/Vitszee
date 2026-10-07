@@ -55,6 +55,10 @@ function firebaseMessagingSwPlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), firebaseMessagingSwPlugin()],
+  server: {
+    port: 5174,
+    strictPort: true,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

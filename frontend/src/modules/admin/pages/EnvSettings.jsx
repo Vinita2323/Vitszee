@@ -29,7 +29,7 @@ const EnvSettings = () => {
     // Mock initial state
     const [config, setConfig] = useState({
         // Frontend
-        VITE_API_BASE_URL: 'http://localhost:5000/api/v1',
+        VITE_API_BASE_URL: 'http://localhost:7000/api',
         VITE_GOOGLE_MAPS_API_KEY: '',
         VITE_FIREBASE_API_KEY: '',
         VITE_FIREBASE_AUTH_DOMAIN: '',
@@ -41,8 +41,8 @@ const EnvSettings = () => {
         VITE_FIREBASE_VAPID_KEY: '',
 
         // Backend
-        FRONTEND_URL: 'http://localhost:5173',
-        PORT: 5000,
+        FRONTEND_URL: 'http://localhost:5174',
+        PORT: 7000,
         JWT_EXPIRES_IN: '7d',
         JWT_REFRESH_EXPIRES_IN: '7d',
         JWT_REFRESH_SECRET: '', // Secret
