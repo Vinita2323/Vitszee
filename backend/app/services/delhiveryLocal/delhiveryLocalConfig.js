@@ -76,9 +76,29 @@ export async function getDelhiveryLocalConfig() {
       .filter(Boolean);
   const cityPincodePrefixes = (() => {
     const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES || dbSettings.cityPincodePrefixes);
-    return list.length ? list : ["380", "382"];
+    return list.length ? list : ["380"]; // clean Ahmedabad prefix (382 overlaps Gandhinagar; add exact 382xxx via DELHIVERY_LOCAL_CITY_PINCODES)
   })();
   const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
+
+  // City-name gate (chosen method): an order qualifies for quick delivery only when BOTH
+  // the seller and the customer address text mention one of these city names. Default
+  // covers Ahmedabad and its common spellings; extend via DELHIVERY_LOCAL_CITY_NAMES.
+  const cityNames = (() => {
+    const list = parseList(process.env.DELHIVERY_LOCAL_CITY_NAMES || dbSettings.cityNames).map((c) => c.toLowerCase());
+    return list.length ? list : ["ahmedabad", "ahmadabad", "amdavad", "ahmdabad", "ahemdabad"];
+  })();
+
+  // Geo sanity box for the quick-delivery city ("minLat,maxLat,minLng,maxLng").
+  // A stored coordinate outside this box is treated as bad/placeholder data (e.g. a
+  // default from another city) and is dropped from the Delhivery payload, so Delhivery
+  // geocodes from the address instead of rejecting the order as unserviceable.
+  const cityGeoBounds = (() => {
+    const raw = parseList(process.env.DELHIVERY_LOCAL_CITY_BOUNDS || dbSettings.cityGeoBounds).map(Number);
+    if (raw.length === 4 && raw.every((n) => Number.isFinite(n))) {
+      return { minLat: raw[0], maxLat: raw[1], minLng: raw[2], maxLng: raw[3] };
+    }
+    return { minLat: 22.8, maxLat: 23.3, minLng: 72.2, maxLng: 72.9 }; // Ahmedabad
+  })();
 
   // Public URL Delhivery calls with fulfilment webhooks. A webhook URL is mandatory
   // on every create-order request, so this must be reachable from the internet.
@@ -130,6 +150,8 @@ export async function getDelhiveryLocalConfig() {
     autoServiceabilityCheck,
     cityPincodePrefixes,
     cityPincodes,
+    cityNames,
+    cityGeoBounds,
     hasCredentials: Boolean(clientId && clientSecret && clientCode),
   };
 }
@@ -143,6 +165,29 @@ export function isLocalCityPincode(pincode, config) {
   if (!/^\d{6}$/.test(pin)) return false;
   if (Array.isArray(config?.cityPincodes) && config.cityPincodes.includes(pin)) return true;
   return Array.isArray(config?.cityPincodePrefixes) && config.cityPincodePrefixes.some((p) => pin.startsWith(p));
+}
+
+/**
+ * True when free-text address content mentions one of the configured quick-delivery
+ * city names (case-insensitive substring). Used to gate quick delivery to the city.
+ */
+export function matchesLocalCity(text, config) {
+  const t = String(text || "").toLowerCase();
+  if (!t) return false;
+  const names = Array.isArray(config?.cityNames) ? config.cityNames : [];
+  return names.some((n) => n && t.includes(n));
+}
+
+/**
+ * True when a coordinate falls inside the quick-delivery city's bounding box.
+ * Used to reject placeholder/wrong coordinates before sending them to Delhivery.
+ */
+export function isWithinCityBounds(lat, lng, config) {
+  const b = config?.cityGeoBounds;
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!b || !Number.isFinite(la) || !Number.isFinite(ln)) return false;
+  return la >= b.minLat && la <= b.maxLat && ln >= b.minLng && ln <= b.maxLng;
 }
 
 function maskSecret(secret) {
@@ -172,5 +217,7 @@ export async function getAdminDelhiveryLocalConfig() {
     autoServiceabilityCheck: config.autoServiceabilityCheck,
     cityPincodePrefixes: config.cityPincodePrefixes,
     cityPincodes: config.cityPincodes,
+    cityNames: config.cityNames,
+    cityGeoBounds: config.cityGeoBounds,
   };
 }

@@ -546,6 +546,18 @@ const OrderDetailPage = () => {
       };
     }
 
+    // Courier (Delhivery Express) shipments take days and have no live rider route,
+    // so quoting minutes here would be wrong. Quick (Local) orders use a CRN id.
+    const awbNumber = String(order?.awbNumber || "");
+    const isCourierShipment = Boolean(awbNumber) && !/^CRN/i.test(awbNumber);
+    if (isCourierShipment) {
+      return {
+        arrivalTimeText: "3-5 days",
+        arrivingInText: "3-5 days",
+        totalDistanceText: "—",
+      };
+    }
+
     const targetLocation =
       routePhase === "delivery" ? order?.address?.location : sellerLocation;
 

@@ -97,7 +97,9 @@ const DeliveryTracking = () => {
             startTime: order.createdAt
               ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : "",
-            estimatedDelivery: "20-30 mins",
+            // Quick (Delhivery Local, CRN id) arrives in minutes; courier takes days.
+            estimatedDelivery:
+              order.awbNumber && !/^CRN/i.test(String(order.awbNumber)) ? "3-5 days" : "20-30 mins",
             customerName: order.customer?.name || "Customer",
             address: order.address
               ? `${order.address.address || ""}, ${order.address.city || ""}`.trim()

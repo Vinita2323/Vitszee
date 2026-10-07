@@ -1,61 +1,72 @@
 import Order from "../../models/order.js";
 import logger from "../logger.js";
-import { getDelhiveryLocalConfig, isLocalCityPincode } from "./delhiveryLocalConfig.js";
+import { getDelhiveryLocalConfig, matchesLocalCity, isLocalCityPincode } from "./delhiveryLocalConfig.js";
 
-/**
- * Extracts a 6-digit pincode from an order's delivery address, falling back to a
- * pincode embedded in the free-text address line.
- */
-function dropPincode(order) {
-  const address = order?.address || {};
-  const pin = String(address.pincode || "").trim();
+/** Combined address text we scan for the configured city name(s). */
+function sellerCityText(seller = {}) {
+  return [seller.city, seller.address, seller.locality, seller.state, seller.shopName]
+    .filter(Boolean)
+    .join(" ");
+}
+function customerCityText(order = {}) {
+  const a = order.address || {};
+  return [a.city, a.fullAddress, a.address, a.landmark].filter(Boolean).join(" ");
+}
+
+/** Extracts a 6-digit pincode from the delivery address (field or embedded in text). */
+function dropPincode(order = {}) {
+  const a = order.address || {};
+  const pin = String(a.pincode || "").trim();
   if (/^\d{6}$/.test(pin)) return pin;
-  const line = String(address.fullAddress || address.address || "");
-  const match = line.match(/\b\d{6}\b/);
-  return match ? match[0] : "";
+  const text = `${a.fullAddress || ""} ${a.address || ""} ${a.city || ""} ${a.landmark || ""}`;
+  const m = text.match(/\b\d{6}\b/);
+  return m ? m[0] : "";
 }
 
 /**
  * Decides whether an order should go via Delhivery Local (quick / intracity) delivery.
  *
- * Quick delivery is intracity, so it needs BOTH ends inside the Ahmedabad service area:
- * the seller pickup pincode and the customer drop pincode must both pass the city gate.
- * Anything else goes via the courier (Express) flow.
+ * An end (seller or customer) counts as "in the city" when its address TEXT mentions a
+ * configured city name (Ahmedabad by default) OR its pincode is in the configured set
+ * (clean 380xxx by default; add exact 382xxx pins via DELHIVERY_LOCAL_CITY_PINCODES).
+ * Quick delivery applies only when BOTH ends are in the city; everything else goes courier.
+ * This covers the whole city even when a customer's pincode is missing/garbled or the
+ * address omits the city name.
  *
- * This is only the city gate; live serviceability (rider availability etc.) is confirmed
- * by the Local quote/create call. Per product decision, an eligible order that Local
- * cannot fulfil is held for manual handling rather than falling back to courier.
+ * An in-city order that Local cannot fulfil is held for manual handling (not couriered).
  *
- * @returns {Promise<{eligible: boolean, pickupPin: string, dropPin: string, reason: string}>}
+ * @returns {Promise<{eligible: boolean, sellerOk: boolean, customerOk: boolean, reason: string}>}
  */
 export async function resolveLocalEligibility(orderId, orderDoc = null) {
   const config = await getDelhiveryLocalConfig();
 
-  if (!config.enabled) return { eligible: false, pickupPin: "", dropPin: "", reason: "local disabled" };
-  if (!config.hasCredentials) return { eligible: false, pickupPin: "", dropPin: "", reason: "local not configured" };
+  if (!config.enabled) return { eligible: false, sellerOk: false, customerOk: false, reason: "local disabled" };
+  if (!config.hasCredentials)
+    return { eligible: false, sellerOk: false, customerOk: false, reason: "local not configured" };
 
   let order = orderDoc;
-  // Ensure we have the address + seller pincode; reload minimally if needed.
-  if (!order || !order.address || !order.seller || typeof order.seller === "string" || !order.seller.pincode) {
+  if (!order || !order.address || !order.seller || typeof order.seller === "string" || !order.seller.city) {
     order = await Order.findOne({ orderId })
-      .populate("seller", "pincode city state")
+      .populate("seller", "city state address locality shopName pincode")
       .select("address seller")
       .lean();
   }
-  if (!order) return { eligible: false, pickupPin: "", dropPin: "", reason: "order not found" };
+  if (!order) return { eligible: false, sellerOk: false, customerOk: false, reason: "order not found" };
 
-  const dropPin = dropPincode(order);
   const seller = order.seller || {};
-  const pickupPin = String(seller.pincode || "").trim();
+  const sellerPin = String(seller.pincode || "").trim();
+  const customerPin = dropPincode(order);
 
-  const dropOk = isLocalCityPincode(dropPin, config);
-  const pickupOk = isLocalCityPincode(pickupPin, config);
-  const eligible = dropOk && pickupOk;
+  // City-name match OR pincode backup, for each end.
+  const sellerOk = matchesLocalCity(sellerCityText(seller), config) || isLocalCityPincode(sellerPin, config);
+  const customerOk = matchesLocalCity(customerCityText(order), config) || isLocalCityPincode(customerPin, config);
+  const eligible = sellerOk && customerOk;
 
+  const city = (config.cityNames && config.cityNames[0]) || "city";
   const reason = eligible
-    ? "ahmedabad intracity"
-    : `not intracity (pickup ${pickupPin || "?"} ${pickupOk ? "ok" : "out"}, drop ${dropPin || "?"} ${dropOk ? "ok" : "out"})`;
+    ? `in-city (${city})`
+    : `not in-city (seller ${sellerOk ? "ok" : "out"}, customer ${customerOk ? "ok" : "out"})`;
 
   logger.info(`[DelhiveryLocal Routing] Order #${orderId}: ${eligible ? "QUICK" : "COURIER"} — ${reason}`);
-  return { eligible, pickupPin, dropPin, reason };
+  return { eligible, sellerOk, customerOk, reason };
 }
