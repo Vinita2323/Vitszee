@@ -97,9 +97,16 @@ const DeliveryTracking = () => {
             startTime: order.createdAt
               ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : "",
-            // Quick (Delhivery Local, CRN id) arrives in minutes; courier takes days.
+            // Quick arrives in minutes, courier takes days. `deliveryMode` is set by the
+            // backend when routing decides; the CRN-vs-numeric AWB check only covers
+            // orders placed before that field existed.
             estimatedDelivery:
-              order.awbNumber && !/^CRN/i.test(String(order.awbNumber)) ? "3-5 days" : "20-30 mins",
+              order.deliveryMode === "courier" ||
+              (order.deliveryMode !== "quick" &&
+                order.awbNumber &&
+                !/^CRN/i.test(String(order.awbNumber)))
+                ? "3-5 days"
+                : "20-30 mins",
             customerName: order.customer?.name || "Customer",
             address: order.address
               ? `${order.address.address || ""}, ${order.address.city || ""}`.trim()

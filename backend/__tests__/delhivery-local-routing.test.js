@@ -92,12 +92,43 @@ describe("resolveLocalEligibility (city-name gate)", () => {
     expect((await resolveLocalEligibility("ORD-4")).eligible).toBe(false);
   });
 
-  it("routes to COURIER for a 382xxx customer with no city name and not in the pincode list", async () => {
+  // The real mismatch bug: Google formats New Ranip as "Ranip, Gujarat 382470" with no
+  // "Ahmedabad" in it, so this intracity order was dispatched by courier while the app
+  // showed it as quick. 382470 is now a listed Ahmedabad pincode.
+  it("routes a 382470 (New Ranip) customer to QUICK even with no city name in the text", async () => {
     mockOrderFindOne.mockReturnValue(orderQuery({
-      address: { city: "Ranip, Gujarat, 382470" },
-      seller: { city: "Ahmedabad", address: "New Ranip Ahmedabad" },
+      address: { city: "Ranip, Gujarat, 382470", address: "Villa-37, New Ranip, Ranip, Gujarat 382470, India" },
+      seller: { city: "ahmedabad", pincode: "382470" },
     }));
-    expect((await resolveLocalEligibility("ORD-5")).eligible).toBe(false);
+    expect((await resolveLocalEligibility("ORD-5")).eligible).toBe(true);
+  });
+
+  it("uses map coordinates inside the city box when the text and pincode both miss", async () => {
+    mockOrderFindOne.mockReturnValue(orderQuery({
+      address: { city: "Ranip, Gujarat, 382999", location: { lat: 23.097976, lng: 72.556982 } },
+      seller: { city: "Shop 1", location: { type: "Point", coordinates: [72.566104, 23.084475] } },
+    }));
+    const result = await resolveLocalEligibility("ORD-5b");
+    expect(result.eligible).toBe(true);
+    expect(result.reason).toContain("geo");
+  });
+
+  it("does NOT use coordinates from outside the city box", async () => {
+    mockOrderFindOne.mockReturnValue(orderQuery({
+      address: { city: "Indore", location: { lat: 22.7196, lng: 75.8577 } }, // Indore
+      seller: { city: "Ahmedabad" },
+    }));
+    expect((await resolveLocalEligibility("ORD-5c")).eligible).toBe(false);
+  });
+
+  it("falls back to an identical pincode on both ends when nothing else matches", async () => {
+    mockOrderFindOne.mockReturnValue(orderQuery({
+      address: { city: "Some Locality", address: "Plot 9, 382999" },
+      seller: { city: "Ahmedabad", pincode: "382999" },
+    }));
+    const result = await resolveLocalEligibility("ORD-5d");
+    expect(result.eligible).toBe(true);
+    expect(result.reason).toContain("same-pincode");
   });
 
   it("catches a 380xxx customer via the pincode backup even without the city name", async () => {

@@ -78,7 +78,13 @@ export async function getDelhiveryLocalConfig() {
     const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODE_PREFIXES || dbSettings.cityPincodePrefixes);
     return list.length ? list : ["380"]; // clean Ahmedabad prefix (382 overlaps Gandhinagar; add exact 382xxx via DELHIVERY_LOCAL_CITY_PINCODES)
   })();
-  const cityPincodes = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
+  // Exact Ahmedabad pincodes outside the 380xxx block. Only codes confirmed from real
+  // Ahmedabad addresses are listed, because a wrong entry would send a Gandhinagar-district
+  // order to Local and get it rejected as unserviceable. Extend via DELHIVERY_LOCAL_CITY_PINCODES.
+  const cityPincodes = (() => {
+    const list = parseList(process.env.DELHIVERY_LOCAL_CITY_PINCODES || dbSettings.cityPincodes);
+    return list.length ? list : ["382470", "382480", "382481"]; // Ranip / New Ranip / Chandkheda
+  })();
 
   // City-name gate (chosen method): an order qualifies for quick delivery only when BOTH
   // the seller and the customer address text mention one of these city names. Default

@@ -531,6 +531,17 @@ const OrderDetailPage = () => {
         : !!routePolyline?.polyline
       : routePolyline?.phase === routePhase;
   const activeRoutePolyline = routeMatchesPhase ? routePolyline : null;
+  // The delivery lane this order was actually dispatched on. `deliveryMode` is written by
+  // the backend when routing decides; the AWB prefix is only a fallback for orders placed
+  // before that field existed (quick/Local ids start with CRN, courier AWBs are numeric).
+  const isCourierShipment = useMemo(() => {
+    if (!order) return false;
+    if (order.deliveryMode === "courier") return true;
+    if (order.deliveryMode === "quick") return false;
+    const awbNumber = String(order.awbNumber || "");
+    return Boolean(awbNumber) && !/^CRN/i.test(awbNumber);
+  }, [order?.deliveryMode, order?.awbNumber]);
+
   const estimatedArrival = useMemo(() => {
     if (!order) {
       return {
@@ -547,9 +558,7 @@ const OrderDetailPage = () => {
     }
 
     // Courier (Delhivery Express) shipments take days and have no live rider route,
-    // so quoting minutes here would be wrong. Quick (Local) orders use a CRN id.
-    const awbNumber = String(order?.awbNumber || "");
-    const isCourierShipment = Boolean(awbNumber) && !/^CRN/i.test(awbNumber);
+    // so quoting minutes here would be wrong.
     if (isCourierShipment) {
       return {
         arrivalTimeText: "3-5 days",
@@ -592,6 +601,7 @@ const OrderDetailPage = () => {
   }, [
     activeRoutePolyline?.distanceMeters,
     activeRoutePolyline?.duration,
+    isCourierShipment,
     liveLocation,
     order,
     routePhase,
@@ -1000,6 +1010,8 @@ const OrderDetailPage = () => {
           >
             <LiveTrackingMap
               status={order.workflowStatus || order.status}
+              mode={isCourierShipment ? "courier" : "quick"}
+              awbNumber={order.awbNumber}
               eta={estimatedArrival.arrivingInText}
               riderName={
                 (status?.startsWith("return_")
@@ -1025,7 +1037,9 @@ const OrderDetailPage = () => {
           </motion.div>
         )}
 
-        {order?.orderId ? <QuickDeliveryCard orderId={order.orderId} role="customer" /> : null}
+        {order?.orderId && !isCourierShipment ? (
+          <QuickDeliveryCard orderId={order.orderId} role="customer" />
+        ) : null}
 
         {/* Order Progress Tracker - New Component */}
         {!isAwaitingOnlinePayment && !isAwaitingPaymentSelection && (
