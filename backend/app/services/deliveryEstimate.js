@@ -1,9 +1,6 @@
 import Seller from "../models/seller.js";
-import {
-  getDelhiveryLocalConfig,
-  matchesLocalCity,
-  isLocalCityPincode,
-} from "./delhiveryLocal/delhiveryLocalConfig.js";
+import { getDelhiveryLocalConfig } from "./delhiveryLocal/delhiveryLocalConfig.js";
+import { evaluateLocalEligibility } from "./delhiveryLocal/delhiveryLocalRouting.js";
 
 // Courier (Delhivery Express) is a multi-day service; quick delivery is intracity.
 export const COURIER_MIN_DAYS = Number(process.env.COURIER_ETA_MIN_DAYS) || 3;
@@ -39,35 +36,14 @@ export function formatCourierEta() {
     : `${COURIER_MIN_DAYS}-${COURIER_MAX_DAYS} days`;
 }
 
-function sellerCityText(seller = {}) {
-  return [seller.city, seller.address, seller.locality, seller.state, seller.shopName]
-    .filter(Boolean)
-    .join(" ");
-}
-function addressCityText(address = {}) {
-  return [address.city, address.fullAddress, address.address, address.landmark].filter(Boolean).join(" ");
-}
-function addressPincode(address = {}) {
-  const p = String(address.pincode || "").trim();
-  if (/^\d{6}$/.test(p)) return p;
-  const text = `${address.fullAddress || ""} ${address.address || ""} ${address.city || ""}`;
-  const m = text.match(/\b\d{6}\b/);
-  return m ? m[0] : "";
-}
-
 /**
- * Same city gate the dispatch uses: quick delivery needs BOTH the seller and the
- * customer inside the configured quick-delivery city.
+ * Exactly the gate dispatch routes on — the same function, not a copy — so what
+ * checkout promises and what the order is actually dispatched as can never disagree.
  */
 export async function isQuickEligible({ seller, address, config = null } = {}) {
   const cfg = config || (await getDelhiveryLocalConfig());
   if (!cfg.enabled || !cfg.hasCredentials || !seller) return false;
-  const sellerOk =
-    matchesLocalCity(sellerCityText(seller), cfg) ||
-    isLocalCityPincode(String(seller.pincode || "").trim(), cfg);
-  const customerOk =
-    matchesLocalCity(addressCityText(address), cfg) || isLocalCityPincode(addressPincode(address), cfg);
-  return Boolean(sellerOk && customerOk);
+  return evaluateLocalEligibility({ seller, address, config: cfg }).eligible;
 }
 
 /**
@@ -107,7 +83,7 @@ export async function resolveDeliveryEstimate({
   let doc = seller;
   if (!doc && sellerId) {
     try {
-      doc = await Seller.findById(sellerId).select("city address locality state shopName pincode").lean();
+      doc = await Seller.findById(sellerId).select("city address locality state shopName pincode location").lean();
     } catch {
       doc = null;
     }
@@ -130,7 +106,7 @@ async function resolveDeliveryEstimateForSellersUnguarded({ sellerIds = [], addr
   const config = await getDelhiveryLocalConfig();
   let docs = [];
   try {
-    docs = await Seller.find({ _id: { $in: ids } }).select("city address locality state shopName pincode").lean();
+    docs = await Seller.find({ _id: { $in: ids } }).select("city address locality state shopName pincode location").lean();
   } catch {
     docs = [];
   }
@@ -159,7 +135,7 @@ async function resolveDeliveryMapForSellersUnguarded({ sellerIds = [], address =
   const config = await getDelhiveryLocalConfig();
   let docs = [];
   try {
-    docs = await Seller.find({ _id: { $in: ids } }).select("city address locality state shopName pincode").lean();
+    docs = await Seller.find({ _id: { $in: ids } }).select("city address locality state shopName pincode location").lean();
   } catch {
     docs = [];
   }

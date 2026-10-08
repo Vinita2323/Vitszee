@@ -187,6 +187,19 @@ import Setting from "../models/setting.js";
  * Respects the autoShipmentCreation setting.
  * Does NOT broadcast to internal captains, does NOT create DeliveryAssignment, does NOT schedule captain timeouts.
  */
+/**
+ * Records the lane an order was routed to, so every client renders the right mode
+ * instead of inferring it from an AWB that may not exist yet. Never throws: a failed
+ * write must not abort the dispatch itself.
+ */
+async function setDeliveryMode(orderId, mode) {
+  try {
+    await Order.updateOne({ orderId }, { $set: { deliveryMode: mode } });
+  } catch (err) {
+    logger.warn(`[dispatchOrderToDelhivery] Could not record deliveryMode for #${orderId}: ${err.message}`);
+  }
+}
+
 export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
   try {
     // Routing: an Ahmedabad intracity order (seller + customer both in the city) goes via
@@ -194,6 +207,7 @@ export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
     const localConfig = await getDelhiveryLocalConfig();
     if (localConfig.enabled && localConfig.hasCredentials) {
       const eligibility = await resolveLocalEligibility(orderId, orderDoc);
+      await setDeliveryMode(orderId, eligibility.eligible ? "quick" : "courier");
       if (eligibility.eligible) {
         // Quick lane. If Local cannot fulfil it, createLocalOrder marks the order failed
         // for manual handling — we deliberately do NOT fall back to courier here.
@@ -206,6 +220,8 @@ export async function dispatchOrderToDelhivery(orderId, orderDoc = null) {
       logger.info(
         `[dispatchOrderToDelhivery] Order #${orderId} routed to courier (${eligibility.reason}).`
       );
+    } else {
+      await setDeliveryMode(orderId, "courier");
     }
 
     const config = await getDelhiveryConfig();
