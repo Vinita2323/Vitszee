@@ -11,6 +11,8 @@ import {
   Star,
   Search,
   Loader2,
+  Truck,
+  PackageCheck,
 } from "lucide-react";
 import customerPin from "@/assets/customer-pin.png";
 import deliveryIcon from "@/assets/deliveryIcon.png";
@@ -51,6 +53,9 @@ function hasValidLatLng(location) {
 
 const LiveTrackingMap = memo(({
   status = "out for delivery",
+  /** "quick" = Delhivery Local rider (live map); "courier" = Delhivery Express parcel. */
+  mode = "quick",
+  awbNumber,
   eta = "8 mins",
   riderName,
   riderPlate,
@@ -239,6 +244,37 @@ const LiveTrackingMap = memo(({
           This order is closed. If payment was reserved, any applicable refund
           follows your store policy.
         </p>
+      </div>
+    );
+  }
+
+  // ─── COURIER STATE ─────────────────────────────────────────────────────
+  // An Express parcel has no rider and no live route, so showing the rider-search radar
+  // or the live map here is simply wrong — it promised a rider that is never coming.
+  if (mode === "courier" && norm !== "delivered") {
+    return (
+      <div className="relative w-full min-h-[260px] bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden rounded-b-[2rem] flex flex-col items-center justify-center gap-3 px-6 py-10 border-b border-slate-200">
+        <motion.div
+          animate={{ x: [-6, 6, -6] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          className="h-16 w-16 bg-slate-700 rounded-full flex items-center justify-center shadow-lg">
+          <Truck size={30} className="text-white" />
+        </motion.div>
+        <h3 className="text-lg font-black text-gray-800 text-center">
+          Shipped by courier
+        </h3>
+        <p className="text-sm text-gray-500 text-center max-w-sm font-medium">
+          This order travels by Delhivery courier, so there is no live rider to follow.
+          It usually arrives in <span className="font-bold text-gray-700">3-5 days</span>.
+        </p>
+        {awbNumber ? (
+          <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 flex items-center gap-2">
+            <PackageCheck size={14} className="text-slate-500" />
+            <span className="text-xs font-bold text-gray-600 tracking-wider">
+              AWB {awbNumber}
+            </span>
+          </div>
+        ) : null}
       </div>
     );
   }

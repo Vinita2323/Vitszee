@@ -400,6 +400,15 @@ const orderSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    // Which Delhivery lane this order was dispatched on. Set once routing decides, so the
+    // customer and seller apps never have to guess the mode from the AWB format (a courier
+    // AWB only appears after manifesting, which left pending orders showing quick UI).
+    deliveryMode: {
+      type: String,
+      enum: ["quick", "courier"],
+      default: null,
+      index: true,
+    },
     deliveryFailureReason: {
       type: String,
       default: null,
