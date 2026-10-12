@@ -33,7 +33,8 @@ const OTP_VERIFY_LIMIT_WINDOW_SECONDS = () =>
   parseInt(process.env.SELLER_OTP_VERIFY_LIMIT_WINDOW_SECONDS || "900", 10);
 const OTP_VERIFY_LIMIT_PER_WINDOW = () =>
   parseInt(process.env.SELLER_OTP_VERIFY_LIMIT_PER_WINDOW || "20", 10);
-const OTP_LENGTH = () => 4;
+const OTP_LENGTH = () =>
+  Math.max(4, parseInt(process.env.OTP_LENGTH || "6", 10) || 6);
 
 function verificationSecret() {
   return (
@@ -312,10 +313,7 @@ export async function issueSellerVerificationOtp({
     }
   }
 
-  let otp = generateSellerOtp(normalizedChannel);
-  if (normalizedChannel === "phone" && target === "6268423925") {
-    otp = "1234";
-  }
+  const otp = generateSellerOtp(normalizedChannel);
   const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES() * 60 * 1000);
 
   if (!session) {
@@ -495,8 +493,7 @@ export async function issueSellerResetOtp({
     }
   }
 
-  let otp = generateSellerOtp(normalizedChannel);
-  otp = "1234";
+  const otp = generateSellerOtp(normalizedChannel);
   const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES() * 60 * 1000);
 
   if (!session) {

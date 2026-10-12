@@ -76,7 +76,7 @@ const DeliveryAuth = () => {
   const [dlFile, setDlFile] = useState(null);
 
   // OTP state
-  const [otp, setOtp] = useState(["", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(30);
@@ -270,7 +270,7 @@ const DeliveryAuth = () => {
               </h1>
               <p className="text-gray-500 text-sm mt-1.5 max-w-[280px] mx-auto">
                 {step === "otp"
-                  ? `Enter the 4-digit code sent to +91 ${mode === "login" ? loginPhone : signupPhone}`
+                  ? `Enter the 6-digit code sent to +91 ${mode === "login" ? loginPhone : signupPhone}`
                   : mode === "login"
                     ? "Login to continue your deliveries"
                     : `Step ${signupStep} of 4: ${signupStep === 1 ? "Personal Info" : signupStep === 2 ? "Vehicle Info" : signupStep === 3 ? "Bank Info" : "Documents"}`}
@@ -767,17 +767,18 @@ const DeliveryAuth = () => {
                     <label className="text-xs font-black text-gray-400 uppercase tracking-widest">
                       Enter Security Code
                     </label>
-                    <div className="flex justify-center gap-3 pt-1">
+                    <div className="flex justify-center gap-2 pt-1">
                       {otp.map((digit, index) => (
                         <input
                           key={index}
                           id={`otp-${index}`}
                           type="tel"
                           maxLength={1}
+                          inputMode="numeric"
                           value={digit}
                           onChange={(e) => handleOtpChange(index, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(index, e)}
-                          className="w-14 h-14 text-center text-2xl font-black border-2 border-gray-100 rounded-2xl focus:border-[#1A4516] focus:ring-4 focus:ring-green-100 outline-none transition-all bg-gray-50 text-gray-900"
+                          className="w-11 h-14 text-center text-xl font-black border-2 border-gray-100 rounded-2xl focus:border-[#1A4516] focus:ring-4 focus:ring-green-100 outline-none transition-all bg-gray-50 text-gray-900"
                         />
                       ))}
                     </div>

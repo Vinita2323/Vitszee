@@ -36,10 +36,7 @@ export const signupDelivery = async (req, res) => {
             return handleResponse(res, 400, "Delivery partner already exists");
         }
 
-        let otp = generateOTP();
-        if (phone === "6268423925" || phone === "+916268423925" || phone === "9111966732" || phone === "+919111966732") {
-            otp = "1234";
-        }
+        const otp = generateOTP();
 
         let aadharUrl = delivery?.documents?.aadhar || "";
         let panUrl = delivery?.documents?.pan || "";
@@ -133,10 +130,7 @@ export const loginDelivery = async (req, res) => {
             return handleResponse(res, 403, "Your application is still pending admin approval");
         }
 
-        let otp = generateOTP();
-        if (phone === "6268423925" || phone === "+916268423925" || phone === "9111966732" || phone === "+919111966732") {
-            otp = "1234";
-        }
+        const otp = generateOTP();
 
         delivery.otp = otp;
         delivery.otpExpiry = Date.now() + 5 * 60 * 1000;
