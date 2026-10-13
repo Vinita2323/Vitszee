@@ -25,6 +25,7 @@ import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import {
   freezeFinancialSnapshot,
   reverseOrderFinanceOnCancellation,
+  handleCodOrderFinance,
 } from "../services/finance/orderFinanceService.js";
 import {
   generateOrderPaymentBreakdown,
@@ -1544,3 +1545,59 @@ export const uploadReturnPickupProof = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+/**
+ * Rider records cash collected upon delivery of a COD order.
+ */
+export const markOrderCodCollected = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user?.id || req.user?._id;
+    const role = req.user?.role;
+
+    if (role !== "delivery" && role !== "admin") {
+      return handleResponse(res, 403, "Access denied.");
+    }
+
+    const orderKey = orderMatchQueryFromRouteParam(orderId);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+
+    const order = await Order.findOne(orderKey);
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+
+    if (role === "delivery" && String(order.deliveryBoy) !== String(userId)) {
+      return handleResponse(res, 403, "You are not assigned to deliver this order.");
+    }
+
+    if (order.paymentMode !== "COD") {
+      return handleResponse(res, 400, "Order is not Cash on Delivery.");
+    }
+
+    const isDelivered =
+      order.workflowStatus === WORKFLOW_STATUS.DELIVERED ||
+      order.status === "delivered" ||
+      order.orderStatus === "delivered";
+
+    if (!isDelivered) {
+      return handleResponse(res, 400, "COD cash can only be recorded after order is delivered.");
+    }
+
+    if (order.financeFlags?.codMarkedCollected) {
+      return handleResponse(res, 200, "COD cash already recorded as collected.", order);
+    }
+
+    const updated = await handleCodOrderFinance(order._id, {
+      deliveryPartnerId: order.deliveryBoy || userId,
+      actorId: userId,
+    });
+
+    return handleResponse(res, 200, "COD cash marked collected successfully", updated);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
