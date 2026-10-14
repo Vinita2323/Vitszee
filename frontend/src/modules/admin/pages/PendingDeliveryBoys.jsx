@@ -15,12 +15,68 @@ import {
     IdCard,
     RotateCw,
     Check,
-    X
+    X,
+    FileText,
+    ExternalLink,
+    Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminApi } from '../services/adminApi';
+
+const extractDocumentList = (r) => {
+    const list = [];
+    const docs = r.documents || {};
+
+    const aadharUrl = docs.aadhar || r.aadharUrl || r.aadhar;
+    if (aadharUrl && typeof aadharUrl === 'string' && /^https?:\/\//i.test(aadharUrl)) {
+        list.push({
+            id: 'aadhar',
+            label: 'Aadhar Card',
+            type: 'Identity Proof',
+            url: aadharUrl,
+            number: r.aadharNumber || null
+        });
+    }
+
+    const panUrl = docs.pan || r.panUrl || r.pan;
+    if (panUrl && typeof panUrl === 'string' && /^https?:\/\//i.test(panUrl)) {
+        list.push({
+            id: 'pan',
+            label: 'PAN Card',
+            type: 'Tax Identification',
+            url: panUrl,
+            number: r.panNumber || null
+        });
+    }
+
+    const dlUrl = docs.drivingLicense || docs.dl || r.drivingLicenseUrl || r.dlUrl;
+    if (dlUrl && typeof dlUrl === 'string' && /^https?:\/\//i.test(dlUrl)) {
+        list.push({
+            id: 'drivingLicense',
+            label: 'Driving License',
+            type: 'Driving Permit',
+            url: dlUrl,
+            number: r.drivingLicenseNumber || null
+        });
+    }
+
+    if (typeof docs === 'object' && docs !== null && !Array.isArray(docs)) {
+        Object.entries(docs).forEach(([key, val]) => {
+            if (!['aadhar', 'pan', 'drivingLicense', 'dl'].includes(key) && typeof val === 'string' && /^https?:\/\//i.test(val)) {
+                list.push({
+                    id: key,
+                    label: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+                    type: 'Uploaded Document',
+                    url: val
+                });
+            }
+        });
+    }
+
+    return list;
+};
 
 const PendingDeliveryBoys = () => {
     const [pendingRiders, setPendingRiders] = useState([]);
@@ -28,6 +84,7 @@ const PendingDeliveryBoys = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [viewingRider, setViewingRider] = useState(null);
+    const [previewDoc, setPreviewDoc] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
     // Fetch Pending Riders
@@ -42,19 +99,26 @@ const PendingDeliveryBoys = () => {
             const list = Array.isArray(payload.items) ? payload.items : (response.data.results || []);
 
             // Map backend data to frontend format
-            const mappedRiders = list.map(r => ({
-                id: r._id,
-                name: r.name,
-                phone: r.phone,
-                email: r.email,
-                appliedDate: new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-                location: r.currentArea || 'Unknown',
-                vehicle: r.vehicleType,
-                documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),
-                status: r.isVerified ? 'approved' : 'pending_review',
-                experience: 'Not Specified', // Mock for now
-                preferredArea: r.currentArea || 'Not Specified'
-            }));
+            const mappedRiders = list.map(r => {
+                const documentList = extractDocumentList(r);
+                return {
+                    id: r._id,
+                    name: r.name,
+                    phone: r.phone,
+                    email: r.email,
+                    appliedDate: new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                    location: r.currentArea || 'Unknown',
+                    vehicle: r.vehicleType,
+                    vehicleNumber: r.vehicleNumber || 'N/A',
+                    drivingLicenseNumber: r.drivingLicenseNumber || null,
+                    avatar: r.profileImage || null,
+                    documents: documentList.map(d => d.label),
+                    documentList,
+                    status: r.isVerified ? 'approved' : 'pending_review',
+                    experience: 'Not Specified', // Mock for now
+                    preferredArea: r.currentArea || 'Not Specified'
+                };
+            });
 
             setPendingRiders(mappedRiders);
         } catch (error) {
@@ -73,6 +137,31 @@ React.useEffect(() => {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [searchTerm, filterStatus]);
+
+// Lock background scroll when any modal is open
+React.useEffect(() => {
+    const isModalOpen = Boolean(viewingRider || previewDoc);
+    if (isModalOpen) {
+        const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+        const prevBodyOverflow = document.body.style.overflow;
+        const prevHtmlOverflow = document.documentElement.style.overflow;
+        const prevPaddingRight = document.body.style.paddingRight;
+
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+        if (scrollBarWidth > 0) {
+            document.body.style.paddingRight = `${scrollBarWidth}px`;
+        }
+        window.lenis?.stop();
+
+        return () => {
+            document.body.style.overflow = prevBodyOverflow;
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            document.body.style.paddingRight = prevPaddingRight;
+            window.lenis?.start();
+        };
+    }
+}, [viewingRider, previewDoc]);
 
 const filteredRiders = useMemo(() => {
     return pendingRiders.filter(r => {
@@ -294,22 +383,33 @@ return (
         {/* Application Review Modal */}
         <AnimatePresence>
             {viewingRider && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-8">
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 lg:p-8 overscroll-contain"
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    data-lenis-prevent-touch
+                    style={{ overscrollBehavior: "contain" }}
+                >
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-xl"
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl"
                         onClick={() => setViewingRider(null)}
                     />
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                        className="w-full max-w-5xl relative z-10 bg-white rounded-[48px] shadow-3xl overflow-hidden flex flex-col lg:flex-row"
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="w-full max-w-5xl max-h-[92vh] relative z-10 bg-white rounded-[36px] sm:rounded-[48px] shadow-3xl overflow-hidden flex flex-col lg:flex-row my-auto overscroll-contain"
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        data-lenis-prevent-touch
+                        style={{ overscrollBehavior: "contain" }}
+                        onClick={(e) => e.stopPropagation()}
                     >
                         {/* Left: Applicant Profile Info */}
-                        <div className="lg:w-80 bg-slate-50 p-5 border-r border-slate-100">
+                        <div className="lg:w-80 bg-slate-50 p-5 border-r border-slate-100 overflow-y-auto shrink-0">
                             <div className="text-center mb-10">
                                 <img 
                                    src={viewingRider.avatar && !viewingRider.avatar.includes('emoji') && !viewingRider.avatar.includes('avatar') ? viewingRider.avatar : "https://cdn-icons-png.flaticon.com/512/149/149071.png"} 
@@ -392,16 +492,52 @@ return (
                                 </div>
                             </div>
 
-                            <div className="space-y-4 mb-14">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Submitted Documents ({viewingRider.documents.length})</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {viewingRider.documents.map((doc, idx) => (
-                                        <div key={idx} className="group relative aspect-[4/3] bg-slate-100 rounded-[24px] overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all">
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                                                <FileSearch className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
-                                                <p className="text-[9px] font-black text-slate-500 uppercase mt-2 text-center">{doc}</p>
+                            <div className="space-y-4 mb-10">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        Submitted Documents ({viewingRider.documentList?.length || 0})
+                                    </h4>
+                                    <span className="text-[10px] font-bold text-slate-400">Click preview to view file</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {(viewingRider.documentList || []).map((doc, idx) => (
+                                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col justify-between group hover:border-blue-400 transition-all">
+                                            <div className="flex items-center gap-3">
+                                                <div 
+                                                    onClick={() => setPreviewDoc({ ...doc, riderName: viewingRider.name })}
+                                                    className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 cursor-pointer flex items-center justify-center hover:ring-2 hover:ring-blue-400 transition-all shadow-2xs"
+                                                    title="Click to preview"
+                                                >
+                                                    {doc.url ? (
+                                                        <img src={doc.url} alt={doc.label} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <FileText className="h-6 w-6 text-slate-400" />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs font-black text-slate-900 truncate">{doc.label}</p>
+                                                    {doc.number && <p className="text-[10px] font-mono font-bold text-slate-500 truncate">{doc.number}</p>}
+                                                    <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/50">✓ Uploaded</span>
+                                                </div>
                                             </div>
-                                            <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/5 transition-colors" />
+                                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewDoc({ ...doc, riderName: viewingRider.name })}
+                                                    className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-900 hover:text-white text-slate-700 text-[11px] font-bold rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                    Preview
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => window.open(doc.url, '_blank', 'noopener,noreferrer')}
+                                                    className="p-1.5 bg-white hover:bg-slate-100 text-slate-500 rounded-xl border border-slate-200 cursor-pointer"
+                                                    title="Open in new window"
+                                                >
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -411,7 +547,7 @@ return (
                                 <button
                                     disabled={isProcessing}
                                     onClick={() => handleApprove(viewingRider.id)}
-                                    className="flex-1 py-5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    className="flex-1 py-5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer"
                                 >
                                     {isProcessing ? (
                                         <>
@@ -427,11 +563,95 @@ return (
                                 </button>
                                 <button
                                     onClick={() => handleReject(viewingRider.id)}
-                                    className="py-5 px-5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 transition-all active:scale-95"
+                                    className="py-5 px-5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 transition-all active:scale-95 cursor-pointer"
                                 >
                                     REJECT APPLICATION
                                 </button>
                             </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+
+        {/* In-App Document Preview Modal */}
+        <AnimatePresence>
+            {previewDoc && (
+                <div
+                    className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 overscroll-contain"
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    data-lenis-prevent-touch
+                    style={{ overscrollBehavior: "contain" }}
+                >
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md"
+                        onClick={() => setPreviewDoc(null)}
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                        className="w-full max-w-4xl max-h-[92vh] relative z-10 bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 overscroll-contain"
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        data-lenis-prevent-touch
+                        style={{ overscrollBehavior: "contain" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-20 p-4 sm:px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <FileText className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm sm:text-base font-black text-slate-900">
+                                        {previewDoc.label}
+                                    </h3>
+                                    <p className="text-xs font-semibold text-slate-400">
+                                        {previewDoc.riderName ? `Applicant: ${previewDoc.riderName}` : 'Submitted Document'}
+                                        {previewDoc.number ? ` • ${previewDoc.number}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => window.open(previewDoc.url, '_blank', 'noopener,noreferrer')}
+                                    className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                                    title="Open in new window"
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Open in Tab</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewDoc(null)}
+                                    className="p-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded-xl transition-all cursor-pointer"
+                                    title="Close Preview"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 bg-slate-900/5 flex items-center justify-center p-4 sm:p-6 overflow-auto max-h-[75vh]">
+                            {previewDoc.url && previewDoc.url.toLowerCase().endsWith('.pdf') ? (
+                                <iframe
+                                    src={previewDoc.url}
+                                    title={previewDoc.label}
+                                    className="w-full h-[70vh] rounded-2xl bg-white border border-slate-200 shadow-sm"
+                                />
+                            ) : (
+                                <img
+                                    src={previewDoc.url}
+                                    alt={previewDoc.label}
+                                    className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-xl border border-slate-200 bg-white"
+                                />
+                            )}
                         </div>
                     </motion.div>
                 </div>

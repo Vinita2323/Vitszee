@@ -7,6 +7,8 @@ import axiosInstance from '@core/api/axios';
 export const adminDeliveryApi = {
     getDeliveryPartners: (params) =>
         axiosInstance.get('/admin/delivery-partners', { params }),
+    updateDeliveryPartner: (id, data) =>
+        axiosInstance.put(`/admin/delivery-partners/${id}`, data),
     approveDeliveryPartner: (id) =>
         axiosInstance.patch(`/admin/delivery-partners/approve/${id}`),
     rejectDeliveryPartner: (id) =>

@@ -1,8 +1,12 @@
+import mongoose from "mongoose";
+import Order from "../models/order.js";
 import Payout from "../models/payout.js";
 import Wallet from "../models/wallet.js";
 import Seller from "../models/seller.js";
 import Delivery from "../models/delivery.js";
 import handleResponse from "../utils/helper.js";
+import { roundCurrency } from "../utils/money.js";
+import { reconcileCodCash } from "../services/finance/orderFinanceService.js";
 import { getAdminFinanceSummary } from "../services/finance/walletService.js";
 import { getLedgerEntries } from "../services/finance/ledgerService.js";
 import { bulkProcessPayouts } from "../services/finance/payoutService.js";
@@ -11,6 +15,7 @@ import { getProfitAnalytics } from "../services/finance/analyticsService.js";
 import { getFinanceDrilldown } from "../services/finance/drilldownService.js";
 import {
   FINANCE_AUDIT_ACTION,
+  ORDER_PAYMENT_STATUS,
   OWNER_TYPE,
 } from "../constants/finance.js";
 import {
@@ -239,3 +244,68 @@ export const getRiderWalletSummaryController = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+/**
+ * Admin reconciles / marks remitted COD cash from delivery partners.
+ */
+export const remitOrderCodCashController = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { amount } = req.body || {};
+    const adminId = req.user?.id || req.user?._id;
+
+    const isMongoId = mongoose.Types.ObjectId.isValid(orderId);
+    const order = await Order.findOne(
+      isMongoId ? { $or: [{ _id: orderId }, { orderId }] } : { orderId }
+    );
+
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+
+    if (order.paymentMode !== "COD") {
+      return handleResponse(res, 400, "Only COD orders can be remitted");
+    }
+
+    if (order.paymentStatus === ORDER_PAYMENT_STATUS.COD_RECONCILED) {
+      return handleResponse(res, 200, "COD for this order is already fully reconciled", order);
+    }
+
+    const codCollected = roundCurrency(order.paymentBreakdown?.codCollectedAmount || 0);
+    const codRemitted = roundCurrency(order.paymentBreakdown?.codRemittedAmount || 0);
+    const codPending = roundCurrency(codCollected - codRemitted);
+
+    if (codPending <= 0) {
+      return handleResponse(res, 400, "No pending COD amount to remit for this order");
+    }
+
+    const remitAmount =
+      amount !== undefined && amount !== null && amount !== ""
+        ? roundCurrency(Number(amount))
+        : codPending;
+
+    if (remitAmount <= 0) {
+      return handleResponse(res, 400, "Remittance amount must be greater than 0");
+    }
+
+    if (remitAmount > codPending) {
+      return handleResponse(
+        res,
+        400,
+        `Remittance amount (${remitAmount}) exceeds pending amount (${codPending})`,
+      );
+    }
+
+    const updated = await reconcileCodCash(
+      order._id,
+      remitAmount,
+      order.deliveryBoy,
+      { actorId: adminId, metadata: { remittedByAdmin: true } },
+    );
+
+    return handleResponse(res, 200, "COD cash remitted successfully", updated);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+

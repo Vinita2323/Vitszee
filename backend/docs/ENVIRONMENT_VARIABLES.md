@@ -46,21 +46,26 @@ Redis is **mandatory in production** (`NODE_ENV=production`). Startup fails if n
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| `USE_MOCK_OTP` | `true` in local dev | No | Enables mock OTP mode for the shared `/api/auth/otp/*` flow |
-| `USE_REAL_SMS` | `false` | No | Backward-compatible flag used by older OTP flows |
+| `USE_MOCK_OTP` | `false` | No | Enables mock OTP for `/api/auth/otp/*` (forbidden in production) |
+| `USE_REAL_SMS` | `true` | Production: **Yes** | Send real OTP SMS via SMS India Hub |
+| `SMS_PROVIDER` | `smsindia` | No | Active SMS provider |
 | `USE_REAL_EMAIL_OTP` | `false` | No | Enables real SMTP delivery for seller email OTPs |
 | `OTP_EXPIRY_MINUTES` | `5` | No | OTP validity window |
-| `OTP_LENGTH` | `4` | No | OTP length for the shared SMS OTP flow |
+| `OTP_LENGTH` | `6` | No | OTP length for SMS OTP flows |
 | `OTP_MAX_FAILED_ATTEMPTS` | `5` | No | Max invalid verification attempts before the OTP session is discarded |
 | `OTP_SEND_RATE_LIMIT_WINDOW_MS` | `900000` | No | Send OTP rate-limit window |
 | `OTP_SEND_RATE_LIMIT_MAX` | `5` | No | Max send OTP requests per window |
 | `OTP_VERIFY_RATE_LIMIT_WINDOW_MS` | `900000` | No | Verify OTP rate-limit window |
 | `OTP_VERIFY_RATE_LIMIT_MAX` | `10` | No | Max verify OTP requests per window |
-| `SMS_INDIA_HUB_API_KEY` | â€” | Real SMS: **Yes** | SMS India HUB API key |
-| `SMS_INDIA_HUB_SENDER_ID` | â€” | Real SMS: **Yes** | DLT-registered sender ID |
-| `SMS_INDIA_HUB_DLT_TEMPLATE_ID` | â€” | Real SMS: **Yes** | Approved DLT template ID |
-| `SMS_INDIA_HUB_URL` | `http://cloud.smsindiahub.in/vendorsms/pushsms.aspx` | No | SMS India HUB endpoint |
+| `SMS_INDIA_HUB_API_KEY` | — | Real SMS: **Yes** | SMS India Hub API key |
+| `SMS_INDIA_HUB_SENDER_ID` | `BGADEC` | Real SMS: **Yes** | DLT-registered sender ID |
+| `SMS_INDIA_HUB_TEMPLATE_ID` | `1007282516644508833` | Real SMS: **Yes** | Approved DLT template ID |
+| `SMS_INDIA_HUB_DLT_TEMPLATE_ID` | same as TEMPLATE_ID | Real SMS: **Yes** | Alias of TEMPLATE_ID |
+| `SMS_INDIA_HUB_BRAND_NAME` | `Vitszee` | No | First DLT `##var##` (brand name) |
+| `SMS_INDIA_HUB_TEMPLATE_TEXT` | approved BGADEC template | No | Exact DLT message body with `##var##` placeholders |
+| `SMS_INDIA_HUB_URL` | `http://cloud.smsindiahub.in/vendorsms/pushsms.aspx` | No | SMS India Hub vendor endpoint |
 | `SMS_INDIA_HUB_TIMEOUT_MS` | `10000` | No | SMS provider request timeout |
+| `SMS_INDIA_HUB_PE_ID` | — | Optional | Principal Entity ID if required by the account |
 
 ## Email / SMTP
 

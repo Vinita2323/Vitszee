@@ -12,6 +12,7 @@ import {
     getDeliveryPartners,
     approveDeliveryPartner,
     rejectDeliveryPartner,
+    updateDeliveryPartner,
     getActiveFleet,
     getAdminWalletData,
     getDeliveryTransactions,
@@ -49,6 +50,7 @@ import {
     updateDeliverySettingsController,
     getAdminFinanceAnalyticsController,
     getAdminFinanceDrilldownController,
+    remitOrderCodCashController,
 } from "../controller/adminFinanceController.js";
 import { getTodayBirthdays, sendReward, getBirthdayAnalytics } from "../controller/admin/adminBirthdayController.js";
 
@@ -180,6 +182,13 @@ router.get(
     getDeliveryPartners
 );
 
+router.put(
+    "/delivery-partners/:id",
+    verifyToken,
+    allowRoles("admin"),
+    updateDeliveryPartner
+);
+
 router.patch(
     "/delivery-partners/approve/:id",
     verifyToken,
@@ -207,6 +216,7 @@ router.get("/delivery-cash", verifyToken, allowRoles("admin"), getDeliveryCashBa
 router.get("/rider-cash-details/:id", verifyToken, allowRoles("admin"), getRiderCashDetails);
 router.post("/settle-cash", verifyToken, allowRoles("admin"), settleRiderCash);
 router.get("/cash-history", verifyToken, allowRoles("admin"), getCashSettlementHistory);
+router.post("/orders/:orderId/cod-remit", verifyToken, allowRoles("admin"), remitOrderCodCashController);
 
 // Seller Withdrawal Management
 router.get("/seller-withdrawals", verifyToken, allowRoles("admin"), getSellerWithdrawals);

@@ -331,6 +331,8 @@ export async function fetchAvailableOrdersForDelivery({
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
       deliveryBoy: null,
+      deliveryProvider: "internal",
+      paymentMode: "COD",
       seller: { $in: sellerIds },
       skippedBy: { $nin: [userId] },
     })
@@ -355,6 +357,7 @@ export async function fetchAvailableOrdersForDelivery({
       ],
       status: { $in: ["confirmed", "packed"] },
       deliveryBoy: null,
+      paymentMode: "COD",
       seller: { $in: sellerIds },
       skippedBy: { $nin: [userId] },
     })

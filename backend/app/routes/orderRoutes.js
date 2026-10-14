@@ -20,6 +20,7 @@ import {
   rejectReturnPickup,
   updateReturnStatus,
   uploadReturnPickupProof,
+  markOrderCodCollected,
 } from "../controller/orderController.js";
 import {
   createOrderWithFinancialSnapshot,
@@ -293,6 +294,20 @@ router.get(
   allowRoles("customer", "user", "delivery", "seller", "admin"),
   requireApprovedSeller,
   getOrderRoute,
+);
+
+// COD cash collection
+router.post(
+  "/:orderId/cod-collected",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  markOrderCodCollected,
+);
+router.post(
+  "/workflow/:orderId/cod-collected",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  markOrderCodCollected,
 );
 
 export default router;

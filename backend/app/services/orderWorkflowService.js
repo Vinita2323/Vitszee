@@ -49,6 +49,7 @@ import { createForwardOrder } from "./delhivery/delhiveryForwardService.js";
 import { getDelhiveryLocalConfig } from "./delhiveryLocal/delhiveryLocalConfig.js";
 import { createLocalOrder } from "./delhiveryLocal/delhiveryLocalService.js";
 import { resolveLocalEligibility } from "./delhiveryLocal/delhiveryLocalRouting.js";
+import { shouldRouteToInternalDelivery } from "./codRoutingService.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -311,6 +312,11 @@ export async function executeOrderAcceptance({
 
   const responseStatus = isAutoAccepted ? "AUTO_ACCEPTED" : "ACCEPTED";
 
+  let isInternalDelivery = false;
+  if (!isPaymentPending) {
+    isInternalDelivery = await shouldRouteToInternalDelivery(orderId, orderForCheck);
+  }
+
   const updatePayload = isPaymentPending
     ? {
         $set: {
@@ -334,7 +340,18 @@ export async function executeOrderAcceptance({
           acceptedBy,
           autoAccepted: isAutoAccepted,
           sellerResponseStatus: responseStatus,
-          deliveryProvider: "delhivery",
+          deliveryProvider: isInternalDelivery ? "internal" : "delhivery",
+          ...(isInternalDelivery
+            ? {
+                deliveryMode: "quick",
+                deliverySearchExpiresAt: new Date(now.getTime() + deliveryMs),
+                deliverySearchMeta: {
+                  radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
+                  attempt: 1,
+                  lastBroadcastAt: now,
+                },
+              }
+            : {}),
         },
         $unset: { expiresAt: 1 },
       };
@@ -358,23 +375,48 @@ export async function executeOrderAcceptance({
   await removeSellerTimeoutJob(orderId);
 
   if (!isPaymentPending) {
-    // Delhivery exclusive delivery dispatch
-    const shipment = await dispatchOrderToDelhivery(orderId, updated);
-    if (shipment?.awbNumber) {
-      updated.awbNumber = shipment.awbNumber;
-      updated.deliveryProvider = "delhivery";
-    }
+    if (isInternalDelivery) {
+      await scheduleDeliveryTimeoutJob(orderId, 1);
 
-    emitOrderStatusUpdate(
-      updated.orderId,
-      {
-        workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-        deliveryProvider: "delhivery",
-        awbNumber: updated.awbNumber,
-        autoAccepted: isAutoAccepted,
-      },
-      updated.customer?._id || updated.customer,
-    );
+      const orderRich = await Order.findOne({ orderId })
+        .populate("seller", "shopName address name location serviceRadius")
+        .lean();
+      if (orderRich) {
+        await emitDeliveryBroadcastForSeller(
+          orderRich.seller,
+          deliveryBroadcastPayloadFromOrder(orderRich),
+        );
+      }
+
+      emitOrderStatusUpdate(
+        updated.orderId,
+        {
+          workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
+          deliveryProvider: "internal",
+          deliveryMode: "quick",
+          autoAccepted: isAutoAccepted,
+        },
+        updated.customer?._id || updated.customer,
+      );
+    } else {
+      // Delhivery delivery dispatch (Local for Quick Prepaid, or Courier Express)
+      const shipment = await dispatchOrderToDelhivery(orderId, updated);
+      if (shipment?.awbNumber) {
+        updated.awbNumber = shipment.awbNumber;
+        updated.deliveryProvider = "delhivery";
+      }
+
+      emitOrderStatusUpdate(
+        updated.orderId,
+        {
+          workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
+          deliveryProvider: "delhivery",
+          awbNumber: updated.awbNumber,
+          autoAccepted: isAutoAccepted,
+        },
+        updated.customer?._id || updated.customer,
+      );
+    }
   } else {
     // Notify customer that seller accepted and payment is pending
     emitOrderStatusUpdate(
@@ -447,17 +489,34 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
  * Called when a customer selects a payment method post-acceptance, or automatically for non-pending payments.
  */
 export async function proceedToDeliverySearch(orderId, orderDoc = null) {
+  const isInternalDelivery = await shouldRouteToInternalDelivery(orderId, orderDoc);
+  const now = new Date();
+  const deliveryMs = DEFAULT_DELIVERY_TIMEOUT_MS();
+
+  const setPayload = {
+    workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
+    status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
+    deliveryProvider: isInternalDelivery ? "internal" : "delhivery",
+    ...(isInternalDelivery
+      ? {
+          deliveryMode: "quick",
+          deliverySearchExpiresAt: new Date(now.getTime() + deliveryMs),
+          deliverySearchMeta: {
+            radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
+            attempt: 1,
+            lastBroadcastAt: now,
+          },
+        }
+      : {}),
+  };
+
   const updated = await Order.findOneAndUpdate(
     {
       orderId,
       workflowVersion: { $gte: 2 },
     },
     {
-      $set: {
-        workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-        status: legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_SEARCH),
-        deliveryProvider: "delhivery",
-      },
+      $set: setPayload,
       $unset: { expiresAt: 1 },
     },
     { new: true },
@@ -467,22 +526,46 @@ export async function proceedToDeliverySearch(orderId, orderDoc = null) {
 
   if (!updated) return null;
 
-  // Delhivery exclusive delivery dispatch
-  const shipment = await dispatchOrderToDelhivery(orderId, updated);
-  if (shipment?.awbNumber) {
-    updated.awbNumber = shipment.awbNumber;
-    updated.deliveryProvider = "delhivery";
-  }
+  if (isInternalDelivery) {
+    await scheduleDeliveryTimeoutJob(orderId, 1);
 
-  emitOrderStatusUpdate(
-    updated.orderId,
-    {
-      workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      deliveryProvider: "delhivery",
-      awbNumber: updated.awbNumber,
-    },
-    updated.customer?._id || updated.customer,
-  );
+    const orderRich = await Order.findOne({ orderId })
+      .populate("seller", "shopName address name location serviceRadius")
+      .lean();
+    if (orderRich) {
+      await emitDeliveryBroadcastForSeller(
+        orderRich.seller,
+        deliveryBroadcastPayloadFromOrder(orderRich),
+      );
+    }
+
+    emitOrderStatusUpdate(
+      updated.orderId,
+      {
+        workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
+        deliveryProvider: "internal",
+        deliveryMode: "quick",
+      },
+      updated.customer?._id || updated.customer,
+    );
+  } else {
+    // Delhivery exclusive delivery dispatch
+    const shipment = await dispatchOrderToDelhivery(orderId, updated);
+    if (shipment?.awbNumber) {
+      updated.awbNumber = shipment.awbNumber;
+      updated.deliveryProvider = "delhivery";
+    }
+
+    emitOrderStatusUpdate(
+      updated.orderId,
+      {
+        workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
+        deliveryProvider: "delhivery",
+        awbNumber: updated.awbNumber,
+      },
+      updated.customer?._id || updated.customer,
+    );
+  }
 
   return updated;
 }
