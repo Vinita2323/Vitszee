@@ -115,7 +115,6 @@ export const requestDeliveryOtp = async (req, res) => {
               await sendSmsIndiaHubOtp({
                 phone,
                 otp: result.otp,
-                message: `Your delivery OTP for order #${orderId} is ${result.otp}. Noyo-kart.`,
               });
             } catch (smsErr) {
               console.warn("[requestDeliveryOtp] SMS failed:", smsErr.message);
@@ -367,7 +366,6 @@ export const requestReturnPickupOtp = async (req, res) => {
               await sendSmsIndiaHubOtp({
                 phone,
                 otp: result.otp,
-                message: `Your return pickup OTP for order #${orderId} is ${result.otp}. Noyo-kart.`,
               });
             }
           } catch (smsErr) {
@@ -496,7 +494,6 @@ export const requestReturnDropOtp = async (req, res) => {
               await sendSmsIndiaHubOtp({
                 phone: sellerPhone,
                 otp: result.otp,
-                message: `Return drop OTP for order #${orderId} is ${result.otp}. Noyo-kart.`,
               });
             }
           } catch (smsErr) {

@@ -91,8 +91,8 @@ const CustomerAuth = () => {
 
   const handleVerifyOtp = async (e) => {
     e?.preventDefault();
-    if (!formData.otp || formData.otp.length !== 4) {
-      toast.error("Please enter the complete 4-digit OTP code");
+    if (!formData.otp || formData.otp.length !== 6) {
+      toast.error("Please enter the complete 6-digit OTP code");
       return;
     }
     setIsLoading(true);
@@ -338,9 +338,9 @@ const CustomerAuth = () => {
                   </div>
 
                   <form onSubmit={handleVerifyOtp} className="space-y-6">
-                    {/* 4-Box OTP Input */}
-                    <div className="flex justify-center gap-3 py-2">
-                      {[0, 1, 2, 3].map((index) => (
+                    {/* 6-Box OTP Input */}
+                    <div className="flex justify-center gap-2 py-2">
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
                         <input
                           key={index}
                           ref={(el) => (otpInputsRef.current[index] = el)}
@@ -358,14 +358,14 @@ const CustomerAuth = () => {
                             const val = e.target.value.replace(/\D/g, "");
                             const currentOtp = formData.otp.split("");
                             currentOtp[index] = val;
-                            const newOtp = currentOtp.join("").slice(0, 4);
+                            const newOtp = currentOtp.join("").slice(0, 6);
                             setFormData({ ...formData, otp: newOtp });
 
-                            if (val && index < 3) {
+                            if (val && index < 5) {
                               otpInputsRef.current[index + 1]?.focus();
                             }
                           }}
-                          className="h-16 w-14 rounded-2xl bg-slate-50 border-2 border-slate-200 text-center text-2xl font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 shadow-sm transition-all"
+                          className="h-14 w-11 rounded-2xl bg-slate-50 border-2 border-slate-200 text-center text-xl font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 shadow-sm transition-all"
                         />
                       ))}
                     </div>
@@ -373,7 +373,7 @@ const CustomerAuth = () => {
                     {/* Verify & Enter Button */}
                     <button
                       type="submit"
-                      disabled={isLoading || formData.otp.length !== 4}
+                      disabled={isLoading || formData.otp.length !== 6}
                       className="w-full py-4 rounded-2xl bg-[#2E7D32] hover:bg-[#256828] text-white font-black text-xs uppercase tracking-[2px] shadow-lg shadow-emerald-900/15 active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {isLoading ? (
