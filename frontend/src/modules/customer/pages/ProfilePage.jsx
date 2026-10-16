@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-    User, MapPin, Package, Wallet, ChevronRight,
-    LogOut, Heart, HelpCircle, Bell, Users, Settings, Edit2, Gift
+    User, MapPin, Package, ChevronRight,
+    LogOut, Heart, HelpCircle, Bell, Users, Settings, Edit2, Gift, Trash2
 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
@@ -14,6 +14,7 @@ const ProfilePage = () => {
     const { user, logout } = useAuth();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
+    const [deleting, setDeleting] = useState(false);
 
     const formatIndiaPhone = (value) => {
         const raw = String(value || '').trim();
@@ -23,13 +24,24 @@ const ProfilePage = () => {
         return raw;
     };
 
-    const handleTestPushNotification = async () => {
+    const handleDeleteAccount = async () => {
+        const confirmed = window.confirm(
+            'Delete your account permanently? This cannot be undone. Your orders will be retained for records, but you will be signed out and cannot log in with this account again.',
+        );
+        if (!confirmed) return;
+
+        setDeleting(true);
         try {
-            await customerApi.testPushNotification();
-            toast.success("Test push notification sent!");
+            await customerApi.deleteAccount();
+            toast.success('Account deleted');
+            await logout();
         } catch (error) {
-            toast.error("Failed to send test push notification.");
-            console.error("Test push notification error:", error);
+            const message =
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to delete account';
+            toast.error(message);
+            setDeleting(false);
         }
     };
 
@@ -66,15 +78,22 @@ const ProfilePage = () => {
                     <div className="space-y-1">
                         <MenuItem icon={Package} label="My Orders" path="/orders" />
                         <MenuItem icon={MapPin} label="My Addresses" path="/addresses" />
+                        {/* Wallet temporarily disabled
                         <MenuItem icon={Wallet} label="My Wallet" rightText={`₹${user?.walletBalance || 0}`} path="/wallet" />
+                        */}
                         <MenuItem icon={Gift} label="My Rewards" path="/rewards" />
                         <MenuItem icon={Heart} label="My Wishlist" path="/wishlist" />
                         <MenuItem icon={Users} label="Refer & Earn" />
                         <MenuItem icon={Bell} label="Notifications" />
                         <MenuItem icon={HelpCircle} label="Help & Support" path="/support" />
                         <MenuItem icon={Settings} label="Settings" path="/settings" />
-                        <MenuItem icon={Bell} label="Test Push Notification" onClick={handleTestPushNotification} />
                         <MenuItem icon={LogOut} label="Logout" onClick={logout} />
+                        <MenuItem
+                            icon={Trash2}
+                            label={deleting ? 'Deleting…' : 'Delete Account'}
+                            onClick={deleting ? undefined : handleDeleteAccount}
+                            danger
+                        />
                     </div>
                 
                     <div className="text-center pt-8 pb-4">
@@ -86,16 +105,16 @@ const ProfilePage = () => {
     );
 };
 
-const MenuItem = ({ icon: Icon, label, rightText, onClick, path }) => {
+const MenuItem = ({ icon: Icon, label, rightText, onClick, path, danger }) => {
     const content = (
-        <div className="flex items-center justify-between py-3.5 px-4 hover:bg-[#F5FBF5] rounded-2xl transition-colors cursor-pointer group">
+        <div className={`flex items-center justify-between py-3.5 px-4 rounded-2xl transition-colors cursor-pointer group ${danger ? 'hover:bg-red-50' : 'hover:bg-[#F5FBF5]'}`}>
             <div className="flex items-center gap-4">
-                <Icon size={20} className="text-slate-500 group-hover:text-[#1A4516] transition-colors" />
-                <span className="text-sm font-bold text-slate-700 group-hover:text-[#1A4516] transition-colors">{label}</span>
+                <Icon size={20} className={danger ? 'text-red-500' : 'text-slate-500 group-hover:text-[#1A4516] transition-colors'} />
+                <span className={`text-sm font-bold transition-colors ${danger ? 'text-red-600' : 'text-slate-700 group-hover:text-[#1A4516]'}`}>{label}</span>
             </div>
             <div className="flex items-center gap-2">
                 {rightText && <span className="text-sm font-black text-[#1A4516]">{rightText}</span>}
-                <ChevronRight size={18} className="text-slate-300 group-hover:translate-x-0.5 group-hover:text-[#1A4516] transition-all" />
+                <ChevronRight size={18} className={`transition-all ${danger ? 'text-red-300' : 'text-slate-300 group-hover:translate-x-0.5 group-hover:text-[#1A4516]'}`} />
             </div>
         </div>
     );

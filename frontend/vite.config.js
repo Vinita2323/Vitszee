@@ -56,6 +56,7 @@ function firebaseMessagingSwPlugin() {
 export default defineConfig({
   plugins: [react(), firebaseMessagingSwPlugin()],
   server: {
+    host: true,
     port: 5174,
     strictPort: true,
   },

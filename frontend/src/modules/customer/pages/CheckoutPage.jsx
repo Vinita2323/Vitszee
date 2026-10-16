@@ -11,7 +11,6 @@ import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import {
   MapPin,
   Clock,
-  CreditCard,
   Banknote,
   ChevronRight,
   ChevronLeft,
@@ -219,13 +218,8 @@ const CheckoutPage = () => {
     }
   }, [cart.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // iOS / COD-only: online (Razorpay) checkout is disabled.
   const paymentMethods = [
-    {
-      id: "online",
-      label: "Pay Online",
-      icon: CreditCard,
-      sublabel: "UPI, Card, Netbanking",
-    },
     {
       id: "cod",
       label: "Cash on Delivery",
@@ -793,7 +787,7 @@ const CheckoutPage = () => {
     setIsPlacingOrder(true);
     try {
       const taxAmount = pricingPreview?.taxTotal || 0;
-      const paymentMode = selectedPayment === "online" ? "ONLINE" : "COD";
+      const paymentMode = "COD";
       const orderData = {
         address: buildAddressForOrder(),
         paymentMode,
@@ -801,7 +795,7 @@ const CheckoutPage = () => {
         taxTotal: taxAmount,
         tipAmount: selectedTip,
         timeSlot: selectedTimeSlot,
-        walletAmount: walletAmountToUse,
+        walletAmount: 0, // Wallet temporarily disabled
         items: cart.map((item) => ({
           product: item.id || item._id,
           name: item.name,
@@ -820,8 +814,6 @@ const CheckoutPage = () => {
           result.order ||
           (Array.isArray(result.orders) ? result.orders[0] : null);
         const mainOrderId = mainOrder?.orderId || result.orderId;
-        const paymentRef =
-          result.paymentRef || result.checkoutGroupId || mainOrderId;
 
         if (!mainOrderId) {
           setIsPlacingOrder(false);
@@ -833,40 +825,7 @@ const CheckoutPage = () => {
           return;
         }
 
-        if (paymentMode === "ONLINE") {
-          // Order is created but held back from the seller until payment
-          // succeeds (backend: shouldStartSellerWorkflow is false for
-          // ONLINE). Kick off the Razorpay session immediately and
-          // redirect — the seller only sees the order after payment
-          // verification completes.
-          try {
-            const payRes = await customerApi.createPaymentOrder({ orderRef: paymentRef });
-            const redirectUrl = payRes.data?.result?.redirectUrl;
-            if (payRes.data?.success && redirectUrl) {
-              clearCart();
-              window.location.href = redirectUrl;
-              return;
-            }
-            setIsPlacingOrder(false);
-            showToast(
-              payRes.data?.message || "Order placed, but payment could not be started. Check My Orders to retry payment.",
-              "warning"
-            );
-            clearCart();
-            navigate(`/orders/${mainOrderId}`);
-          } catch (payErr) {
-            setIsPlacingOrder(false);
-            showToast(
-              payErr?.response?.data?.message || "Order placed, but payment could not be started. Check My Orders to retry payment.",
-              "warning"
-            );
-            clearCart();
-            navigate(`/orders/${mainOrderId}`);
-          }
-          return;
-        }
-
-        // COD flow — order goes straight to the seller, no payment step
+        // COD-only — order goes straight to the seller, no online payment step
         clearCart();
         showToast("Order placed — waiting for seller to accept.", "success");
         setOrderId(mainOrderId);
@@ -1182,10 +1141,11 @@ const CheckoutPage = () => {
               paymentMethods={paymentMethods}
               selectedPayment={selectedPayment}
               onSelectPayment={setSelectedPayment}
-              useWallet={useWallet}
-              onToggleWallet={() => setUseWallet((v) => !v)}
-              walletBalance={user?.walletBalance || 0}
-              walletAmountToUse={walletAmountToUse}
+              useWallet={false}
+              onToggleWallet={() => {}}
+              // Wallet temporarily disabled — hide checkout wallet toggle
+              walletBalance={0}
+              walletAmountToUse={0}
             />
 
             {/* Desktop Proceed to Pay */}

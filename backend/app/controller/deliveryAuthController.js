@@ -2,7 +2,11 @@ import Delivery from "../models/delivery.js";
 import jwt from "jsonwebtoken";
 import handleResponse from "../utils/helper.js";
 import { sendSmsIndiaHubOtp } from "../services/smsIndiaHubService.js";
-import { generateOTP, useRealSMS } from "../utils/otp.js";
+import {
+  generateOTP,
+  isDefaultTestPhone,
+  shouldDispatchSms,
+} from "../utils/otp.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import { clearRiderPresence } from "../services/firebaseService.js";
 
@@ -36,7 +40,7 @@ export const signupDelivery = async (req, res) => {
             return handleResponse(res, 400, "Delivery partner already exists");
         }
 
-        const otp = generateOTP();
+        const otp = generateOTP(phone);
 
         let aadharUrl = delivery?.documents?.aadhar || "";
         let panUrl = delivery?.documents?.pan || "";
@@ -91,6 +95,7 @@ export const signupDelivery = async (req, res) => {
             },
             otp,
             otpExpiry: Date.now() + 5 * 60 * 1000,
+            ...(isDefaultTestPhone(phone) ? { isVerified: true } : {}),
         };
 
         if (!delivery) {
@@ -100,11 +105,13 @@ export const signupDelivery = async (req, res) => {
             await delivery.save();
         }
 
-        if (useRealSMS()) {
+        if (shouldDispatchSms(phone)) {
             await sendSmsIndiaHubOtp({ phone, otp });
         }
 
-        return handleResponse(res, 200, "OTP sent successfully");
+        return handleResponse(res, 200, "OTP sent successfully", {
+            ...(isDefaultTestPhone(phone) ? { mockOtp: otp } : {}),
+        });
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }
@@ -121,26 +128,46 @@ export const loginDelivery = async (req, res) => {
             return handleResponse(res, 400, "Phone number is required");
         }
 
-        const delivery = await Delivery.findOne({ phone });
+        let delivery = await Delivery.findOne({ phone });
+
+        // Auto-provision the fixed demo delivery partner so login always works.
+        if (!delivery && isDefaultTestPhone(phone)) {
+            delivery = await Delivery.create({
+                name: "Demo Delivery Partner",
+                phone,
+                vehicleType: "bike",
+                isVerified: true,
+                isOnline: true,
+            });
+        }
 
         if (!delivery) {
             return handleResponse(res, 404, "Delivery partner not found");
         }
+        if (delivery.deletedAt || delivery.isActive === false) {
+            return handleResponse(res, 403, "This account has been deleted. Please sign up again.");
+        }
         if (!delivery.isVerified) {
-            return handleResponse(res, 403, "Your application is still pending admin approval");
+            if (isDefaultTestPhone(phone)) {
+                delivery.isVerified = true;
+            } else {
+                return handleResponse(res, 403, "Your application is still pending admin approval");
+            }
         }
 
-        const otp = generateOTP();
+        const otp = generateOTP(phone);
 
         delivery.otp = otp;
         delivery.otpExpiry = Date.now() + 5 * 60 * 1000;
         await delivery.save();
 
-        if (useRealSMS()) {
+        if (shouldDispatchSms(phone)) {
             await sendSmsIndiaHubOtp({ phone, otp });
         }
 
-        return handleResponse(res, 200, "OTP sent successfully");
+        return handleResponse(res, 200, "OTP sent successfully", {
+            ...(isDefaultTestPhone(phone) ? { mockOtp: otp } : {}),
+        });
     } catch (error) {
         console.error("loginDelivery Error:", error);
         return handleResponse(res, 500, error.message, { stack: error.stack });
@@ -166,6 +193,10 @@ export const verifyDeliveryOTP = async (req, res) => {
 
         if (!delivery) {
             return handleResponse(res, 400, "Invalid or expired OTP");
+        }
+
+        if (delivery.deletedAt || delivery.isActive === false) {
+            return handleResponse(res, 403, "This account has been deleted. Please sign up again.");
         }
 
         if (!delivery.isVerified) {
@@ -204,6 +235,9 @@ export const getDeliveryProfile = async (req, res) => {
         const delivery = await Delivery.findById(req.user.id);
         if (!delivery) {
             return handleResponse(res, 404, "Delivery partner not found");
+        }
+        if (delivery.deletedAt || delivery.isActive === false) {
+            return handleResponse(res, 403, "This account has been deleted");
         }
         return handleResponse(res, 200, "Profile fetched successfully", delivery);
     } catch (error) {
@@ -254,5 +288,20 @@ export const updateDeliveryProfile = async (req, res) => {
         return handleResponse(res, 200, "Profile updated successfully", delivery);
     } catch (error) {
         return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   DELETE ACCOUNT (self-service)
+================================ */
+export const deleteDeliveryAccount = async (req, res) => {
+    try {
+        const { softDeleteDeliveryAccount } = await import(
+            "../services/lifecycle/accountLifecycleService.js"
+        );
+        await softDeleteDeliveryAccount(req.user.id);
+        return handleResponse(res, 200, "Account deleted successfully");
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };

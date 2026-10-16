@@ -91,6 +91,19 @@ const deliverySchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+
+        /** Soft-delete tombstone. Set by account self-delete / admin lifecycle. */
+        deletedAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+
         location: {
             type: {
                 type: String,

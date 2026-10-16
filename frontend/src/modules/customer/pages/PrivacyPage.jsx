@@ -1,12 +1,14 @@
 import React from 'react';
 import { ChevronLeft, Shield } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '@core/context/SettingsContext';
 
 const PrivacyPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
+    const isDelivery = location.pathname.startsWith('/delivery');
     return (
         <div className="min-h-screen bg-slate-50 font-sans pb-10">
             {/* Header */}
@@ -16,7 +18,7 @@ const PrivacyPage = () => {
                         if (window.history.state && window.history.state.idx > 0) {
                             navigate(-1);
                         } else {
-                            navigate('/');
+                            navigate(isDelivery ? '/delivery/auth' : '/');
                         }
                     }}
                     className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors"

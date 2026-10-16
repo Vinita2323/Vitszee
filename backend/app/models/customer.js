@@ -135,6 +135,13 @@ const userSchema = new mongoose.Schema(
             default: true,
         },
 
+        /** Soft-delete tombstone. Set by account self-delete / admin lifecycle. */
+        deletedAt: {
+            type: Date,
+            default: null,
+            index: true,
+        },
+
         lastLogin: Date,
     },
     {

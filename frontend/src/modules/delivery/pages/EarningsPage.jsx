@@ -156,12 +156,14 @@ const EarningsPage = () => {
             >
               COD Cash
             </button>
+            {/* Wallet / withdraw temporarily disabled
             <button
               onClick={() => setIsModalOpen(true)}
               className="px-4 py-2.5 bg-white text-[#1A4516] font-bold text-xs rounded-full shadow-sm hover:bg-gray-100 transition-colors"
             >
               Withdraw Funds
             </button>
+            */}
             <button
               onClick={() => toast.success("Downloading earnings report...")}
               className="p-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full transition-colors cursor-pointer"

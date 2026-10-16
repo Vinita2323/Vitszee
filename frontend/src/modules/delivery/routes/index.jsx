@@ -18,8 +18,7 @@ import BankAccount from "../pages/profile/BankAccount";
 import Documents from "../pages/profile/Documents";
 import SafetyPrivacy from "../pages/profile/SafetyPrivacy";
 import Settings from "../pages/profile/Settings";
-import HelpSupport from "../pages/profile/HelpSupport";
-import Withdrawals from "../pages/profile/Withdrawals";
+// import Withdrawals from "../pages/profile/Withdrawals"; // wallet temporarily disabled
 import Notifications from "../pages/Notifications";
 import ReviewsPage from "../pages/ReviewsPage";
 
@@ -48,8 +47,11 @@ const DeliveryRoutes = () => {
         <Route path="profile/documents" element={<Documents />} />
         <Route path="profile/safety-privacy" element={<SafetyPrivacy />} />
         <Route path="profile/settings" element={<Settings />} />
-        <Route path="profile/help-support" element={<HelpSupport />} />
-        <Route path="profile/withdrawals" element={<Withdrawals />} />
+        <Route path="profile/help-support" element={<Navigate to="/delivery/support" replace />} />
+        <Route path="support" element={<Navigate to="/delivery/support" replace />} />
+        {/* Wallet / money request temporarily disabled */}
+        <Route path="profile/withdrawals" element={<Navigate to="/delivery/profile" replace />} />
+        {/* <Route path="profile/withdrawals" element={<Withdrawals />} /> */}
         <Route path="notifications" element={<Notifications />} />
         <Route path="reviews" element={<ReviewsPage />} />
         <Route path="/" element={<Navigate to="dashboard" replace />} />

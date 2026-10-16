@@ -15,8 +15,6 @@ function safeMoney(value) {
 
 const CodCash = () => {
   const [loading, setLoading] = React.useState(true);
-  const [paying, setPaying] = React.useState(false);
-  const [payAmount, setPayAmount] = React.useState("");
   const [data, setData] = React.useState({
     systemFloatCOD: 0,
     cashInHand: 0,
@@ -30,18 +28,12 @@ const CodCash = () => {
       const res = await deliveryApi.getCodCashSummary();
       if (res.data.success && res.data.result) {
         const result = res.data.result;
-        const nextToRemit = Array.isArray(result.toRemit) ? result.toRemit : [];
-        const nextPayable = nextToRemit.reduce(
-          (sum, row) => sum + safeMoney(row.amountNetPending),
-          0,
-        );
         setData({
           systemFloatCOD: safeMoney(result.systemFloatCOD),
           cashInHand: safeMoney(result.cashInHand),
           toCollect: Array.isArray(result.toCollect) ? result.toCollect : [],
-          toRemit: nextToRemit,
+          toRemit: Array.isArray(result.toRemit) ? result.toRemit : [],
         });
-        setPayAmount(nextPayable > 0 ? String(nextPayable) : "");
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to load COD cash");
@@ -72,97 +64,6 @@ const CodCash = () => {
     (sum, row) => sum + safeMoney(row.amountNetPending),
     0,
   );
-  const enteredPayAmount = safeMoney(payAmount);
-
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) {
-        resolve(true);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
-  const handlePayNow = async () => {
-    if (paying) return;
-    if (enteredPayAmount <= 0) {
-      toast.error("Enter an amount to pay");
-      return;
-    }
-    if (enteredPayAmount > payableNowAmount) {
-      toast.error(`You can pay up to ${RUPEE}${safeMoney(payableNowAmount).toLocaleString()}`);
-      return;
-    }
-
-    try {
-      setPaying(true);
-      
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded) {
-        toast.error("Failed to load payment gateway. Please check your connection.");
-        setPaying(false);
-        return;
-      }
-
-      const initRes = await deliveryApi.initiateCodDeposit({ amount: enteredPayAmount });
-      const { orderId, amount, key } = initRes.data?.result || {};
-
-      if (!orderId || !key) {
-        toast.error("Failed to initialize payment");
-        setPaying(false);
-        return;
-      }
-
-      const options = {
-        key: key,
-        amount: amount * 100, // Amount in paise
-        currency: "INR",
-        name: "Vitszee Market",
-        description: "COD Cash Deposit",
-        order_id: orderId,
-        handler: async function (response) {
-          try {
-            setPaying(true);
-            const verifyRes = await deliveryApi.verifyCodDeposit({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              amount: enteredPayAmount
-            });
-            const result = verifyRes.data?.result || {};
-            toast.success(
-              `Deposited ${RUPEE}${safeMoney(result.totalSubmitted).toLocaleString()} successfully`
-            );
-            await fetchSummary();
-          } catch (verifyError) {
-            toast.error(verifyError?.response?.data?.message || "Payment verification failed");
-          } finally {
-            setPaying(false);
-            setPayAmount("");
-          }
-        },
-        theme: {
-          color: "#f97316" // Tailwind orange-500
-        }
-      };
-
-      const razorpayInstance = new window.Razorpay(options);
-      razorpayInstance.on('payment.failed', function (response) {
-        toast.error(response.error.description || "Payment failed");
-        setPaying(false);
-      });
-      
-      razorpayInstance.open();
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to initiate COD deposit");
-      setPaying(false);
-    }
-  };
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
@@ -232,64 +133,16 @@ const CodCash = () => {
             </div>
 
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-100 p-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-bold text-orange-700 uppercase">
-                      Ready To Pay Now
-                    </p>
-                    <p className="text-xl font-extrabold text-gray-900 mt-1">
-                      {RUPEE}
-                      {safeMoney(payableNowAmount).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Only cash from collected orders can be paid now.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[11px] font-bold text-orange-700 uppercase">
-                    Enter Amount
-                  </p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <div className="flex-1 rounded-xl border border-orange-200 bg-white px-4 py-3">
-                      <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">
-                        Amount To Pay
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-gray-900">{RUPEE}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={payAmount}
-                          onChange={(e) => setPayAmount(e.target.value)}
-                          placeholder="Enter amount"
-                          disabled={paying}
-                          className="w-full bg-transparent outline-none text-lg font-bold text-gray-900"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handlePayNow}
-                      disabled={paying || enteredPayAmount <= 0}
-                      className="shrink-0"
-                    >
-                      {paying ? "Paying..." : "Pay Admin"}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    Max you can pay right now: {RUPEE}
-                    {safeMoney(payableNowAmount).toLocaleString()}
-                  </p>
-                  {payableNowAmount <= 0 && (
-                    <p className="text-xs text-orange-700 mt-1">
-                      You can pay after COD cash is marked as collected.
-                    </p>
-                  )}
-                </div>
-              </div>
+              <p className="text-[11px] font-bold text-orange-700 uppercase">
+                Ready To Submit
+              </p>
+              <p className="text-xl font-extrabold text-gray-900 mt-1">
+                {RUPEE}
+                {safeMoney(payableNowAmount).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                Online deposit is disabled. Submit this COD cash to the admin in person / cash handover only.
+              </p>
             </div>
           </Card>
         </motion.div>

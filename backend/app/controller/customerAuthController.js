@@ -117,6 +117,9 @@ export const getCustomerProfile = async (req, res) => {
         if (!customer) {
             return handleResponse(res, 404, "Customer not found");
         }
+        if (customer.deletedAt || customer.isActive === false) {
+            return handleResponse(res, 403, "This account has been deleted");
+        }
 
         try {
             const { getCustomerBalance } = await import("../services/finance/walletService.js");
@@ -221,5 +224,20 @@ export const requestWalletWithdrawal = async (req, res) => {
             return handleResponse(res, 400, error.message);
         }
         return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   DELETE ACCOUNT (self-service)
+================================ */
+export const deleteCustomerAccount = async (req, res) => {
+    try {
+        const { softDeleteCustomerAccount } = await import(
+            "../services/lifecycle/accountLifecycleService.js"
+        );
+        await softDeleteCustomerAccount(req.user.id);
+        return handleResponse(res, 200, "Account deleted successfully");
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };

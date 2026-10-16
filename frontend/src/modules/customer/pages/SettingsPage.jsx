@@ -1,9 +1,40 @@
-import React from 'react';
-import { Bell, Lock, User, Globe, ChevronRight, LogOut, ChevronLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, Lock, User, Globe, ChevronRight, Trash2, ChevronLeft, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useAuth } from '@core/context/AuthContext';
+import { customerApi } from '../services/customerApi';
 
 const SettingsPage = () => {
     const navigate = useNavigate();
+    const { logout } = useAuth();
+    const [deleting, setDeleting] = useState(false);
+
+    const handleDeleteAccount = async () => {
+        const confirmed = window.confirm(
+            'Delete your account permanently? This cannot be undone. Your orders will be retained for records, but you will be signed out and cannot log in with this account again.',
+        );
+        if (!confirmed) return;
+
+        const doubleCheck = window.confirm(
+            'Are you sure? Type OK by confirming again to delete your account.',
+        );
+        if (!doubleCheck) return;
+
+        setDeleting(true);
+        try {
+            await customerApi.deleteAccount();
+            toast.success('Account deleted');
+            await logout();
+        } catch (error) {
+            const message =
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to delete account';
+            toast.error(message);
+            setDeleting(false);
+        }
+    };
     
     return (
         <div className="min-h-screen bg-white font-sans">
@@ -50,8 +81,14 @@ const SettingsPage = () => {
 
                 {/* Danger Zone */}
                 <div className="pt-2">
-                    <button className="w-full py-3.5 text-red-600 font-bold bg-red-50 rounded-2xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors text-sm">
-                        <LogOut size={18} /> Delete Account
+                    <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={handleDeleteAccount}
+                        className="w-full py-3.5 text-red-600 font-bold bg-red-50 rounded-2xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors text-sm disabled:opacity-60"
+                    >
+                        {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                        {deleting ? 'Deleting…' : 'Delete Account'}
                     </button>
                 </div>
 
