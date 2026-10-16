@@ -74,7 +74,13 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 BEFORE="$(git rev-parse --short HEAD)"
-git pull --ff-only origin "${DEPLOY_BRANCH}"
+# Production always matches origin. ff-only fails after force-push / rewritten history.
+if git merge-base --is-ancestor HEAD "origin/${DEPLOY_BRANCH}" 2>/dev/null; then
+  git pull --ff-only origin "${DEPLOY_BRANCH}"
+else
+  warn "Local ${DEPLOY_BRANCH} diverged from origin — resetting hard to origin/${DEPLOY_BRANCH}"
+  git reset --hard "origin/${DEPLOY_BRANCH}"
+fi
 AFTER="$(git rev-parse --short HEAD)"
 log "Git ${BEFORE} → ${AFTER}"
 
