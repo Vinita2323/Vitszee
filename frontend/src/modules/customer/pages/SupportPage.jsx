@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send } from 'lucide-react';
-import { useToast } from '@shared/components/ui/Toast';
+import { Link, useNavigate } from 'react-router-dom';
+import { Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
-import { useAuth } from '@core/context/AuthContext';
-import { customerApi } from '../services/customerApi';
-import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import axiosInstance from '@core/api/axios';
 import { getJSON, setJSON, STORAGE_KEYS } from '@core/utils/storage';
 
@@ -16,37 +10,12 @@ const FAQ_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const SupportPage = () => {
     const navigate = useNavigate();
-    const location = useLocation();
-    const { showToast } = useToast();
-    const { isAuthenticated } = useAuth();
     const { settings } = useSettings();
     const supportEmail = settings?.supportEmail || 'support@orangebasket.com';
     const supportEmailShort = supportEmail ? (supportEmail.length > 12 ? supportEmail.slice(0, 12) + '...' : supportEmail) : 'support@...';
     const supportPhone = settings?.supportPhone || '+919876543210';
     const supportPhoneShort = supportPhone ? (supportPhone.length > 12 ? supportPhone.slice(0, 12) + '...' : supportPhone) : '+91 98765...';
-    const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
-    const [ticketLoading, setTicketLoading] = useState(false);
-    const [ticketData, setTicketData] = useState({
-        subject: '',
-        description: '',
-        priority: 'medium'
-    });
     const [faqs, setFaqs] = useState([]);
-
-    useEffect(() => {
-        if (location.state?.autoOpenTicket) {
-            setIsTicketModalOpen(true);
-            if (location.state.subject) {
-                setTicketData(prev => ({
-                    ...prev,
-                    subject: location.state.subject
-                }));
-            }
-            
-            // Clear the state so refreshing doesn't keep opening it
-            navigate('.', { replace: true, state: {} });
-        }
-    }, [location.state, navigate]);
 
     useEffect(() => {
         const fetchFaqs = async () => {
@@ -76,26 +45,6 @@ const SupportPage = () => {
         fetchFaqs();
     }, []);
 
-    const handleTicketSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            setTicketLoading(true);
-            const res = await customerApi.createTicket({
-                ...ticketData,
-                userType: 'Customer'
-            });
-            if (res.data.success) {
-                showToast("Ticket raised successfully", "success");
-                setIsTicketModalOpen(false);
-                setTicketData({ subject: '', description: '', priority: 'medium' });
-            }
-        } catch (error) {
-            showToast(error.response?.data?.message || "Failed to create ticket", "error");
-        } finally {
-            setTicketLoading(false);
-        }
-    };
-
     return (
         <div className="min-h-screen bg-slate-50 pb-24 font-sans">
             <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-slate-200/60 mb-4 flex items-center gap-2">
@@ -110,33 +59,7 @@ const SupportPage = () => {
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-5">
                 {/* Contact Channels */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <ContactCard
-                        icon={MessageCircle}
-                        label="Chat Us"
-                        sub="Instant Support"
-                        onClick={() => {
-                            if (!isAuthenticated) {
-                                showToast("Please log in to chat with support", "info");
-                                navigate("/login", { state: { from: location } });
-                                return;
-                            }
-                            navigate("/chat");
-                        }}
-                    />
-                    <ContactCard
-                        icon={PlusCircle}
-                        label="Raise Ticket"
-                        sub="Formal Request"
-                        onClick={() => {
-                            if (!isAuthenticated) {
-                                showToast("Please log in to raise a ticket", "info");
-                                navigate("/login", { state: { from: location } });
-                                return;
-                            }
-                            setIsTicketModalOpen(true);
-                        }}
-                    />
+                <div className="grid grid-cols-2 gap-3">
                     <ContactCard icon={Phone} label="Call Us" sub={supportPhoneShort} onClick={() => window.location.href = `tel:${supportPhone}`} />
                     <ContactCard icon={Mail} label="Email Us" sub={supportEmailShort} onClick={() => window.location.href = `mailto:${supportEmail}`} />
                 </div>
@@ -174,103 +97,6 @@ const SupportPage = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Ticket Creation Modal */}
-            <AnimatePresence>
-                {isTicketModalOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsTicketModalOpen(false)}
-                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ y: "100%" }}
-                            animate={{ y: 0 }}
-                            exit={{ y: "100%" }}
-                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden z-10"
-                        >
-                            <div className="p-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div>
-                                        <h2 className="text-2xl font-black text-slate-800">Raise a Ticket</h2>
-                                        <p className="text-sm text-slate-500 font-medium">Describe your issue in detail</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsTicketModalOpen(false)}
-                                        className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
-                                    >
-                                        <X size={20} />
-                                    </button>
-                                </div>
-
-                                <form onSubmit={handleTicketSubmit} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Subject</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={ticketData.subject}
-                                            onChange={(e) => setTicketData({ ...ticketData, subject: e.target.value })}
-                                            placeholder="What's the issue about?"
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {['low', 'medium', 'high'].map((p) => (
-                                            <button
-                                                key={p}
-                                                type="button"
-                                                onClick={() => setTicketData({ ...ticketData, priority: p })}
-                                                className={cn(
-                                                    "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border",
-                                                    ticketData.priority === p
-                                                        ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-brand-100"
-                                                        : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
-                                                )}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Description</label>
-                                        <textarea
-                                            required
-                                            value={ticketData.description}
-                                            onChange={(e) => setTicketData({ ...ticketData, description: e.target.value })}
-                                            placeholder="Please explain the issue clearly..."
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold min-h-[150px] outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
-                                        />
-                                    </div>
-
-                                    <Button
-                                        type="submit"
-                                        disabled={ticketLoading}
-                                        className="w-full h-14 bg-primary hover:bg-[#0b721b] text-white text-lg font-black rounded-2xl shadow-xl shadow-brand-100 transition-all active:scale-95"
-                                    >
-                                        {ticketLoading ? (
-                                            <div className="flex items-center gap-2 text-center w-full justify-center">
-                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                SUBMITTING...
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2 text-center w-full justify-center">
-                                                <Send size={20} /> SUBMIT TICKET
-                                            </div>
-                                        )}
-                                    </Button>
-                                </form>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
         </div>
     );
 };
@@ -316,4 +142,3 @@ const FAQItem = ({ question, answer }) => {
 };
 
 export default SupportPage;
-
