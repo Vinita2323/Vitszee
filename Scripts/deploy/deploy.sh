@@ -29,7 +29,8 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 WEB_ROOT="${WEB_ROOT:-}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:7000/health}"
 READY_URL="${READY_URL:-http://127.0.0.1:7000/health/ready}"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-}"
+# Public check is optional. Correct path is /health (NOT /api/health).
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://vitszee.com/health}"
 PM2_APP_NAMES="${PM2_APP_NAMES:-all}"
 NODE_ENV="${NODE_ENV:-production}"
 NPM_INSTALL_FLAGS="${NPM_INSTALL_FLAGS:---omit=dev}"
@@ -37,6 +38,8 @@ SKIP_FRONTEND="${SKIP_FRONTEND:-0}"
 SKIP_BACKEND_INSTALL="${SKIP_BACKEND_INSTALL:-0}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
 HEALTH_SLEEP_SEC="${HEALTH_SLEEP_SEC:-3}"
+# Set to 0 to skip the optional public URL check
+CHECK_PUBLIC_HEALTH="${CHECK_PUBLIC_HEALTH:-1}"
 
 log()  { echo -e "\n\033[1;32m==>\033[0m $*"; }
 warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
@@ -143,17 +146,23 @@ check_url() {
   local url="$1"
   local label="$2"
   local code
-  code="$(curl -sS -o /tmp/vitszee-health.json -w "%{http_code}" --max-time 10 "${url}" || echo "000")"
+  local body="/tmp/vitszee-health-${label}.json"
+  rm -f "${body}"
+  # curl exits non-zero on connection refused; still capture http_code when possible
+  code="$(curl -sS -o "${body}" -w "%{http_code}" --max-time 10 "${url}" 2>/dev/null || true)"
+  [[ -z "${code}" || "${code}" == "000" ]] && code="000"
   if [[ "${code}" == "200" ]]; then
     echo "  OK  ${label} (${url}) → ${code}"
     return 0
   fi
-  echo "  FAIL ${label} (${url}) → ${code}"
-  [[ -f /tmp/vitszee-health.json ]] && head -c 400 /tmp/vitszee-health.json && echo
+  echo "  WAIT ${label} (${url}) → ${code} (API still starting after restart)"
+  if [[ -s "${body}" ]]; then
+    head -c 200 "${body}" && echo
+  fi
   return 1
 }
 
-log "Health checks (up to ${HEALTH_RETRIES} attempts)"
+log "Waiting for API after PM2 restart (up to ${HEALTH_RETRIES} attempts)"
 OK=0
 for i in $(seq 1 "${HEALTH_RETRIES}"); do
   echo "  attempt ${i}/${HEALTH_RETRIES}..."
@@ -168,9 +177,12 @@ if [[ "${OK}" != "1" ]]; then
   die "Health checks failed after deploy. Inspect: pm2 logs"
 fi
 
-if [[ -n "${PUBLIC_HEALTH_URL}" ]]; then
+if [[ "${CHECK_PUBLIC_HEALTH}" == "1" && -n "${PUBLIC_HEALTH_URL}" ]]; then
   log "Public health: ${PUBLIC_HEALTH_URL}"
-  check_url "${PUBLIC_HEALTH_URL}" "public" || warn "Public health check failed (CDN/nginx cache?)"
+  if ! check_url "${PUBLIC_HEALTH_URL}" "public"; then
+    warn "Public URL check failed — local API is healthy. Check nginx path (use /health not /api/health)."
+  fi
 fi
 
 log "Deploy complete ✓  commit=${AFTER}  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+log "Local API is healthy. Early WAIT lines above are normal while Node boots."

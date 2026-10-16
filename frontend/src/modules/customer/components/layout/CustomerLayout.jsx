@@ -123,7 +123,14 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                 </>
             )}
 
-            <main className={cn("flex-1 md:pb-0", !showHeader && "pt-0", !fullHeight && "pb-16")}>
+            <main
+                className={cn(
+                    "flex-1 md:pb-0",
+                    !showHeader && "pt-0",
+                    // Reserve space for bottom nav content (56px) + padding + iOS home indicator
+                    !fullHeight && "pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]"
+                )}
+            >
                 {children}
             </main>
 

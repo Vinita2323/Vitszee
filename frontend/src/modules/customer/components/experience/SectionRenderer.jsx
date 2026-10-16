@@ -80,7 +80,10 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
           );
         }
 
+        // Temporarily hidden from home / experience pages ("Explore Top Categories")
         if (section.displayType === "categories") {
+          return null;
+          /*
           const ids = section.config?.categories?.categoryIds || [];
           const allItems = ids
             .map((id) => categoriesById[id])
@@ -116,7 +119,6 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
                       key={cat._id}
                       className="group flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
                       onClick={() => {
-                        // Remember the header & section so back navigation can restore context
                         rememberExperienceReturn(section.headerId, section._id);
                         navigate(`/category/${cat._id}`);
                       }}
@@ -146,6 +148,7 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
               />
             </div>
           );
+          */
         }
 
         if (section.displayType === "products") {

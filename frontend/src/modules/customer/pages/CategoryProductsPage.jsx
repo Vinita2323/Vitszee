@@ -133,7 +133,7 @@ const CategoryProductsPage = () => {
         : category?.name || sidebarCategories.find(c => c.id === activeCatId)?.name || 'Category';
 
     return (
-        <div className="flex flex-col bg-[#F8FAF8] w-full font-sans md:min-h-screen max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:bottom-[70px] max-md:z-20 max-md:overflow-hidden">
+        <div className="flex flex-col bg-[#F8FAF8] w-full font-sans md:min-h-screen max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] max-md:z-20 max-md:overflow-hidden">
             {/* Top Compact Header */}
             <header className={cn(
                 "shrink-0 sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-3 md:px-6 py-2.5 flex items-center justify-between gap-3 shadow-xs",
