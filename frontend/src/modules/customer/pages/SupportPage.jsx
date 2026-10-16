@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send } from 'lucide-react';
 import { useToast } from '@shared/components/ui/Toast';
 import { useSettings } from '@core/context/SettingsContext';
+import { useAuth } from '@core/context/AuthContext';
 import { customerApi } from '../services/customerApi';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +18,7 @@ const SupportPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { showToast } = useToast();
+    const { isAuthenticated } = useAuth();
     const { settings } = useSettings();
     const supportEmail = settings?.supportEmail || 'support@orangebasket.com';
     const supportEmailShort = supportEmail ? (supportEmail.length > 12 ? supportEmail.slice(0, 12) + '...' : supportEmail) : 'support@...';
@@ -109,12 +111,31 @@ const SupportPage = () => {
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-5">
                 {/* Contact Channels */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <ContactCard icon={MessageCircle} label="Chat Us" sub="Instant Support" to="/chat" />
+                    <ContactCard
+                        icon={MessageCircle}
+                        label="Chat Us"
+                        sub="Instant Support"
+                        onClick={() => {
+                            if (!isAuthenticated) {
+                                showToast("Please log in to chat with support", "info");
+                                navigate("/login", { state: { from: location } });
+                                return;
+                            }
+                            navigate("/chat");
+                        }}
+                    />
                     <ContactCard
                         icon={PlusCircle}
                         label="Raise Ticket"
                         sub="Formal Request"
-                        onClick={() => setIsTicketModalOpen(true)}
+                        onClick={() => {
+                            if (!isAuthenticated) {
+                                showToast("Please log in to raise a ticket", "info");
+                                navigate("/login", { state: { from: location } });
+                                return;
+                            }
+                            setIsTicketModalOpen(true);
+                        }}
                     />
                     <ContactCard icon={Phone} label="Call Us" sub={supportPhoneShort} onClick={() => window.location.href = `tel:${supportPhone}`} />
                     <ContactCard icon={Mail} label="Email Us" sub={supportEmailShort} onClick={() => window.location.href = `mailto:${supportEmail}`} />

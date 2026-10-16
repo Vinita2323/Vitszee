@@ -410,7 +410,7 @@ const CustomerAuth = () => {
           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
             By continuing, you agree to our
           </p>
-          <div className="flex items-center justify-center gap-2 mt-0.5">
+          <div className="flex items-center justify-center gap-2 mt-0.5 flex-wrap">
             <button
               onClick={() => navigate("/terms")}
               className="text-[10px] font-black text-emerald-800 uppercase tracking-wider hover:underline"
@@ -423,6 +423,13 @@ const CustomerAuth = () => {
               className="text-[10px] font-black text-emerald-800 uppercase tracking-wider hover:underline"
             >
               Privacy Policy
+            </button>
+            <span className="text-[8px] text-slate-300">•</span>
+            <button
+              onClick={() => navigate("/support")}
+              className="text-[10px] font-black text-emerald-800 uppercase tracking-wider hover:underline"
+            >
+              Help & Support
             </button>
           </div>
         </div>

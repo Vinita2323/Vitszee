@@ -801,7 +801,7 @@ const DeliveryLayout = () => {
   };
 
   return (
-    <div className="h-screen h-[100dvh] bg-gray-50 text-gray-900 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden border-x border-gray-100">
+    <div className="h-screen h-[100dvh] bg-gray-50 text-gray-900 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden border-x border-gray-100 flex flex-col">
       {/* Full-screen order alert — portaled so it always stacks above nav/content */}
       {typeof document !== "undefined" &&
         createPortal(
@@ -940,7 +940,11 @@ const DeliveryLayout = () => {
         )}
 
       <main
-        className={`h-full overflow-y-auto ${shouldShowBottomNav ? "pb-16" : ""} no-scrollbar`}>
+        className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y ${
+          shouldShowBottomNav
+            ? "pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
+            : "pb-[env(safe-area-inset-bottom,0px)]"
+        }`}>
         <Outlet />
       </main>
 

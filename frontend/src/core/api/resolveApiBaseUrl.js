@@ -25,23 +25,31 @@ function parseEnvUrl(rawUrl) {
   }
 }
 
+function isLoopbackHost(hostname) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 export function resolveApiBaseUrl() {
   const envUrl =
     parseEnvUrl(import.meta.env.VITE_API_URL) ||
     parseEnvUrl(import.meta.env.VITE_API_BASE_URL);
 
-  const browserHostname = window.location.hostname;
+  const browserHostname = window.location.hostname || "localhost";
   if (!envUrl) {
-    const fallbackHost = browserHostname || "localhost";
-    return buildLocalApiUrl(fallbackHost);
+    return buildLocalApiUrl(browserHostname);
   }
 
   try {
     const parsed = new URL(envUrl);
+    // When the page is opened from a phone/LAN IP (e.g. http://192.168.x.x:5174)
+    // but VITE_API_URL still points at localhost, rewrite the API host so the
+    // phone talks to the PC instead of itself.
+    if (!isLoopbackHost(browserHostname) && isLoopbackHost(parsed.hostname)) {
+      parsed.hostname = browserHostname;
+    }
     return `${normalizeOrigin(parsed.origin)}${ensureApiPath(parsed.pathname)}`;
   } catch {
-    const fallbackHost = browserHostname || "localhost";
-    return buildLocalApiUrl(fallbackHost);
+    return buildLocalApiUrl(browserHostname);
   }
 }
 

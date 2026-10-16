@@ -20,6 +20,7 @@ import ApplicationPending from '../../modules/seller/pages/ApplicationPending';
 import AdminAuth from '../../modules/admin/pages/AdminAuth';
 import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
 import CustomerAuth from '../../modules/customer/pages/CustomerAuth';
+import DeliveryHelpSupport from '../../modules/delivery/pages/profile/HelpSupport';
 
 // Customer Pages (lazy-loaded)
 const Home = lazy(() => import('../../modules/customer/pages/Home'));
@@ -45,7 +46,7 @@ const ProductDetailPage = lazy(() => import('../../modules/customer/pages/Produc
 const CheckoutPage = lazy(() => import('../../modules/customer/pages/CheckoutPage'));
 const PaymentStatusPage = lazy(() => import('../../modules/customer/pages/PaymentStatusPage'));
 const SearchPage = lazy(() => import('../../modules/customer/pages/SearchPage'));
-const WalletPage = lazy(() => import('../../modules/customer/pages/WalletPage'));
+// const WalletPage = lazy(() => import('../../modules/customer/pages/WalletPage')); // wallet temporarily disabled
 const NotificationsPage = lazy(() => import('../../modules/customer/pages/NotificationsPage'));
 const MilestoneRewards = lazy(() => import('../../modules/customer/pages/MilestoneRewards'));
 
@@ -116,6 +117,31 @@ const AppRouter = () => {
                     path: 'delivery/login',
                     element: <Navigate to="/delivery/auth" replace />,
                 },
+                // Public before login — Support / Privacy / Terms (App Store support URL)
+                {
+                    path: 'delivery/support',
+                    element: <DeliveryHelpSupport />,
+                },
+                {
+                    path: 'delivery/help-support',
+                    element: <Navigate to="/delivery/support" replace />,
+                },
+                {
+                    path: 'delivery/privacy',
+                    element: (
+                        <Suspense fallback={null}>
+                            <PrivacyPage />
+                        </Suspense>
+                    ),
+                },
+                {
+                    path: 'delivery/terms',
+                    element: (
+                        <Suspense fallback={null}>
+                            <TermsPage />
+                        </Suspense>
+                    ),
+                },
                 {
                     path: 'seller/*',
                     element: (
@@ -170,13 +196,15 @@ const AppRouter = () => {
                         { path: 'transactions', element: <ProtectedRoute><OrderTransactionsPage /></ProtectedRoute> },
                         { path: 'addresses', element: <ProtectedRoute><AddressesPage /></ProtectedRoute> },
                         { path: 'settings', element: <ProtectedRoute><SettingsPage /></ProtectedRoute> },
-                        { path: 'support', element: <ProtectedRoute><SupportPage /></ProtectedRoute> },
+                        { path: 'support', element: <SupportPage /> },
                         { path: 'chat', element: <ProtectedRoute><ChatPage /></ProtectedRoute> },
                         { path: 'checkout', element: <ProtectedRoute><CheckoutPage /></ProtectedRoute> },
                         { path: 'payment-status', element: <PaymentStatusPage /> },
                         { path: 'profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
                         { path: 'profile/edit', element: <ProtectedRoute><EditProfilePage /></ProtectedRoute> },
-                        { path: 'wallet', element: <ProtectedRoute><WalletPage /></ProtectedRoute> },
+                        // Wallet temporarily disabled — redirect to profile
+                        // { path: 'wallet', element: <ProtectedRoute><WalletPage /></ProtectedRoute> },
+                        { path: 'wallet', element: <Navigate to="/profile" replace /> },
                         { path: 'notifications', element: <ProtectedRoute><NotificationsPage /></ProtectedRoute> },
                         { path: 'search', element: <SearchPage /> },
                         { path: 'rewards', element: <ProtectedRoute><MilestoneRewards /></ProtectedRoute> },

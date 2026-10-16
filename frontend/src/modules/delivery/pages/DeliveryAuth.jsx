@@ -117,7 +117,12 @@ const DeliveryAuth = () => {
           return;
         }
         const res = await deliveryApi.sendLoginOtp({ phone: loginPhone });
-        toast.success(res.data?.message || "OTP sent!");
+        const issuedMockOtp = res.data?.result?.mockOtp || "";
+        if (issuedMockOtp) {
+          toast.success(`Demo OTP for +91 ${loginPhone} is ${issuedMockOtp}`);
+        } else {
+          toast.success(res.data?.message || "OTP sent!");
+        }
       } else {
         if (!signupName.trim()) { toast.error("Please enter your name"); return; }
         if (!signupPhone || signupPhone.length < 10) { toast.error("Please enter a valid 10-digit phone number"); return; }
@@ -148,7 +153,12 @@ const DeliveryAuth = () => {
       setStep("otp");
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || "Failed to send OTP");
+      const apiMessage = error?.response?.data?.message;
+      const networkMessage =
+        !error?.response
+          ? "Cannot reach the backend. On a phone use your PC LAN IP (not localhost), or run: adb reverse tcp:7000 tcp:7000"
+          : null;
+      toast.error(apiMessage || networkMessage || "Failed to send OTP");
     } finally {
       setLoading(false);
     }
@@ -814,9 +824,29 @@ const DeliveryAuth = () => {
 
                       <p className="text-center text-xs text-slate-400 font-semibold pt-1">
                         By joining, you agree to our{" "}
-                        <span className="text-[#0057B7] font-bold cursor-pointer hover:underline">Terms</span>{" "}
+                        <button
+                          type="button"
+                          onClick={() => navigate("/delivery/terms")}
+                          className="text-[#0057B7] font-bold cursor-pointer hover:underline"
+                        >
+                          Terms
+                        </button>{" "}
                         &amp;{" "}
-                        <span className="text-[#0057B7] font-bold cursor-pointer hover:underline">Privacy Policy</span>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/delivery/privacy")}
+                          className="text-[#0057B7] font-bold cursor-pointer hover:underline"
+                        >
+                          Privacy Policy
+                        </button>
+                        {" · "}
+                        <button
+                          type="button"
+                          onClick={() => navigate("/delivery/support")}
+                          className="text-[#0057B7] font-bold cursor-pointer hover:underline"
+                        >
+                          Help &amp; Support
+                        </button>
                       </p>
                     </div>
                   )}
@@ -873,6 +903,24 @@ const DeliveryAuth = () => {
                           className="text-[#0057B7] font-bold hover:underline"
                         >
                           Register
+                        </button>
+                      </p>
+
+                      <p className="text-center text-[11px] text-slate-400 font-semibold pt-2 space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => navigate("/delivery/support")}
+                          className="text-[#0057B7] font-bold hover:underline"
+                        >
+                          Help &amp; Support
+                        </button>
+                        <span>·</span>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/delivery/privacy")}
+                          className="text-[#0057B7] font-bold hover:underline"
+                        >
+                          Privacy Policy
                         </button>
                       </p>
                     </div>
@@ -939,8 +987,28 @@ const DeliveryAuth = () => {
                     />
                     <label htmlFor="terms" className="text-xs text-slate-600 leading-relaxed cursor-pointer font-medium">
                       I confirm my phone number is correct and I agree to the{" "}
-                      <span className="text-[#0057B7] font-bold">Terms of Service</span> &amp;{" "}
-                      <span className="text-[#0057B7] font-bold">Privacy Policy</span>.
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate("/delivery/terms");
+                        }}
+                        className="text-[#0057B7] font-bold hover:underline"
+                      >
+                        Terms of Service
+                      </button>{" "}
+                      &amp;{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate("/delivery/privacy");
+                        }}
+                        className="text-[#0057B7] font-bold hover:underline"
+                      >
+                        Privacy Policy
+                      </button>
+                      .
                     </label>
                   </div>
 

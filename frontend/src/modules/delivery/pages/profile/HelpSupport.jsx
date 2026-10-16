@@ -7,13 +7,29 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  Shield,
 } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@core/context/AuthContext";
+import { useSettings } from "@core/context/SettingsContext";
 
 const HelpSupport = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { settings } = useSettings();
+
+  const supportPhone = settings?.supportPhone || "";
+  const supportEmail = settings?.supportEmail || "";
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(isAuthenticated ? "/delivery/profile" : "/delivery/auth");
+    }
+  };
 
   const faqs = [
     {
@@ -46,11 +62,10 @@ const HelpSupport = () => {
 
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
-      
       {/* Sticky Deep Green Header Banner */}
       <div className="bg-[#1A4516] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="p-1.5 rounded-full hover:bg-white/10 transition-colors mr-2 cursor-pointer"
           aria-label="Go Back"
         >
@@ -61,22 +76,39 @@ const HelpSupport = () => {
 
       {/* Main Content Area overlapping with rounded corners */}
       <div className="bg-white rounded-t-[32px] -mt-5 pt-4 px-4 space-y-4.5 relative z-10">
-        
         {/* Support Channels */}
         <section className="grid grid-cols-2 gap-3.5 mt-5">
-          <Card className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => {
+              if (supportEmail) {
+                window.location.href = `mailto:${supportEmail}`;
+              }
+            }}
+          >
             <div className="w-10 h-10 bg-[#1A4516]/5 rounded-full flex items-center justify-center text-[#1A4516] mb-2 shrink-0">
               <MessageCircle size={18} />
             </div>
-            <h4 className="font-bold text-gray-800 text-xs">Chat Support</h4>
-            <p className="text-[10px] text-gray-400 mt-0.5">Wait time: ~2 mins</p>
+            <h4 className="font-bold text-gray-800 text-xs">Email Support</h4>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {supportEmail || "Contact us anytime"}
+            </p>
           </Card>
-          <Card className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => {
+              if (supportPhone) {
+                window.location.href = `tel:${supportPhone}`;
+              }
+            }}
+          >
             <div className="w-10 h-10 bg-[#1A4516]/5 rounded-full flex items-center justify-center text-[#1A4516] mb-2 shrink-0">
               <Phone size={18} />
             </div>
             <h4 className="font-bold text-gray-800 text-xs">Call Support</h4>
-            <p className="text-[10px] text-gray-400 mt-0.5">Available 24/7</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {supportPhone || "Available 24/7"}
+            </p>
           </Card>
         </section>
 
@@ -90,7 +122,8 @@ const HelpSupport = () => {
               <Card
                 key={index}
                 className="overflow-hidden cursor-pointer bg-white border border-gray-100 rounded-xl shadow-sm"
-                onClick={() => toggleAccordion(index)}>
+                onClick={() => toggleAccordion(index)}
+              >
                 <div className="p-3 flex justify-between items-center bg-white">
                   <h4 className="font-semibold text-gray-800 text-xs pr-3">
                     {faq.question}
@@ -107,7 +140,8 @@ const HelpSupport = () => {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="bg-gray-50/50">
+                      className="bg-gray-50/50"
+                    >
                       <div className="p-3 text-[11px] text-gray-500 border-t border-gray-100/50 leading-relaxed font-medium">
                         {faq.answer}
                       </div>
@@ -119,10 +153,23 @@ const HelpSupport = () => {
           </div>
         </section>
 
-        <div className="text-center pt-4">
+        <div className="text-center pt-4 space-y-2">
+          <button
+            type="button"
+            onClick={() => navigate("/delivery/privacy")}
+            className="inline-flex items-center gap-1.5 text-[#1A4516] font-bold text-xs hover:underline"
+          >
+            <Shield size={14} /> Privacy Policy
+          </button>
           <p className="text-gray-400 text-xs">Still need help?</p>
-          <Button variant="link" className="text-[#1A4516] font-bold text-xs p-0 h-auto mt-1 hover:underline">
-            View All FAQs
+          <Button
+            variant="link"
+            className="text-[#1A4516] font-bold text-xs p-0 h-auto mt-1 hover:underline"
+            onClick={() => {
+              if (supportEmail) window.location.href = `mailto:${supportEmail}`;
+            }}
+          >
+            Contact Support
           </Button>
         </div>
       </div>

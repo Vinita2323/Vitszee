@@ -15,13 +15,29 @@ const ProtectedRoute = ({ children }) => {
     }
 
     if (!isAuthenticated) {
-        if (location.pathname.startsWith('/admin')) {
+        const path = location.pathname;
+        // Allow Help & Support / Privacy / Terms without login
+        const publicPaths = [
+            '/support',
+            '/privacy',
+            '/terms',
+            '/about',
+            '/delivery/support',
+            '/delivery/help-support',
+            '/delivery/privacy',
+            '/delivery/terms',
+        ];
+        if (publicPaths.includes(path)) {
+            return <>{children}</>;
+        }
+
+        if (path.startsWith('/admin')) {
             return <Navigate to="/admin/auth" state={{ from: location }} replace />;
         }
-        if (location.pathname.startsWith('/seller')) {
+        if (path.startsWith('/seller')) {
             return <Navigate to="/seller/auth" state={{ from: location }} replace />;
         }
-        if (location.pathname.startsWith('/delivery')) {
+        if (path.startsWith('/delivery')) {
             return <Navigate to="/delivery/auth" state={{ from: location }} replace />;
         }
         return <Navigate to="/login" state={{ from: location }} replace />;

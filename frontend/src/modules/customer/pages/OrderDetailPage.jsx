@@ -22,7 +22,6 @@ import {
   HelpCircle,
   Phone,
   MessageSquare,
-  ArrowRight,
   User,
   Loader2,
   Store,
@@ -508,12 +507,6 @@ const OrderDetailPage = () => {
   };
 
   const status = order ? getLegacyStatusFromOrder(order) : null;
-  const isAwaitingOnlinePayment =
-    Boolean(order) &&
-    order.paymentMode === "ONLINE" &&
-    order.paymentStatus !== "PAID" &&
-    status !== "cancelled";
-
   const isAwaitingPaymentSelection =
     Boolean(order) &&
     order.workflowStatus === "SELLER_ACCEPTED" &&
@@ -847,47 +840,23 @@ const OrderDetailPage = () => {
     setReturnImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleRetryPayment = async () => {
-    try {
-      if (!order) return;
-      const paymentRef =
-        Number(order.checkoutGroupSize || 1) > 1
-          ? (order.checkoutGroupId || order.orderId)
-          : order.orderId;
-      const response = await customerApi.createPaymentOrder({
-        orderRef: paymentRef,
-      });
-      if (response.data.success && response.data.result?.redirectUrl) {
-        window.location.href = response.data.result.redirectUrl;
-      } else {
-        toast.error(response.data.message || "Failed to initiate payment");
-      }
-    } catch (err) {
-      console.error("[OrderDetailPage] Retry payment error:", err);
-      toast.error(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Unable to start payment. Please try again later.",
-      );
-    }
-  };
-
   const handleSelectPaymentMethod = async (method) => {
     try {
       if (!order) return;
+      // COD-only deploy: ignore online payment selection.
+      if (method !== "COD") {
+        toast.error("Only Cash on Delivery is available right now");
+        return;
+      }
       setIsProcessingPayment(true);
       const paymentRef =
         Number(order.checkoutGroupSize || 1) > 1
           ? (order.checkoutGroupId || order.orderId)
           : order.orderId;
-      const response = await customerApi.selectPaymentMethod(paymentRef, { paymentMode: method });
-      if (method === "ONLINE" && response.data.result?.redirectUrl) {
-        window.location.href = response.data.result.redirectUrl;
-      } else {
-        toast.success(response.data.message || "Payment method updated");
-        const res = await customerApi.getOrderDetails(orderId);
-        setOrder(res.data.result);
-      }
+      const response = await customerApi.selectPaymentMethod(paymentRef, { paymentMode: "COD" });
+      toast.success(response.data.message || "Payment method updated");
+      const res = await customerApi.getOrderDetails(orderId);
+      setOrder(res.data.result);
     } catch (err) {
       console.error("[OrderDetailPage] Select payment error:", err);
       toast.error(
@@ -947,62 +916,24 @@ const OrderDetailPage = () => {
                 <h3 className="text-sm font-black text-[#1A4516] uppercase tracking-tight">Order Accepted</h3>
               </div>
               <p className="text-xs text-[#1A4516] font-medium leading-relaxed mb-4">
-                The seller has accepted your order! Please select how you would like to pay <span className="font-bold">₹{order.pricing.total}</span> to proceed.
+                The seller has accepted your order! Confirm Cash on Delivery for <span className="font-bold">₹{order.pricing.total}</span> to proceed.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleSelectPaymentMethod("ONLINE")}
-                  disabled={isProcessingPayment}
-                  className="bg-[#1A4516] text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-[#0a3000] active:scale-95 transition-all shadow-md flex flex-col items-center justify-center gap-1 disabled:opacity-70"
-                >
-                  <CreditCard size={18} />
-                  Pay Online
-                </button>
-                <button
-                  onClick={() => handleSelectPaymentMethod("COD")}
-                  disabled={isProcessingPayment}
-                  className="bg-white text-[#1A4516] border-2 border-[#1A4516] px-4 py-3 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all shadow-sm flex flex-col items-center justify-center gap-1 disabled:opacity-70"
-                >
-                  <MapPin size={18} />
-                  Cash on Delivery
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Payment Required Card - Only for Online Pending Orders */}
-        {isAwaitingOnlinePayment && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-[#F5FBF5] rounded-2xl p-4 shadow-sm border border-[#1A4516]/20 relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-3 opacity-10">
-              <CreditCard size={64} className="text-[#1A4516]" />
-            </div>
-            <div className="relative z-10 flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-[#1A4516] animate-pulse" />
-                  <h3 className="text-sm font-black text-[#1A4516] uppercase tracking-tight">Payment Required</h3>
-                </div>
-                <p className="text-xs text-[#1A4516] font-medium leading-relaxed">
-                  Complete your payment of <span className="font-bold">₹{order.pricing.total}</span> to proceed with this order.
-                </p>
-              </div>
               <button
-                onClick={handleRetryPayment}
-                className="bg-[#1A4516] text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-[#0a3000] active:scale-95 transition-all shadow-md shrink-0"
+                onClick={() => handleSelectPaymentMethod("COD")}
+                disabled={isProcessingPayment}
+                className="w-full bg-[#1A4516] text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-[#0a3000] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                Pay Now <ArrowRight size={14} />
+                <MapPin size={18} />
+                {isProcessingPayment ? "Confirming…" : "Confirm Cash on Delivery"}
               </button>
             </div>
           </motion.div>
         )}
 
+        {/* Online payment retry disabled for COD-only / iOS deploy */}
+
         {/* Enhanced Map with Cleaner Design - Hide when delivered or cancelled */}
-        {!isAwaitingOnlinePayment && !isAwaitingPaymentSelection && status !== "delivered" && status !== "cancelled" && (
+        {!isAwaitingPaymentSelection && status !== "delivered" && status !== "cancelled" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1042,7 +973,7 @@ const OrderDetailPage = () => {
         ) : null}
 
         {/* Order Progress Tracker - New Component */}
-        {!isAwaitingOnlinePayment && !isAwaitingPaymentSelection && (
+        {!isAwaitingPaymentSelection && (
           <OrderProgressTracker
             order={order}
             estimatedArrivalText={estimatedArrival.arrivalTimeText}

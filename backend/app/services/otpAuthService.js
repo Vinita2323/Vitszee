@@ -1,7 +1,12 @@
 import crypto from "crypto";
 import Customer from "../models/customer.js";
 import { sendSmsIndiaHubOtp } from "./smsIndiaHubService.js";
-import { generateOTP, useRealSMS } from "../utils/otp.js";
+import {
+  generateOTP,
+  isDefaultTestPhone,
+  shouldDispatchSms,
+  useRealSMS,
+} from "../utils/otp.js";
 import { getRedisClient } from "../config/redis.js";
 import { isValidE164Phone, maskPhone, normalizePhoneNumber } from "../utils/phone.js";
 
@@ -114,18 +119,36 @@ export async function issueCustomerOtp({
     "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
   );
 
+  if (customer?.deletedAt || customer?.isActive === false) {
+    const err = new Error("This account has been deleted. Please sign up again.");
+    err.statusCode = 403;
+    throw err;
+  }
+
   if (flow === "login" && (!customer || !customer.isVerified)) {
-    if (useRealSMS()) {
+    // Fixed demo phone always gets a real OTP session so 123456 login works.
+    if (isDefaultTestPhone(phone)) {
+      if (!customer) {
+        customer = await Customer.create({
+          name: name || "Demo Customer",
+          phone,
+          isVerified: false,
+          dob,
+          bloodGroup,
+        });
+        customer = await Customer.findById(customer._id).select(
+          "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
+        );
+      }
+    } else if (useRealSMS()) {
       otpAuditLog("customer_otp_login_generic_response", {
         phone: maskPhone(phone),
         ipAddress,
         accountExists: !!customer,
       });
       return { sent: true, phone };
-    }
-
-    // In mock/dev mode, allow login OTP issuance so local testing works end-to-end.
-    if (!customer) {
+    } else if (!customer) {
+      // In mock/dev mode, allow login OTP issuance so local testing works end-to-end.
       customer = await Customer.create({
         name: name || "Customer",
         phone,
@@ -158,16 +181,18 @@ export async function issueCustomerOtp({
     throw err;
   }
 
-  const lastSentAt = customer.otpLastSentAt ? new Date(customer.otpLastSentAt) : null;
-  const cooldownMs = OTP_RESEND_COOLDOWN_SECONDS() * 1000;
-  if (lastSentAt && now.getTime() - lastSentAt.getTime() < cooldownMs) {
-    const waitSec = Math.ceil((cooldownMs - (now.getTime() - lastSentAt.getTime())) / 1000);
-    const err = new Error(`Please wait ${waitSec}s before requesting another OTP`);
-    err.statusCode = 429;
-    throw err;
+  if (!isDefaultTestPhone(phone)) {
+    const lastSentAt = customer.otpLastSentAt ? new Date(customer.otpLastSentAt) : null;
+    const cooldownMs = OTP_RESEND_COOLDOWN_SECONDS() * 1000;
+    if (lastSentAt && now.getTime() - lastSentAt.getTime() < cooldownMs) {
+      const waitSec = Math.ceil((cooldownMs - (now.getTime() - lastSentAt.getTime())) / 1000);
+      const err = new Error(`Please wait ${waitSec}s before requesting another OTP`);
+      err.statusCode = 429;
+      throw err;
+    }
   }
 
-  const otp = generateOTP();
+  const otp = generateOTP(phone);
   customer.otpHash = hashOtp(phone, otp);
   customer.otpExpiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES() * 60 * 1000);
   customer.otpFailedAttempts = 0;
@@ -181,7 +206,7 @@ export async function issueCustomerOtp({
 
   await customer.save();
 
-  if (useRealSMS()) {
+  if (shouldDispatchSms(phone)) {
     await dispatchCustomerOtpSms({ phone, otp });
     otpAuditLog("customer_otp_sms_dispatched", {
       phone: maskPhone(phone),
@@ -194,14 +219,14 @@ export async function issueCustomerOtp({
       phone: maskPhone(phone),
       flow,
       ipAddress,
-      mode: "mock",
+      mode: isDefaultTestPhone(phone) ? "fixed_test" : "mock",
     });
   }
 
   return {
     sent: true,
     phone,
-    ...(useRealSMS() ? {} : { mockOtp: otp }),
+    ...(!shouldDispatchSms(phone) ? { mockOtp: otp } : {}),
   };
 }
 
@@ -234,6 +259,12 @@ export async function verifyCustomerOtpCode({
   if (!customer) {
     const err = new Error("Invalid or expired OTP");
     err.statusCode = 400;
+    throw err;
+  }
+
+  if (customer.deletedAt || customer.isActive === false) {
+    const err = new Error("This account has been deleted. Please sign up again.");
+    err.statusCode = 403;
     throw err;
   }
 
