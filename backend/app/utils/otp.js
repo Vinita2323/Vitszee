@@ -1,10 +1,11 @@
 import { generateOTP as cryptoGenerateOtp, getOtpLength } from "./smsHelpers.js";
 
-const MOCK_OTP = "1234";
-
 /** Fixed local/demo credentials for customer + delivery panels. */
 export const DEFAULT_TEST_PHONE_DIGITS = "9301841832";
 export const DEFAULT_TEST_OTP = "123456";
+
+/** Mock OTP length must match the delivery/customer 6-digit UI. */
+const MOCK_OTP = "123456";
 
 export const useRealSMS = () =>
   process.env.USE_REAL_SMS === "true" || process.env.USE_REAL_SMS === "1";
@@ -27,7 +28,7 @@ export function getDefaultTestOtp() {
 
 /**
  * Prefer the fixed demo OTP for the default test phone.
- * Otherwise use mock 1234 when real SMS is off, or a random OTP when on.
+ * Otherwise use mock 123456 when real SMS is off, or a random OTP when on.
  */
 export const generateOTP = (phone = null) => {
   if (phone != null && isDefaultTestPhone(phone)) {

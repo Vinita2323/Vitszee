@@ -24,6 +24,7 @@ import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
 import axiosInstance from "@core/api/axios";
 import { deliveryApi } from "../services/deliveryApi";
+import DeliveryAvatar from "../components/DeliveryAvatar";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const Profile = () => {
   const [faqs, setFaqs] = useState([]);
   const [stats, setStats] = useState({ totalDeliveries: 0 });
   const [deleting, setDeleting] = useState(false);
+  const [profile, setProfile] = useState(user);
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
@@ -61,6 +63,10 @@ const Profile = () => {
   };
 
   useEffect(() => {
+    setProfile(user);
+  }, [user]);
+
+  useEffect(() => {
     const fetchFaqs = async () => {
       try {
         const response = await axiosInstance.get("/public/faqs", {
@@ -81,8 +87,18 @@ const Profile = () => {
         console.error("Error fetching stats:", error);
       }
     };
+    const fetchProfile = async () => {
+      try {
+        const res = await deliveryApi.getProfile();
+        const data = res.data?.result;
+        if (data) setProfile(data);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
     fetchFaqs();
     fetchStats();
+    fetchProfile();
   }, []);
 
   const menuItems = [
@@ -165,34 +181,30 @@ const Profile = () => {
 
         <div className="flex items-center gap-3">
           <div className="relative shrink-0">
-            <div className="w-12 h-12 bg-white rounded-full p-0.5 shadow-sm">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="Profile"
-                className="w-full h-full rounded-full object-cover bg-gray-100"
-              />
+            <div className="w-12 h-12 bg-white rounded-full p-0.5 shadow-sm overflow-hidden">
+              <DeliveryAvatar user={profile || user} />
             </div>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-brand-500 border-2 border-white rounded-full" />
           </div>
           <div className="text-white min-w-0">
             <h2 className="font-extrabold text-sm leading-snug truncate">
-              {user?.name || "Delivery Partner"}
+              {(profile || user)?.name || "Delivery Partner"}
             </h2>
             <p className="text-white/80 text-[11px] flex items-center truncate">
-              <Phone size={11} className="mr-1 shrink-0" /> {user?.phone || ""}
+              <Phone size={11} className="mr-1 shrink-0" /> {(profile || user)?.phone || ""}
             </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                ID: {user?._id ? user._id.substring(0, 6).toUpperCase() : ""}
+                ID: {(profile || user)?._id ? String((profile || user)._id).substring(0, 6).toUpperCase() : ""}
               </span>
               <span
                 className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wide ${
-                  user?.isVerified
+                  (profile || user)?.isVerified
                     ? "bg-brand-500 text-primary-foreground"
                     : "bg-red-500 text-white"
                 }`}
               >
-                {user?.isVerified ? "VERIFIED" : "UNVERIFIED"}
+                {(profile || user)?.isVerified ? "VERIFIED" : "UNVERIFIED"}
               </span>
             </div>
           </div>
@@ -206,8 +218,8 @@ const Profile = () => {
             Joined
           </p>
           <p className="font-bold text-gray-900 text-xs">
-            {user?.createdAt
-              ? new Date(user.createdAt).toLocaleDateString("en-US", {
+            {(profile || user)?.createdAt
+              ? new Date((profile || user).createdAt).toLocaleDateString("en-US", {
                   month: "short",
                   year: "2-digit",
                 })
@@ -229,7 +241,11 @@ const Profile = () => {
             Rating
           </p>
           <p className="font-bold text-gray-900 text-xs flex justify-center items-center">
-            {user?.rating ? Number(user.rating).toFixed(1) : "N/A"}
+            {(profile || user)?.averageRating
+              ? Number((profile || user).averageRating).toFixed(1)
+              : (profile || user)?.rating
+                ? Number((profile || user).rating).toFixed(1)
+                : "N/A"}
             <span className="text-yellow-400 text-[10px] ml-0.5">★</span>
           </p>
         </div>

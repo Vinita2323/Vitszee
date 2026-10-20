@@ -5,6 +5,7 @@ import Button from "@/shared/components/ui/Button";
 import Input from "@/shared/components/ui/Input";
 import { toast } from "sonner";
 import { deliveryApi } from "../../services/deliveryApi";
+import DeliveryAvatar from "../../components/DeliveryAvatar";
 
 const PersonalDetails = () => {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const PersonalDetails = () => {
     dob: "",
     bloodGroup: "",
     id: "",
+    profileImage: "",
   });
 
   React.useEffect(() => {
@@ -37,6 +39,7 @@ const PersonalDetails = () => {
           dob: user.dob || "",
           bloodGroup: user.bloodGroup || "",
           id: user._id || "",
+          profileImage: user.profileImage || "",
         });
       }
     } catch (error) {
@@ -102,11 +105,13 @@ const PersonalDetails = () => {
         {/* Profile Photo */}
         <div className="flex flex-col items-center justify-center py-4">
           <div className="relative">
-            <div className="w-18 h-18 rounded-full p-0.5 bg-white shadow-md">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="Profile"
-                className="w-full h-full rounded-full object-cover bg-gray-100"
+            <div className="w-20 h-20 rounded-full p-0.5 bg-white shadow-md overflow-hidden">
+              <DeliveryAvatar
+                user={{
+                  name: formData.name,
+                  phone: formData.phone,
+                  profileImage: formData.profileImage,
+                }}
               />
             </div>
             {isEditing && (

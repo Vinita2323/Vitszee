@@ -47,7 +47,8 @@ const DeliveryAuth = () => {
 
   // mode: "login" | "signup"
   const [mode, setMode] = useState("login");
-  const [step, setStep] = useState("form"); // "form" | "otp"
+  // Only "form" | "otp" — any other value breaks the login UI (no phone field / Login button).
+  const [step, setStep] = useState("form");
 
   // Login state
   const [loginPhone, setLoginPhone] = useState("");
@@ -88,6 +89,13 @@ const DeliveryAuth = () => {
   const [panVerified, setPanVerified] = useState(null);
   const [aadharVerified, setAadharVerified] = useState(null);
 
+  // Guard against invalid step values so Login / Register UI never disappears.
+  useEffect(() => {
+    if (step !== "form" && step !== "otp") {
+      setStep("form");
+    }
+  }, [step]);
+
   useEffect(() => {
     let interval;
     if (step === "otp" && timer > 0) {
@@ -121,7 +129,7 @@ const DeliveryAuth = () => {
         if (issuedMockOtp) {
           toast.success(`Demo OTP for +91 ${loginPhone} is ${issuedMockOtp}`);
         } else {
-          toast.success(res.data?.message || "OTP sent!");
+          toast.success(res.data?.message || "OTP sent to your phone");
         }
       } else {
         if (!signupName.trim()) { toast.error("Please enter your name"); return; }
@@ -146,7 +154,12 @@ const DeliveryAuth = () => {
         if (dlFile) formData.append("dl", dlFile);
 
         const res = await deliveryApi.sendSignupOtp(formData);
-        toast.success(res.data?.message || "OTP sent!");
+        const issuedMockOtp = res.data?.result?.mockOtp || "";
+        if (issuedMockOtp) {
+          toast.success(`Demo OTP for +91 ${signupPhone} is ${issuedMockOtp}`);
+        } else {
+          toast.success(res.data?.message || "OTP sent to your phone");
+        }
       }
       setOtp(["", "", "", "", "", ""]);
       setTimer(60);
@@ -171,7 +184,22 @@ const DeliveryAuth = () => {
       const phone = mode === "login" ? loginPhone : signupPhone;
       const otpString = otp.join("");
       const response = await deliveryApi.verifyOtp({ phone, otp: otpString });
-      const { token, delivery } = response.data.result;
+      const result = response.data?.result || {};
+
+      if (result.pendingApproval) {
+        toast.success(response.data?.message || "Phone verified. Waiting for admin approval.");
+        setStep("form");
+        setMode("login");
+        setSignupStep(1);
+        setOtp(["", "", "", "", "", ""]);
+        return;
+      }
+
+      const { token, delivery } = result;
+      if (!token || !delivery) {
+        toast.error("OTP verified but login data was incomplete. Please try logging in.");
+        return;
+      }
 
       login({ ...delivery, token, role: "delivery" });
 
@@ -364,7 +392,7 @@ const DeliveryAuth = () => {
                     ? "Welcome Back!"
                     : "Join Fleet Team"}
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-[280px] mx-auto font-medium">
+              <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-[280px] mx-auto font-medium break-words px-1">
                 {step === "otp"
                   ? `Enter the 6-digit code sent to +91 ${mode === "login" ? loginPhone : signupPhone}`
                   : mode === "login"
@@ -406,13 +434,13 @@ const DeliveryAuth = () => {
           )}
 
           {/* Form Body */}
-          <div className="p-6 pt-2">
+          <div className="p-5 sm:p-6 pt-2 w-full min-w-0 overflow-x-hidden">
             <AnimatePresence mode="wait">
               {step === "form" && (
                 <motion.div
                   key={`form-${mode}`}
                   variants={slideVariants}
-                  initial="hidden"
+                  initial={false}
                   animate="visible"
                   exit="exit"
                   className="space-y-4"
@@ -933,17 +961,17 @@ const DeliveryAuth = () => {
                 <motion.div
                   key="otp"
                   variants={slideVariants}
-                  initial="hidden"
+                  initial={false}
                   animate="visible"
                   exit="exit"
-                  className="space-y-5 pt-2"
+                  className="space-y-5 pt-2 w-full min-w-0 overflow-x-hidden"
                 >
-                  {/* OTP Boxes */}
-                  <div className="space-y-2 text-center">
+                  {/* OTP Boxes — grid so 6 cells always fit the card width on small phones */}
+                  <div className="space-y-2 text-center w-full min-w-0">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
                       Enter Security Code
                     </label>
-                    <div className="flex justify-center gap-2 pt-1">
+                    <div className="grid grid-cols-6 gap-1.5 sm:gap-2 w-full max-w-[300px] mx-auto pt-1">
                       {otp.map((digit, index) => (
                         <input
                           key={index}
@@ -954,7 +982,7 @@ const DeliveryAuth = () => {
                           value={digit}
                           onChange={(e) => handleOtpChange(index, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(index, e)}
-                          className="w-11 h-14 text-center text-xl font-black border-2 border-slate-200 rounded-2xl focus:border-[#0057B7] focus:ring-4 focus:ring-blue-500/10 outline-none transition-all bg-[#F8FAF9] text-slate-900"
+                          className="w-full min-w-0 h-12 sm:h-14 text-center text-lg sm:text-xl font-black border-2 border-slate-200 rounded-xl sm:rounded-2xl focus:border-[#0057B7] focus:ring-2 focus:ring-blue-500/15 outline-none transition-all bg-[#F8FAF9] text-slate-900"
                         />
                       ))}
                     </div>

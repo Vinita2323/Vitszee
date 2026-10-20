@@ -5,6 +5,7 @@ import { sendSmsIndiaHubOtp } from "../services/smsIndiaHubService.js";
 import {
   generateOTP,
   isDefaultTestPhone,
+  phoneDigits,
   shouldDispatchSms,
 } from "../utils/otp.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
@@ -17,30 +18,102 @@ const generateToken = (delivery) =>
         { expiresIn: "7d" }
     );
 
+function normalizeDeliveryPhone(raw) {
+    const digits = phoneDigits(raw);
+    if (!/^\d{10}$/.test(digits)) {
+        const err = new Error("Enter a valid 10-digit mobile number");
+        err.statusCode = 400;
+        throw err;
+    }
+    return digits;
+}
+
+/** Find by exact 10-digit phone or common +91 / 0-prefixed variants. */
+async function findDeliveryByPhone(phone10) {
+    return Delivery.findOne({
+        $or: [
+            { phone: phone10 },
+            { phone: `+91${phone10}` },
+            { phone: `91${phone10}` },
+            { phone: `0${phone10}` },
+        ],
+    }).select("+otp +otpExpiry");
+}
+
+async function dispatchDeliveryOtpSms(phone10, otp) {
+    try {
+        await sendSmsIndiaHubOtp({ phone: phone10, otp });
+    } catch (smsError) {
+        console.error("[deliveryAuth] SMS dispatch failed:", {
+            phone: phone10.slice(0, 2) + "******" + phone10.slice(-2),
+            message: smsError.message,
+            providerCode: smsError.providerCode,
+        });
+        const err = new Error(
+            smsError.message || "Failed to send OTP SMS. Please try again.",
+        );
+        err.statusCode = smsError.statusCode || 502;
+        throw err;
+    }
+}
+
+function otpResponsePayload(phone10, otp) {
+    const smsSent = shouldDispatchSms(phone10);
+    return {
+        phone: phone10,
+        smsSent,
+        // Only expose OTP when SMS was intentionally skipped (demo / mock).
+        ...(!smsSent ? { mockOtp: otp } : {}),
+    };
+}
+
 /* ===============================
    SIGNUP – Send OTP
 ================================ */
 export const signupDelivery = async (req, res) => {
     try {
         const {
-            name, phone, vehicleType,
+            name, phone: rawPhone, vehicleType,
             email, address, vehicleNumber,
             drivingLicenseNumber,
             accountHolder, accountNumber, ifsc,
             dob, bloodGroup
         } = req.body;
 
-        if (!name || !phone) {
+        if (!name || !rawPhone) {
             return handleResponse(res, 400, "Name and phone are required");
         }
 
-        let delivery = await Delivery.findOne({ phone });
+        const phone = normalizeDeliveryPhone(rawPhone);
+        const normalizedEmail = String(email || "").trim().toLowerCase();
 
-        if (delivery && delivery.isVerified) {
-            return handleResponse(res, 400, "Delivery partner already exists");
+        let delivery = await findDeliveryByPhone(phone);
+
+        if (delivery && delivery.isVerified && !delivery.deletedAt && delivery.isActive !== false) {
+            return handleResponse(res, 400, "Delivery partner already exists. Please login.");
         }
 
-        const otp = generateOTP(phone);
+        // Soft-deleted / inactive rows should be reused for re-registration.
+        if (delivery && (delivery.deletedAt || delivery.isActive === false)) {
+            delivery.deletedAt = null;
+            delivery.isActive = true;
+            delivery.isVerified = false;
+        }
+
+        if (normalizedEmail) {
+            const emailEscaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const emailOwner = await Delivery.findOne({
+                email: { $regex: new RegExp(`^${emailEscaped}$`, "i") },
+                ...(delivery?._id ? { _id: { $ne: delivery._id } } : {}),
+            }).select("_id phone isVerified");
+            if (emailOwner) {
+                return handleResponse(
+                    res,
+                    409,
+                    `This email is already registered with phone ending ${String(emailOwner.phone || "").slice(-4)}. Use that number or a different email.`,
+                );
+            }
+        }
 
         let aadharUrl = delivery?.documents?.aadhar || "";
         let panUrl = delivery?.documents?.pan || "";
@@ -74,11 +147,14 @@ export const signupDelivery = async (req, res) => {
         if (/^https?:\/\//i.test(normalizedDl)) dlUrl = normalizedDl;
         if (/^https?:\/\//i.test(normalizedProfileImage)) profileImageUrl = normalizedProfileImage;
 
+        // Generate OTP after uploads so expiry starts when SMS is about to go out.
+        const otp = generateOTP(phone);
+
         const deliveryData = {
             name,
             phone,
             vehicleType,
-            email,
+            email: normalizedEmail || email,
             address,
             vehicleNumber,
             drivingLicenseNumber,
@@ -94,7 +170,7 @@ export const signupDelivery = async (req, res) => {
                 drivingLicense: dlUrl,
             },
             otp,
-            otpExpiry: Date.now() + 5 * 60 * 1000,
+            otpExpiry: new Date(Date.now() + 5 * 60 * 1000),
             ...(isDefaultTestPhone(phone) ? { isVerified: true } : {}),
         };
 
@@ -106,14 +182,17 @@ export const signupDelivery = async (req, res) => {
         }
 
         if (shouldDispatchSms(phone)) {
-            await sendSmsIndiaHubOtp({ phone, otp });
+            await dispatchDeliveryOtpSms(phone, otp);
         }
 
-        return handleResponse(res, 200, "OTP sent successfully", {
-            ...(isDefaultTestPhone(phone) ? { mockOtp: otp } : {}),
-        });
+        return handleResponse(res, 200, "OTP sent successfully", otpResponsePayload(phone, otp));
     } catch (error) {
-        return handleResponse(res, 500, error.message);
+        const status = error.statusCode || (error.code === 11000 ? 409 : 500);
+        const message =
+            error.code === 11000
+                ? "A delivery partner with this phone or email already exists"
+                : error.message;
+        return handleResponse(res, status, message);
     }
 };
 
@@ -122,13 +201,14 @@ export const signupDelivery = async (req, res) => {
 ================================ */
 export const loginDelivery = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { phone: rawPhone } = req.body;
 
-        if (!phone) {
+        if (!rawPhone) {
             return handleResponse(res, 400, "Phone number is required");
         }
 
-        let delivery = await Delivery.findOne({ phone });
+        const phone = normalizeDeliveryPhone(rawPhone);
+        let delivery = await findDeliveryByPhone(phone);
 
         // Auto-provision the fixed demo delivery partner so login always works.
         if (!delivery && isDefaultTestPhone(phone)) {
@@ -157,20 +237,19 @@ export const loginDelivery = async (req, res) => {
 
         const otp = generateOTP(phone);
 
+        delivery.phone = phone; // normalize stored phone going forward
         delivery.otp = otp;
-        delivery.otpExpiry = Date.now() + 5 * 60 * 1000;
+        delivery.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
         await delivery.save();
 
         if (shouldDispatchSms(phone)) {
-            await sendSmsIndiaHubOtp({ phone, otp });
+            await dispatchDeliveryOtpSms(phone, otp);
         }
 
-        return handleResponse(res, 200, "OTP sent successfully", {
-            ...(isDefaultTestPhone(phone) ? { mockOtp: otp } : {}),
-        });
+        return handleResponse(res, 200, "OTP sent successfully", otpResponsePayload(phone, otp));
     } catch (error) {
         console.error("loginDelivery Error:", error);
-        return handleResponse(res, 500, error.message, { stack: error.stack });
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };
 
@@ -179,19 +258,23 @@ export const loginDelivery = async (req, res) => {
 ================================ */
 export const verifyDeliveryOTP = async (req, res) => {
     try {
-        const { phone, otp } = req.body;
+        const { phone: rawPhone, otp } = req.body;
 
-        if (!phone || !otp) {
+        if (!rawPhone || !otp) {
             return handleResponse(res, 400, "Phone and OTP are required");
         }
 
-        const delivery = await Delivery.findOne({
-            phone,
-            otp,
-            otpExpiry: { $gt: Date.now() },
-        });
+        const phone = normalizeDeliveryPhone(rawPhone);
+        const code = String(otp || "").trim();
 
-        if (!delivery) {
+        const delivery = await findDeliveryByPhone(phone);
+
+        if (
+            !delivery ||
+            String(delivery.otp || "") !== code ||
+            !delivery.otpExpiry ||
+            new Date(delivery.otpExpiry).getTime() <= Date.now()
+        ) {
             return handleResponse(res, 400, "Invalid or expired OTP");
         }
 
@@ -200,15 +283,18 @@ export const verifyDeliveryOTP = async (req, res) => {
         }
 
         if (!delivery.isVerified) {
-            // New signup OTP verification
+            // New signup OTP verification — phone confirmed; wait for admin approval.
+            delivery.phone = phone;
             delivery.otp = undefined;
             delivery.otpExpiry = undefined;
             await delivery.save();
-            return handleResponse(res, 200, "Phone verified successfully", {
-                pendingApproval: true
+            return handleResponse(res, 200, "Phone verified successfully. Waiting for admin approval.", {
+                pendingApproval: true,
+                phone,
             });
         }
 
+        delivery.phone = phone;
         delivery.isOnline = true; // Auto-activate delivery boy on login
         delivery.otp = undefined;
         delivery.otpExpiry = undefined;
@@ -223,7 +309,7 @@ export const verifyDeliveryOTP = async (req, res) => {
             delivery,
         });
     } catch (error) {
-        return handleResponse(res, 500, error.message);
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };
 

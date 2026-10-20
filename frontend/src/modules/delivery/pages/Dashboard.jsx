@@ -20,6 +20,7 @@ import Card from "@/shared/components/ui/Card";
 
 import { useAuth } from "@core/context/AuthContext";
 import { deliveryApi } from "../services/deliveryApi";
+import DeliveryAvatar from "../components/DeliveryAvatar";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -207,11 +208,7 @@ const Dashboard = () => {
               className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20 shadow-md cursor-pointer"
               onClick={() => navigate("/delivery/profile")}
             >
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
+              <DeliveryAvatar user={user} />
             </div>
             <div>
               <h2 className="text-[16px] font-black leading-tight tracking-tight">
