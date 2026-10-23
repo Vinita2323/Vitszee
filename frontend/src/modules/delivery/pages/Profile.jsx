@@ -10,7 +10,6 @@ import {
   LogOut,
   Trash2,
   ChevronRight,
-  Shield,
   Bell,
   Settings,
   ChevronDown,
@@ -139,11 +138,11 @@ const Profile = () => {
       path: "/delivery/profile/documents",
     },
     {
-      icon: Shield,
-      label: "Safety & Privacy",
-      sub: "Emergency contacts",
-      color: "text-red-600 bg-red-50",
-      path: "/delivery/profile/safety-privacy",
+      icon: FileText,
+      label: "Privacy Policy",
+      sub: "How we use your data",
+      color: "text-indigo-600 bg-indigo-50",
+      path: "/delivery/privacy",
     },
     {
       icon: Settings,
@@ -164,7 +163,7 @@ const Profile = () => {
   return (
     <div className="bg-gray-50/50 min-h-full pb-6">
       {/* Header */}
-      <div className="bg-[#1A4516] pt-3 pb-8 px-4 rounded-b-2xl relative shadow-sm">
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] pt-3 pb-8 px-4 rounded-b-2xl relative shadow-sm">
         <div className="flex justify-between items-center mb-2">
           <h1 className="text-white text-base font-black leading-tight tracking-tight">
             My Profile
@@ -184,7 +183,7 @@ const Profile = () => {
             <div className="w-12 h-12 bg-white rounded-full p-0.5 shadow-sm overflow-hidden">
               <DeliveryAvatar user={profile || user} />
             </div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-brand-500 border-2 border-white rounded-full" />
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
           </div>
           <div className="text-white min-w-0">
             <h2 className="font-extrabold text-sm leading-snug truncate">
@@ -200,7 +199,7 @@ const Profile = () => {
               <span
                 className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wide ${
                   (profile || user)?.isVerified
-                    ? "bg-brand-500 text-primary-foreground"
+                    ? "bg-emerald-500 text-white"
                     : "bg-red-500 text-white"
                 }`}
               >

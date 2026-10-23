@@ -94,7 +94,7 @@ const Notifications = () => {
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24 font-sans">
       {/* Header */}
-      <div className="bg-white shadow-sm p-4 sticky top-0 z-30 backdrop-blur-md bg-white/90">
+      <div className="bg-white shadow-sm p-4 sticky top-0 z-30">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center">
             <Button

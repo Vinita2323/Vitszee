@@ -7,6 +7,13 @@ export const deliveryApi = {
   verifyOtp: (data) => axiosInstance.post("/delivery/verify-otp", data),
   getProfile: () => axiosInstance.get("/delivery/profile"),
   updateProfile: (data) => axiosInstance.put("/delivery/profile", data),
+  uploadProfileImage: (file) => {
+    const body = new FormData();
+    body.append("profileImage", file);
+    return axiosInstance.put("/delivery/profile", body, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   deleteAccount: () => axiosInstance.delete("/delivery/account"),
   getStats: () => axiosInstance.get("/delivery/stats"),
   getEarnings: (params) => axiosInstance.get("/delivery/earnings", { params }),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
   Star,
@@ -26,6 +26,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [isOnline, setIsOnline] = useState(user?.isOnline || false);
+  const togglingRef = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [locationText, setLocationText] = useState("Fetching location...");
   const [isDetecting, setIsDetecting] = useState(false);
@@ -168,18 +169,24 @@ const Dashboard = () => {
   }, [isOnline, activeTab]);
 
   const handleOnlineToggle = async () => {
+    if (togglingRef.current) return;
+    togglingRef.current = true;
     const newStatus = !isOnline;
+    // Optimistic: flip the UI immediately, roll back if the request fails.
+    setIsOnline(newStatus);
+    if (newStatus) {
+      toast.success("You are now ONLINE. Finding orders...");
+    } else {
+      toast.info("You are now OFFLINE. No new orders.");
+    }
     try {
       await deliveryApi.updateProfile({ isOnline: newStatus });
-      await refreshUser(); // Refresh global auth state
-      setIsOnline(newStatus);
-      if (newStatus) {
-        toast.success("You are now ONLINE. Finding orders...");
-      } else {
-        toast.info("You are now OFFLINE. No new orders.");
-      }
+      refreshUser(); // Sync global auth state in the background
     } catch (error) {
+      setIsOnline(!newStatus);
       toast.error("Failed to update status");
+    } finally {
+      togglingRef.current = false;
     }
   };
 
@@ -200,22 +207,22 @@ const Dashboard = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white pt-3 pb-10 px-6 relative">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+      {/* Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-3 pb-10 px-4 relative">
+        <div className="flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div
-              className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20 shadow-md cursor-pointer"
+              className="w-11 h-11 shrink-0 rounded-full overflow-hidden border-2 border-white/20 shadow-md cursor-pointer"
               onClick={() => navigate("/delivery/profile")}
             >
               <DeliveryAvatar user={user} />
             </div>
-            <div>
-              <h2 className="text-[16px] font-black leading-tight tracking-tight">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[15px] font-black leading-tight tracking-tight truncate">
                 Hi, {user?.name?.split(" ")[0] || "Partner"} 👋
               </h2>
-              <div className="flex items-center mt-0.5 space-x-2">
-                <p className="text-xs text-white/70 font-medium flex items-center max-w-[200px] truncate">
+              <div className="flex items-center mt-0.5 gap-1.5 min-w-0">
+                <p className="text-[11px] text-white/70 font-medium flex items-center min-w-0 truncate">
                   <MapPin size={12} className="mr-1 shrink-0" />
                   <span className="truncate">{locationText}</span>
                 </p>
@@ -231,14 +238,37 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div
-            className="relative p-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full transition-colors cursor-pointer"
-            onClick={() => navigate("/delivery/notifications")}
-          >
-            <Bell size={20} className="text-white" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#1A4516] rounded-full animate-pulse"></span>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleOnlineToggle}
+              aria-label={isOnline ? "Go offline" : "Go online"}
+              className={`w-[68px] h-7 shrink-0 rounded-full transition-all duration-300 relative flex items-center px-1 border border-white/20 ${
+                isOnline ? "bg-emerald-500" : "bg-white/20"
+              }`}
+            >
+              {isOnline ? (
+                <>
+                  <span className="text-[10px] font-bold text-white ml-1">Online</span>
+                  <div className="w-5 h-5 bg-white rounded-full absolute right-1 shadow-sm" />
+                </>
+              ) : (
+                <>
+                  <div className="w-5 h-5 bg-white rounded-full absolute left-1 shadow-sm" />
+                  <span className="text-[10px] font-bold text-white/90 ml-auto mr-1">Offline</span>
+                </>
+              )}
+            </button>
+
+            <div
+              className="relative w-9 h-9 shrink-0 flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/10 rounded-full transition-colors cursor-pointer"
+              onClick={() => navigate("/delivery/notifications")}
+            >
+              <Bell size={18} className="text-white" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#0057B7] rounded-full animate-pulse"></span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -271,7 +301,7 @@ const Dashboard = () => {
             <span className="text-[10px] font-bold text-gray-400">Today's Earnings</span>
             <button
               onClick={() => navigate("/delivery/earnings")}
-              className="text-[#1A4516] text-[10px] font-bold hover:underline"
+              className="text-[#0057B7] text-[10px] font-bold hover:underline"
             >
               View Details
             </button>
@@ -283,19 +313,19 @@ const Dashboard = () => {
                 <TrendingUp size={10} className="mr-0.5 shrink-0" /> +₹120 vs yesterday
               </span>
             </div>
-            {/* Sparkline Graphic (SVG Line) matching user image */}
+            {/* Sparkline Graphic (SVG Line) matching blue theme */}
             <div className="w-20 h-8">
               <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible">
                 <defs>
                   <linearGradient id="sparkline-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1A4516" stopOpacity="0.15" />
-                    <stop offset="100%" stopColor="#1A4516" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="#0057B7" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#0057B7" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
                 <path
                   d="M5,30 Q25,12 40,25 T75,8 T100,5"
                   fill="none"
-                  stroke="#1A4516"
+                  stroke="#0057B7"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                 />
@@ -303,34 +333,9 @@ const Dashboard = () => {
                   d="M5,30 Q25,12 40,25 T75,8 T100,5 L100,40 L5,40 Z"
                   fill="url(#sparkline-grad)"
                 />
-                <circle cx="100" cy="5" r="3" fill="#1A4516" />
+                <circle cx="100" cy="5" r="3" fill="#0057B7" />
               </svg>
             </div>
-          </div>
-        </Card>
-
-        {/* Current Status (Toggle Card) */}
-        <Card className="bg-white py-2.5 px-3.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <span className="text-xs font-bold text-gray-800">Current Status</span>
-          <div className="flex items-center">
-            <button
-              onClick={handleOnlineToggle}
-              className={`w-18 h-6.5 rounded-full transition-all duration-300 relative flex items-center px-1 ${
-                isOnline ? "bg-[#1A4516]" : "bg-gray-200"
-              }`}
-            >
-              {isOnline ? (
-                <>
-                  <span className="text-[9px] font-bold text-white ml-1">Online</span>
-                  <div className="w-4.5 h-4.5 bg-white rounded-full absolute right-1 shadow-sm" />
-                </>
-              ) : (
-                <>
-                  <div className="w-4.5 h-4.5 bg-white rounded-full absolute left-1 shadow-sm" />
-                  <span className="text-[9px] font-bold text-gray-400 ml-auto mr-1">Offline</span>
-                </>
-              )}
-            </button>
           </div>
         </Card>
 
@@ -354,7 +359,7 @@ const Dashboard = () => {
               </div>
               <span className="text-xs font-bold text-gray-700">New Orders</span>
             </div>
-            <span className="h-5 w-5 rounded-full bg-[#1A4516] text-white text-[9px] font-black flex items-center justify-center">
+            <span className="h-5 w-5 rounded-full bg-[#0057B7] text-white text-[9px] font-black flex items-center justify-center">
               {availableOrders.length}
             </span>
           </button>
@@ -376,7 +381,7 @@ const Dashboard = () => {
               </div>
               <span className="text-xs font-bold text-gray-700">Ongoing Orders</span>
             </div>
-            <span className="h-5 w-5 rounded-full bg-[#1A4516] text-white text-[9px] font-black flex items-center justify-center">
+            <span className="h-5 w-5 rounded-full bg-[#0057B7] text-white text-[9px] font-black flex items-center justify-center">
               {earnings.ongoingCount || 0}
             </span>
           </button>
@@ -387,12 +392,12 @@ const Dashboard = () => {
             className="w-full flex items-center justify-between py-2.5 px-3.5 hover:bg-gray-50/50 transition-colors"
           >
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-green-50 text-[#1A4516] flex items-center justify-center border border-green-100/30">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/30">
                 <CheckCircle size={15} />
               </div>
               <span className="text-xs font-bold text-gray-700">Completed Orders</span>
             </div>
-            <span className="h-5 w-5 rounded-full bg-[#1A4516] text-white text-[9px] font-black flex items-center justify-center">
+            <span className="h-5 w-5 rounded-full bg-[#0057B7] text-white text-[9px] font-black flex items-center justify-center">
               {earnings.deliveries}
             </span>
           </button>
@@ -411,8 +416,8 @@ const Dashboard = () => {
                     className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm text-center"
                   >
                     <div className="flex justify-center mb-3">
-                      <div className="w-12 h-12 rounded-full bg-[#1A4516]/10 flex items-center justify-center">
-                        <Package className="text-[#1A4516]" size={24} />
+                      <div className="w-12 h-12 rounded-full bg-[#0057B7]/10 flex items-center justify-center">
+                        <Package className="text-[#0057B7]" size={24} />
                       </div>
                     </div>
                     <h3 className="text-sm font-bold text-gray-900 mb-1">
@@ -424,7 +429,7 @@ const Dashboard = () => {
                       A fullscreen alert will open with Accept and Reject. Use that to respond before the timer ends.
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      <span className="w-2 h-2 bg-[#1A4516] rounded-full animate-pulse" />
+                      <span className="w-2 h-2 bg-[#0057B7] rounded-full animate-pulse" />
                       Listening for assignments
                     </div>
                   </motion.div>
@@ -434,7 +439,7 @@ const Dashboard = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="bg-[#1A4516] rounded-2xl p-5 text-white shadow-lg relative overflow-hidden"
+                    className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] rounded-2xl p-5 text-white shadow-lg relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 p-4 opacity-10">
                       <Package size={80} />
@@ -450,7 +455,7 @@ const Dashboard = () => {
                       <p className="text-xs text-white/80 mb-5 truncate max-w-[80%] font-medium">
                         {ongoingOrder.historyJobType === 'RETURN' ? 'Return Pickup' : 'Delivery to Customer'}
                       </p>
-                      <Button onClick={() => navigate(`/delivery/order-details/${ongoingOrder.orderId}`)} variant="secondary" className="w-full bg-white text-[#1A4516] hover:bg-gray-50 font-bold border-0 shadow-sm py-2.5">
+                      <Button onClick={() => navigate(`/delivery/order-details/${ongoingOrder.orderId}`)} variant="secondary" className="w-full bg-white text-[#0057B7] hover:bg-gray-50 font-bold border-0 shadow-sm py-2.5">
                         View Order Details
                       </Button>
                     </div>
@@ -463,13 +468,13 @@ const Dashboard = () => {
                     exit={{ opacity: 0 }}
                     className="bg-white rounded-2xl p-5 text-center border border-dashed border-gray-200 relative overflow-hidden"
                   >
-                    <div className="absolute inset-0 bg-[#1A4516]/5 opacity-50"></div>
+                    <div className="absolute inset-0 bg-[#0057B7]/5 opacity-50"></div>
                     <div className="relative z-10">
                       <div className="relative w-12 h-12 mx-auto mb-2.5">
-                        <div className="absolute inset-0 bg-[#1A4516]/10 rounded-full animate-ping opacity-20"></div>
-                        <div className="absolute inset-1 bg-[#1A4516]/10 rounded-full animate-ping opacity-40 delay-150"></div>
-                        <div className="relative w-full h-full bg-[#1A4516]/5 rounded-full flex items-center justify-center border border-[#1A4516]/10 shadow-sm">
-                          <MapPin size={20} className="text-[#1A4516]" />
+                        <div className="absolute inset-0 bg-[#0057B7]/10 rounded-full animate-ping opacity-20"></div>
+                        <div className="absolute inset-1 bg-[#0057B7]/10 rounded-full animate-ping opacity-40 delay-150"></div>
+                        <div className="relative w-full h-full bg-[#0057B7]/5 rounded-full flex items-center justify-center border border-[#0057B7]/10 shadow-sm">
+                          <MapPin size={20} className="text-[#0057B7]" />
                         </div>
                       </div>
                       <h3 className="text-xs font-bold mb-1 text-gray-800">
@@ -491,18 +496,18 @@ const Dashboard = () => {
                 >
                   <div className="flex justify-between items-center mb-1">
                     <h3 className="text-sm font-bold text-gray-800 tracking-tight">Available Return Pickups</h3>
-                    <span className="text-[10px] font-bold text-[#1A4516] bg-[#1A4516]/10 px-2 py-0.5 rounded-full uppercase italic">Open for Acceptance</span>
+                    <span className="text-[10px] font-bold text-[#0057B7] bg-[#0057B7]/10 px-2 py-0.5 rounded-full uppercase italic">Open for Acceptance</span>
                   </div>
                   {availableOrders.length > 0 ? (
                     availableOrders.map((order) => (
-                      <Card key={order._id} className="p-4 border border-gray-100 hover:border-[#1A4516]/30 transition-all shadow-sm bg-white rounded-2xl">
+                      <Card key={order._id} className="p-4 border border-gray-100 hover:border-[#0057B7]/30 transition-all shadow-sm bg-white rounded-2xl">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <span className="text-[10px] font-black text-[#1A4516]/60 uppercase tracking-widest mb-1 block">Return Task</span>
+                            <span className="text-[10px] font-black text-[#0057B7]/60 uppercase tracking-widest mb-1 block">Return Task</span>
                             <h4 className="font-bold text-gray-900">#{order.orderId}</h4>
                           </div>
                           <div className="text-right">
-                            <span className="block font-black text-[#1A4516] text-lg">₹{order.returnDeliveryCommission || 0}</span>
+                            <span className="block font-black text-[#0057B7] text-lg">₹{order.returnDeliveryCommission || 0}</span>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Commission</span>
                           </div>
                         </div>
@@ -522,7 +527,7 @@ const Dashboard = () => {
                           <Button 
                             variant="primary" 
                             size="sm" 
-                            className="flex-1 font-black text-[10px] tracking-widest uppercase h-10 shadow-md bg-[#1A4516] hover:bg-[#0f2d0f] text-white rounded-xl"
+                            className="flex-1 font-black text-[10px] tracking-widest uppercase h-10 shadow-md bg-[#0057B7] hover:bg-[#004899] text-white rounded-xl"
                             onClick={() => handleAcceptReturn(order.orderId)}
                           >
                             Accept Pickup
@@ -556,7 +561,7 @@ const Dashboard = () => {
         {/* Go Online / Go Offline Action Button */}
         <button
           onClick={handleOnlineToggle}
-          className="w-full py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-300 shadow-md bg-[#1A4516] hover:bg-[#0f2d0f] text-white shadow-[#1A4516]/10"
+          className="w-full py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-300 shadow-md bg-[#0057B7] hover:bg-[#004899] text-white shadow-[#0057B7]/20"
         >
           {isOnline ? "Go Offline" : "Go Online"}
         </button>

@@ -21,6 +21,7 @@ import AdminAuth from '../../modules/admin/pages/AdminAuth';
 import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
 import CustomerAuth from '../../modules/customer/pages/CustomerAuth';
 import DeliveryHelpSupport from '../../modules/delivery/pages/profile/HelpSupport';
+import DeliveryPrivacyPolicy from '../../modules/delivery/pages/profile/PrivacyPolicy';
 
 // Customer Pages (lazy-loaded)
 const Home = lazy(() => import('../../modules/customer/pages/Home'));
@@ -128,11 +129,7 @@ const AppRouter = () => {
                 },
                 {
                     path: 'delivery/privacy',
-                    element: (
-                        <Suspense fallback={null}>
-                            <PrivacyPage />
-                        </Suspense>
-                    ),
+                    element: <DeliveryPrivacyPolicy />,
                 },
                 {
                     path: 'delivery/terms',

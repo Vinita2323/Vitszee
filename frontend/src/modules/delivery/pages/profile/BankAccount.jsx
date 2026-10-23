@@ -100,8 +100,8 @@ const BankAccount = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Sticky Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
+      {/* Sticky Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
         <button 
           onClick={() => navigate(-1)} 
           className="p-1.5 rounded-full hover:bg-white/10 transition-colors mr-2 cursor-pointer"
@@ -116,7 +116,7 @@ const BankAccount = () => {
       <div className="p-4 max-w-lg mx-auto space-y-4 relative z-10">
         
         {/* Bank Card Visual */}
-        <div className="bg-gradient-to-br from-[#1A4516] to-[#123610] text-white p-4.5 rounded-2xl shadow-md relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white p-4.5 rounded-2xl shadow-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
           
           <div className="flex justify-between items-center mb-5 relative z-10">
@@ -165,7 +165,7 @@ const BankAccount = () => {
               label="Account Holder Name" 
               placeholder="Enter account holder name" 
               icon={User}
-              className="focus:ring-[#1A4516]/10 focus:border-[#1A4516]"
+              className="focus:ring-[#0057B7]/15 focus:border-[#0057B7]"
             />
             <Input 
               name="newAccount"
@@ -174,7 +174,7 @@ const BankAccount = () => {
               label="New Account Number" 
               placeholder="Enter account number" 
               icon={CreditCard}
-              className="focus:ring-[#1A4516]/10 focus:border-[#1A4516]"
+              className="focus:ring-[#0057B7]/15 focus:border-[#0057B7]"
             />
             <Input 
               name="confirmAccount"
@@ -183,7 +183,7 @@ const BankAccount = () => {
               label="Confirm Account Number" 
               placeholder="Re-enter account number" 
               icon={CreditCard}
-              className="focus:ring-[#1A4516]/10 focus:border-[#1A4516]"
+              className="focus:ring-[#0057B7]/15 focus:border-[#0057B7]"
             />
             <Input 
               name="ifscCode"
@@ -192,12 +192,12 @@ const BankAccount = () => {
               label="IFSC Code" 
               placeholder="Enter IFSC code" 
               icon={Landmark}
-              className="focus:ring-[#1A4516]/10 focus:border-[#1A4516]"
+              className="focus:ring-[#0057B7]/15 focus:border-[#0057B7]"
             />
             <Button 
               type="submit" 
               disabled={isUpdating}
-              className="w-full mt-2 bg-[#1A4516] hover:bg-[#153b12] text-white border-none py-2 text-xs font-bold rounded-xl flex items-center justify-center" 
+              className="w-full mt-2 bg-[#0057B7] hover:bg-[#004899] text-white border-none py-2 text-xs font-bold rounded-xl flex items-center justify-center" 
               variant="outline"
             >
               {isUpdating ? <div className="h-4 w-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "Verify & Update"}

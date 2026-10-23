@@ -252,8 +252,8 @@ const DeliveryLayout = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--primary", "#1A4516");
-    root.style.setProperty("--primary-color", "#1A4516");
+    root.style.setProperty("--primary", "#0057B7");
+    root.style.setProperty("--primary-color", "#0057B7");
   }, []);
 
   const hideBottomNavRoutes = [
@@ -940,7 +940,8 @@ const DeliveryLayout = () => {
         )}
 
       <main
-        className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y ${
+        data-lenis-prevent
+        className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           shouldShowBottomNav
             ? "pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
             : "pb-[env(safe-area-inset-bottom,0px)]"

@@ -41,7 +41,7 @@ export default function ReviewsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50 pb-24">
-        <div className="bg-[#1A4516] text-white pt-4 pb-5 px-4">
+        <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-5 px-4">
           <div className="flex items-center">
             <button
               type="button"
@@ -61,7 +61,7 @@ export default function ReviewsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-24">
-      <div className="bg-[#1A4516] text-white pt-4 pb-5 px-4 sticky top-0 z-20">
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-5 px-4 sticky top-0 z-20">
         <div className="flex items-center">
           <button
             type="button"

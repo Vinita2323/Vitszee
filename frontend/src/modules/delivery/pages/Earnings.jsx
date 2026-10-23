@@ -139,7 +139,7 @@ const Earnings = () => {
         <div className="flex justify-between items-center mb-4">
           <h1 className="ds-h2 text-gray-900">My Earnings</h1>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)} className="text-xs font-bold bg-[#1A4516] text-white hover:bg-[#133A10] border-none rounded-xl">
+            <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)} className="text-xs font-bold bg-[#0057B7] text-white hover:bg-[#004899] border-none rounded-xl">
               Withdraw Funds
             </Button>
             <Button variant="ghost" size="icon">

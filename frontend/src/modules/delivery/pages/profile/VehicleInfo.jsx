@@ -38,8 +38,8 @@ const VehicleInfo = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white pt-4 pb-12 px-6 relative">
+      {/* Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-12 px-6 relative">
         <div className="flex items-center">
           <button
             onClick={() => navigate(-1)}
@@ -56,7 +56,7 @@ const VehicleInfo = () => {
       <div className="bg-white rounded-t-[32px] -mt-5 pt-4 px-5 space-y-4 relative z-10">
         
         {/* Vehicle Card */}
-        <Card className="p-4 bg-gradient-to-br from-gray-900 to-[#123610] text-white border-none shadow-md rounded-2xl relative overflow-hidden">
+        <Card className="p-4 bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white border-none shadow-md rounded-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 blur-xl" />
           <div className="flex justify-between items-start mb-4 relative z-10">
             <div>
@@ -89,7 +89,7 @@ const VehicleInfo = () => {
               <Card key={index} className="p-3 border border-gray-100 bg-white rounded-xl shadow-sm">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center min-w-0">
-                    <div className="p-2 rounded-lg mr-2.5 bg-[#1A4516]/5 text-[#1A4516] shrink-0">
+                    <div className="p-2 rounded-lg mr-2.5 bg-[#0057B7]/10 text-[#0057B7] shrink-0">
                       <FileText size={16} />
                     </div>
                     <div className="min-w-0">
@@ -110,9 +110,9 @@ const VehicleInfo = () => {
         </div>
 
         {/* Info Box */}
-        <div className="bg-[#1A4516]/5 border border-[#1A4516]/10 p-3.5 rounded-xl flex items-start">
-          <AlertCircle size={16} className="text-[#1A4516] mr-2.5 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-[#1A4516] font-medium leading-relaxed">
+        <div className="bg-[#0057B7]/5 border border-[#0057B7]/15 p-3.5 rounded-xl flex items-start">
+          <AlertCircle size={16} className="text-[#0057B7] mr-2.5 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-[#0057B7] font-medium leading-relaxed">
             To change your vehicle details, please visit the nearest {appName} Partner Center with your original documents.
           </p>
         </div>

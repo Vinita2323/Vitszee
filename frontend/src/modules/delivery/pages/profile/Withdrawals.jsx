@@ -90,8 +90,8 @@ const Withdrawals = () => {
     return (
         <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
             
-            {/* Sticky Deep Green Header Banner */}
-            <div className="bg-[#1A4516] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
+            {/* Sticky Brand Blue Header Banner */}
+            <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
                 <button
                     onClick={() => navigate(-1)}
                     className="p-1.5 rounded-full hover:bg-white/10 transition-colors mr-2 cursor-pointer"
@@ -104,7 +104,7 @@ const Withdrawals = () => {
 
             <div className="p-4 max-w-lg mx-auto space-y-4 relative z-10">
                 {/* Balance Card */}
-                <div className="bg-gradient-to-br from-[#1A4516] to-[#123610] p-4.5 rounded-2xl text-white shadow-md shadow-[#1A4516]/10 relative overflow-hidden">
+                <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] p-4.5 rounded-2xl text-white shadow-md shadow-[#0057B7]/20 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 blur-xl" />
                     <div className="absolute bottom-0 left-0 w-20 h-20 bg-black/5 rounded-full -ml-6 -mb-6 blur-lg" />
 
@@ -128,7 +128,7 @@ const Withdrawals = () => {
                 {/* Withdrawal Form */}
                 <Card className="p-4 border border-gray-100 bg-white rounded-xl shadow-sm">
                     <div className="flex items-center gap-2 mb-3.5">
-                        <div className="p-1.5 bg-[#1A4516]/5 text-[#1A4516] rounded-lg">
+                        <div className="p-1.5 bg-[#0057B7]/10 text-[#0057B7] rounded-lg">
                             <Wallet size={16} />
                         </div>
                         <h3 className="font-bold text-gray-800 text-xs">Request Fund Transfer</h3>
@@ -146,7 +146,7 @@ const Withdrawals = () => {
                                     placeholder="0.00"
                                     value={amount}
                                     onChange={(e) => setAmount(e.target.value)}
-                                    className="w-full bg-gray-50/60 border border-gray-100 rounded-xl py-2.5 pl-10 pr-4 font-extrabold text-lg outline-none focus:ring-2 focus:ring-[#1A4516]/10 focus:border-[#1A4516] transition-all"
+                                    className="w-full bg-gray-50/60 border border-gray-100 rounded-xl py-2.5 pl-10 pr-4 font-extrabold text-lg outline-none focus:ring-2 focus:ring-[#0057B7]/15 focus:border-[#0057B7] transition-all"
                                 />
                             </div>
                         </div>
@@ -161,7 +161,7 @@ const Withdrawals = () => {
                         <Button
                             onClick={handleRequest}
                             disabled={loading || !amount || Number(amount) <= 0}
-                            className="w-full py-2.5 bg-[#1A4516] hover:bg-[#153b12] text-white border-none rounded-xl font-bold text-xs shadow-md shadow-[#1A4516]/10 flex justify-center items-center"
+                            className="w-full py-2.5 bg-[#0057B7] hover:bg-[#004899] text-white border-none rounded-xl font-bold text-xs shadow-md shadow-[#0057B7]/20 flex justify-center items-center"
                         >
                             {loading ? (
                                 <RotateCw className="animate-spin mr-1.5 text-white" size={14} />
@@ -179,7 +179,7 @@ const Withdrawals = () => {
                         </h3>
                         <button
                             onClick={fetchData}
-                            className="text-[#1A4516] text-[10px] font-bold flex items-center gap-1 uppercase hover:underline cursor-pointer"
+                            className="text-[#0057B7] text-[10px] font-bold flex items-center gap-1 uppercase hover:underline cursor-pointer"
                         >
                             <RotateCw size={10} className={fetching ? "animate-spin" : ""} />
                             Refresh

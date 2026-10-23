@@ -36,7 +36,12 @@ router.post("/verify-otp", verifyDeliveryOTP);
 
 // Profile routes
 router.get("/profile", verifyToken, getDeliveryProfile);
-router.put("/profile", verifyToken, updateDeliveryProfile);
+router.put(
+  "/profile",
+  verifyToken,
+  upload.fields([{ name: "profileImage", maxCount: 1 }]),
+  updateDeliveryProfile,
+);
 router.delete("/account", verifyToken, allowRoles("delivery"), deleteDeliveryAccount);
 router.get("/stats", verifyToken, getDeliveryStats);
 router.get("/earnings", verifyToken, getDeliveryEarnings);

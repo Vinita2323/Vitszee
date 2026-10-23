@@ -152,11 +152,11 @@ const OrderHistory = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white pt-4 pb-12 px-6 relative">
+      {/* Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-12 px-6 relative">
         <h1 className="text-lg font-black leading-tight tracking-tight mb-3">Order History</h1>
         
-        {/* Search Input inside Green Header */}
+        {/* Search Input inside Header */}
         <div className="relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-gray-400"
@@ -183,7 +183,7 @@ const OrderHistory = () => {
               onClick={() => setFilter(status.toLowerCase())}
               className={`snap-start h-8 px-4 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
                 filter === status.toLowerCase()
-                  ? "bg-[#1A4516] text-white border-transparent shadow-md shadow-[#1A4516]/10"
+                  ? "bg-[#0057B7] text-white border-transparent shadow-md shadow-[#0057B7]/20"
                   : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100"
               }`}
             >
@@ -195,15 +195,15 @@ const OrderHistory = () => {
         {/* Orders List */}
         <div className="space-y-3.5 max-w-lg mx-auto">
           {refreshing && (
-            <div className="flex items-center justify-center gap-1.5 py-1 text-[11px] font-bold text-[#1A4516]">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-[#1A4516] border-t-transparent" />
+            <div className="flex items-center justify-center gap-1.5 py-1 text-[11px] font-bold text-[#0057B7]">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-[#0057B7] border-t-transparent" />
               <span>Updating…</span>
             </div>
           )}
           
           {initialLoading ? (
             <div className="flex justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1A4516]"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0057B7]"></div>
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
@@ -233,7 +233,7 @@ const OrderHistory = () => {
                         <div className="flex justify-between items-start mb-2.5">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 mb-0.5 min-w-0 flex-wrap">
-                              <span className="font-bold text-gray-900 text-xs group-hover:text-[#1A4516] transition-colors break-all">
+                              <span className="font-bold text-gray-900 text-xs group-hover:text-[#0057B7] transition-colors break-all">
                                 #{order.orderId} {order.historyJobType === 'RETURN' ? <span className="text-amber-600">(Return)</span> : ''}
                               </span>
                               <span
@@ -242,7 +242,7 @@ const OrderHistory = () => {
                                     ? "bg-green-50 text-emerald-700 border border-green-100/30"
                                     : displayOrderStatus(order) === "cancelled"
                                     ? "bg-rose-50 text-rose-700 border border-rose-100/30"
-                                    : "bg-green-50 text-[#1A4516]"
+                                    : "bg-blue-50 text-[#0057B7]"
                                 }`}
                               >
                                 {displayOrderStatus(order)}
@@ -254,7 +254,7 @@ const OrderHistory = () => {
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="block font-black text-base text-[#1A4516] leading-none mb-0.5">
+                            <span className="block font-black text-base text-[#0057B7] leading-none mb-0.5">
                               ₹{Math.round(order.displayEarnings ?? (order.paymentBreakdown?.riderPayoutTotal || ((order.pricing?.total || 0) * 0.1)))}
                             </span>
                             <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Earnings</span>
@@ -292,7 +292,7 @@ const OrderHistory = () => {
                               <Clock size={10} className="mr-0.5 text-gray-400" /> {Math.round((order.distanceSnapshot?.distanceKmRounded || 2.4) * 6.25)} min
                             </span>
                           </div>
-                          <div className="flex items-center text-[#1A4516] font-bold group-hover:underline">
+                          <div className="flex items-center text-[#0057B7] font-bold group-hover:underline">
                             View Details <ChevronRight size={12} className="ml-0.5" />
                           </div>
                         </div>

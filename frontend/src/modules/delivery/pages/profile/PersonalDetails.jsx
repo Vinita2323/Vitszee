@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, User, Mail, Phone, MapPin, Calendar, Droplet } from "lucide-react";
+import { ArrowLeft, Save, User, Mail, Phone, MapPin, Calendar, Droplet, Camera, Loader2 } from "lucide-react";
+import { useAuth } from "@core/context/AuthContext";
 import Button from "@/shared/components/ui/Button";
 import Input from "@/shared/components/ui/Input";
 import { toast } from "sonner";
@@ -9,6 +10,9 @@ import DeliveryAvatar from "../../components/DeliveryAvatar";
 
 const PersonalDetails = () => {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
+  const fileInputRef = useRef(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -65,11 +69,37 @@ const PersonalDetails = () => {
     }
   };
 
+  const handlePhotoSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const res = await deliveryApi.uploadProfileImage(file);
+      const url = res.data?.result?.profileImage;
+      if (url) setFormData((prev) => ({ ...prev, profileImage: url }));
+      refreshUser?.();
+      toast.success("Profile photo updated");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white pt-4 pb-12 px-6 relative">
+      {/* Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-12 px-6 relative">
         <div className="flex items-center">
           <button 
             onClick={() => navigate(-1)} 
@@ -83,7 +113,7 @@ const PersonalDetails = () => {
             {isEditing ? (
               <button 
                 onClick={handleSave} 
-                className="h-8 px-4 rounded-full bg-white text-[#1A4516] text-xs font-black hover:bg-gray-100 transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                className="h-8 px-4 rounded-full bg-white text-[#0057B7] text-xs font-black hover:bg-gray-100 transition-colors cursor-pointer shadow-sm flex items-center gap-1"
               >
                 <Save size={12} /> Save
               </button>
@@ -114,9 +144,26 @@ const PersonalDetails = () => {
                 }}
               />
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoSelected}
+            />
             {isEditing && (
-              <button className="absolute bottom-0 right-0 bg-[#1A4516] text-white p-1 rounded-full shadow-md hover:bg-[#153b12] transition-colors cursor-pointer">
-                <User size={12} />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                aria-label="Change profile photo"
+                className="absolute bottom-0 right-0 bg-[#0057B7] text-white p-1.5 rounded-full shadow-md hover:bg-[#004899] transition-colors cursor-pointer disabled:opacity-60"
+              >
+                {uploadingPhoto ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Camera size={12} />
+                )}
               </button>
             )}
           </div>
@@ -131,7 +178,7 @@ const PersonalDetails = () => {
             onChange={(e) => setFormData({...formData, name: e.target.value})}
             readOnly={!isEditing} 
             icon={User}
-            className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#1A4516]/10 focus:border-[#1A4516]"}
+            className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#0057B7]/15 focus:border-[#0057B7]"}
           />
           
           <Input
@@ -150,7 +197,7 @@ const PersonalDetails = () => {
             onChange={(e) => setFormData({...formData, email: e.target.value})}
             icon={Mail}
             type="email"
-            className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#1A4516]/10 focus:border-[#1A4516]"}
+            className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#0057B7]/15 focus:border-[#0057B7]"}
           />
 
           <div className="relative">
@@ -166,7 +213,7 @@ const PersonalDetails = () => {
                 className={`w-full pl-9 pr-4 py-2 rounded-xl text-xs border outline-none transition-all resize-none ${
                   !isEditing 
                     ? "bg-gray-50/60 border-transparent text-gray-700" 
-                    : "bg-white border-gray-200 focus:ring-2 focus:ring-[#1A4516]/10 focus:border-[#1A4516]"
+                    : "bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B7]/15 focus:border-[#0057B7]"
                 }`}
                 rows={2}
               />
@@ -176,12 +223,18 @@ const PersonalDetails = () => {
           <div className="grid grid-cols-2 gap-3.5">
             <Input
               label="Date of Birth"
-              value={formData.dob}
+              value={formData.dob ? String(formData.dob).slice(0, 10) : ""}
               type="date"
+              max={new Date().toISOString().slice(0, 10)}
+              onFocus={(e) =>
+                // Native date popup opens below the field; bring the field
+                // near the top so the calendar isn't clipped by the screen edge.
+                e.currentTarget.scrollIntoView({ block: "start", behavior: "smooth" })
+              }
               readOnly={!isEditing}
               onChange={(e) => setFormData({...formData, dob: e.target.value})}
               icon={Calendar}
-              className={!isEditing ? "bg-gray-50 border-transparent text-gray-400" : "focus:ring-[#1A4516]/10 focus:border-[#1A4516]"}
+              className={!isEditing ? "bg-gray-50 border-transparent text-gray-400" : "focus:ring-[#0057B7]/15 focus:border-[#0057B7]"}
             />
             <Input
               label="Blood Group"
@@ -189,7 +242,7 @@ const PersonalDetails = () => {
               readOnly={!isEditing}
               onChange={(e) => setFormData({...formData, bloodGroup: e.target.value})}
               icon={Droplet}
-              className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#1A4516]/10 focus:border-[#1A4516]"}
+              className={!isEditing ? "bg-gray-50/60 border-transparent text-gray-700" : "focus:ring-[#0057B7]/15 focus:border-[#0057B7]"}
             />
           </div>
         </div>

@@ -142,8 +142,8 @@ const EarningsPage = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white pt-4 pb-12 px-6 relative">
+      {/* Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white pt-4 pb-12 px-6 relative">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-lg font-black leading-tight tracking-tight">My Earnings</h1>
@@ -159,7 +159,7 @@ const EarningsPage = () => {
             {/* Wallet / withdraw temporarily disabled
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 bg-white text-[#1A4516] font-bold text-xs rounded-full shadow-sm hover:bg-gray-100 transition-colors"
+              className="px-4 py-2.5 bg-white text-[#0057B7] font-bold text-xs rounded-full shadow-sm hover:bg-gray-100 transition-colors"
             >
               Withdraw Funds
             </button>
@@ -204,7 +204,7 @@ const EarningsPage = () => {
               }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all capitalize ${
                 activeTab === tab
-                  ? "bg-white text-[#1A4516] shadow-sm"
+                  ? "bg-white text-[#0057B7] shadow-sm"
                   : "text-gray-400 hover:text-gray-600"
               }`}
             >
@@ -215,7 +215,7 @@ const EarningsPage = () => {
 
         {/* Total Earnings Card */}
         <motion.div variants={itemVariants} className="w-full">
-          <div className="bg-gradient-to-br from-[#1A4516] to-[#123610] rounded-2xl p-3.5 text-white shadow-md shadow-[#1A4516]/10 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] rounded-2xl p-3.5 text-white shadow-md shadow-[#0057B7]/20 relative overflow-hidden">
             {/* Background patterns */}
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-6 -mt-6 blur-xl" />
             <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full -ml-6 -mb-6 blur-lg" />
@@ -254,7 +254,7 @@ const EarningsPage = () => {
           <Card className="p-3.5 rounded-xl shadow-sm border border-gray-100 bg-white">
             <div className="flex justify-between items-center mb-2.5">
               <h3 className="font-bold text-gray-800 text-xs flex items-center">
-                <TrendingUp size={16} className="mr-1.5 text-[#1A4516]" />
+                <TrendingUp size={16} className="mr-1.5 text-[#0057B7]" />
                 Earnings Trend
               </h3>
               <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-gray-400 hover:text-gray-600">
@@ -282,7 +282,7 @@ const EarningsPage = () => {
                       fontSize: "10px",
                     }}
                   />
-                  <Bar dataKey="earnings" fill="#1A4516" radius={[3, 3, 0, 0]} stackId="a" />
+                  <Bar dataKey="earnings" fill="#0057B7" radius={[3, 3, 0, 0]} stackId="a" />
                   <Bar dataKey="incentives" fill="#93c5fd" radius={[3, 3, 0, 0]} stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
@@ -295,7 +295,7 @@ const EarningsPage = () => {
           <Card className="overflow-hidden border border-gray-100 rounded-xl shadow-sm bg-white">
             <div className="p-3 px-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/40">
               <h3 className="font-bold text-gray-800 text-xs">Recent Earnings</h3>
-              <Button variant="link" className="text-[#1A4516] text-[11px] font-bold h-auto p-0 hover:underline">
+              <Button variant="link" className="text-[#0057B7] text-[11px] font-bold h-auto p-0 hover:underline">
                 View All
               </Button>
             </div>

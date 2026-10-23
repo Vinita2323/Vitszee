@@ -356,6 +356,17 @@ export const updateDeliveryProfile = async (req, res) => {
         if (bloodGroup) delivery.bloodGroup = bloodGroup;
         if (address) delivery.address = address;
 
+        const profileImageFile = req.files?.profileImage?.[0];
+        if (profileImageFile) {
+            if (!String(profileImageFile.mimetype || "").startsWith("image/")) {
+                return handleResponse(res, 400, "Profile photo must be an image");
+            }
+            delivery.profileImage = await uploadToCloudinary(
+                profileImageFile.buffer,
+                "delivery/profiles",
+            );
+        }
+
         // Capture going-offline transition before the save so we know whether
         // to drop the rider's realtime presence nodes after the write.
         const wasOnline = delivery.isOnline === true;

@@ -626,7 +626,7 @@ const OrderDetails = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-28 font-sans">
       {/* Header */}
-      <div className="bg-white/85 backdrop-blur-md sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b border-slate-100">
+      <div className="bg-white sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center">
           <Button
             variant="ghost"
@@ -1185,9 +1185,9 @@ const OrderDetails = () => {
         {/* Return Step 4: arrived at seller — request seller drop OTP */}
         {isReturn && step === 4 && !showDropOtpInput && isAssignedRider && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card className="p-6 rounded-3xl shadow-sm border border-green-100">
+            <Card className="p-6 rounded-3xl shadow-sm border border-blue-100">
               <div className="flex items-center mb-4 text-gray-800">
-                <ShieldCheck className="mr-2 text-green-600" size={24} />
+                <ShieldCheck className="mr-2 text-[#0057B7]" size={24} />
                 <h3 className="font-bold text-lg">Request Seller OTP</h3>
               </div>
               <p className="text-gray-500 text-sm mb-4">
@@ -1197,8 +1197,8 @@ const OrderDetails = () => {
                 orderId={orderId}
                 isReturn={false}
                 isReturnDrop={true}
-                bgColor="bg-green-600"
-                bgColorLight="bg-green-50"
+                bgColor="bg-[#0057B7]"
+                bgColorLight="bg-blue-50"
                 label="SLIDE TO SEND SELLER OTP"
                 onSuccess={(data) => {
                   const newExpiresAt = data?.result?.expiresAt || data?.data?.expiresAt || data?.expiresAt;
@@ -1252,7 +1252,7 @@ const OrderDetails = () => {
         {/* Seller drop OTP input */}
         {isReturn && showDropOtpInput && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="p-6 rounded-3xl shadow-sm border border-green-100">
+            <Card className="p-6 rounded-3xl shadow-sm border border-slate-100">
               <OtpInput
                 orderId={orderId}
                 isReturn={false}
@@ -1276,7 +1276,7 @@ const OrderDetails = () => {
 
       {/* Slide button: for returns shown at steps 1 and 3 (navigation steps); for standard shown at steps 1-2 */}
       {((isReturn && (step === 1 || step === 3) && isAssignedRider) || (!isReturn && step <= 2)) && !showSellerOtpInput && !showOtpInput && !showDropOtpInput && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)]">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white">
           <div className="max-w-2xl mx-auto p-4">
             <div className="relative h-16 bg-slate-100 rounded-full overflow-hidden select-none">
               <motion.div

@@ -3,7 +3,7 @@ import { applyCloudinaryTransform } from "@core/utils/imageUtils";
 
 function fallbackAvatar(user) {
   const seed = encodeURIComponent(user?.name || user?.phone || "partner");
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=1a4516&textColor=ffffff`;
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=0057b7&textColor=ffffff`;
 }
 
 /**

@@ -78,8 +78,8 @@ const Documents = () => {
   return (
     <div className="bg-white min-h-screen pb-28 relative overflow-hidden font-sans">
       
-      {/* Sticky Deep Green Header Banner */}
-      <div className="bg-[#1A4516] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
+      {/* Sticky Brand Blue Header Banner */}
+      <div className="bg-gradient-to-br from-[#09356E] via-[#0057B7] to-[#004494] text-white py-3 px-5 sticky top-0 z-40 shadow-sm flex items-center">
         <button 
           onClick={() => navigate(-1)} 
           className="p-1.5 rounded-full hover:bg-white/10 transition-colors mr-2 cursor-pointer"
@@ -117,7 +117,7 @@ const Documents = () => {
               {doc.status !== "Verified" && (
                 <Button 
                   size="sm" 
-                  className="w-full text-[10px] h-7 bg-[#1A4516] hover:bg-[#153b12] text-white border-none rounded-lg font-bold flex justify-center items-center gap-1" 
+                  className="w-full text-[10px] h-7 bg-[#0057B7] hover:bg-[#004899] text-white border-none rounded-lg font-bold flex justify-center items-center gap-1" 
                   onClick={() => handleUpload(doc.id)}
                 >
                   <UploadCloud size={12} /> 
