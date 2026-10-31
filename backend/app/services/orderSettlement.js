@@ -1,4 +1,6 @@
 import Transaction from "../models/transaction.js";
+import Order from "../models/order.js";
+import logger from "./logger.js";
 import {
   handleCodOrderFinance,
   settleDeliveredOrder,
@@ -69,5 +71,22 @@ export async function applyDeliveredSettlement(order, orderIdString) {
         { upsert: true, new: true },
       );
     }
+  }
+
+  // Captain cash settlement: record what was collected (cash vs online) against
+  // the active shift. Read the order fresh so the COD finance flags written by
+  // handleCodOrderFinance above are visible. Never fails the delivery.
+  try {
+    const fresh = await Order.findById(order._id).lean();
+    if (fresh) {
+      const { recordDeliveryCollection } = await import("./cashSettlement/collectionService.js");
+      await recordDeliveryCollection(fresh);
+    }
+  } catch (error) {
+    logger.error("cash collection recording failed", {
+      scope: "cashSettlement",
+      orderId: orderIdString,
+      error: error.message,
+    });
   }
 }

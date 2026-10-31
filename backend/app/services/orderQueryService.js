@@ -708,6 +708,18 @@ export async function getOrderWithAccess(orderId, userId, role) {
     }
   }
 
+  // COD payment step (QR / cash) status for customer, assigned rider and admin.
+  if (isOwnerCustomer || isAssignedDeliveryBoy || isAdmin) {
+    try {
+      const { getOrderPaymentSummary } = await import("./codQrPaymentService.js");
+      order.codPayment = await getOrderPaymentSummary(order, {
+        includeQr: isAssignedDeliveryBoy,
+      });
+    } catch (err) {
+      logger.warn("Failed to attach COD payment summary", { error: err.message, orderId: order.orderId });
+    }
+  }
+
   return {
     isGroupSummary: false,
     payload: order,

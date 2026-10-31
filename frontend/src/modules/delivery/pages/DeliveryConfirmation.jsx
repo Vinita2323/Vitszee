@@ -57,6 +57,13 @@ const DeliveryConfirmation = () => {
 
   const handleOtpValidationSuccess = (data) => {
     console.log("OTP validated successfully:", data);
+    // COD order: delivery completes only after payment (QR / cash) — that
+    // step lives on the order details screen.
+    if (data?.result?.paymentRequired) {
+      toast.success("OTP verified. Collect the payment to complete delivery.");
+      navigate(`/delivery/order-details/${orderId}`);
+      return;
+    }
     setIsCompleted(true);
     confetti({
       particleCount: 150,

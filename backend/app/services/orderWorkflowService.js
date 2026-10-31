@@ -40,6 +40,13 @@ import {
 } from "./orderSocketEmitter.js";
 import { distanceMeters } from "../utils/geoUtils.js";
 import { applyDeliveredSettlement } from "./orderSettlement.js";
+import { completeOutForDeliveryOrder } from "./deliveryCompletionService.js";
+import {
+  orderRequiresCodPayment,
+  orderIsOutstandingCod,
+  beginCodPaymentHandoff,
+  outstandingAmountRupees,
+} from "./codQrPaymentService.js";
 import { requireCanonicalOrderId } from "../utils/orderLookup.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import logger from "./logger.js";
@@ -647,6 +654,16 @@ export async function deliveryAcceptAtomic(deliveryId, orderId, idempotencyKey) 
     const err = new Error("Invalid delivery account");
     err.statusCode = 400;
     throw err;
+  }
+
+  // Cash holding limit: block NEW COD orders while overdue cash exceeds the
+  // limit (admin override respected). Orders already in progress are untouched.
+  {
+    const target = await Order.findOne({ orderId }).select("paymentMode").lean();
+    if (String(target?.paymentMode || "").toUpperCase() === "COD") {
+      const { assertCodAssignmentAllowed } = await import("./cashSettlement/limitService.js");
+      await assertCodAssignmentAllowed(deliveryOid);
+    }
   }
 
   if (idempotencyKey) {
@@ -1735,6 +1752,13 @@ export async function verifyHandoffOtpAndDeliver(deliveryId, orderId, code, imag
     throw err;
   }
 
+  // Cash must belong to a real active shift: refuse BEFORE the OTP is
+  // consumed so the rider can start a shift and retry the same OTP.
+  if (orderIsOutstandingCod(order)) {
+    const { assertActiveShiftForCash } = await import("./cashSettlement/shiftService.js");
+    await assertActiveShiftForCash(deliveryId);
+  }
+
   // Load the most recent OTP record; do NOT filter on consumedAt so we
   // can return actionable OTP_CONSUMED instead of a generic OTP_NOT_FOUND.
   const otp = await OrderOtp.findOne({ orderId, type: "delivery" }).sort({
@@ -1810,127 +1834,33 @@ export async function verifyHandoffOtpAndDeliver(deliveryId, orderId, code, imag
     });
   }
 
-  // For v2 orders we move the workflow state; for legacy v1 we just
-  // flip the legacy `status`. The atomic guard prevents double-delivery
-  // by including the expected pre-state in the filter.
-  const updateFilter = isV2Out
-    ? {
-        orderId,
-        workflowStatus: WORKFLOW_STATUS.OUT_FOR_DELIVERY,
-        deliveryBoy: deliveryId,
-      }
-    : {
-        orderId,
-        status: "out_for_delivery",
-        deliveryBoy: deliveryId,
-      };
-
-  const updateSet = {
-    status: "delivered",
-    deliveredAt: now,
-    otpValidatedAt: now,
-    deliveryProofImages: images,
-  };
-  if (isV2Out) {
-    updateSet.workflowStatus = WORKFLOW_STATUS.DELIVERED;
-  }
-  if (validationLocation) {
-    updateSet.otpValidationLocation = validationLocation;
-  }
-
-  let updated = await Order.findOneAndUpdate(
-    updateFilter,
-    { $set: updateSet },
-    { new: true },
-  );
-
-  if (updated) {
-    updated = await updated.populate("customer");
-  }
-
-  if (!updated) {
-    const err = new Error("Could not finalize delivery");
-    err.statusCode = 409;
-    err.code = "ORDER_NOT_READY";
-    throw err;
-  }
-
-  if (!updated.customer) {
-    logger.error("Customer field lost during delivery completion", {
-      scope: "ORDER_BUG",
-      orderId,
-      _id: updated._id,
+  // COD orders with money outstanding: the OTP only proves hand-over to the
+  // right person. The order stays OUT_FOR_DELIVERY until payment is verified
+  // (Razorpay QR) or cash is recorded — see codQrPaymentService.
+  if (orderRequiresCodPayment(order)) {
+    const handoffOrder = await beginCodPaymentHandoff({
+      order,
+      deliveryId,
+      images,
+      validationLocation,
+      now,
     });
-    const err = new Error(
-      "Order data integrity error: customer reference lost during update",
-    );
-    err.statusCode = 500;
-    err.code = "ORDER_DATA_CORRUPT";
-    throw err;
-  }
-
-  let settlementWarning = null;
-  try {
-    await applyDeliveredSettlement(updated, orderId);
-  } catch (settlementError) {
-    // Order is already marked delivered. Surface a warning instead of
-    // failing the OTP call — finance can reconcile out-of-band.
-    logger.error("Settlement failed after delivery", {
-      scope: "verifyHandoffOtpAndDeliver",
-      orderId,
-      error: settlementError.message,
-    });
-    settlementWarning = {
-      code: "FINANCE_SETTLEMENT_FAILED",
-      message: settlementError.message,
+    return {
+      paymentRequired: true,
+      order: handoffOrder,
+      orderId: handoffOrder.orderId,
+      otpVerifiedAt: now.toISOString(),
+      amountDue: outstandingAmountRupees(handoffOrder),
+      warning: null,
     };
   }
 
-  // Realtime tracking nodes for this order are no longer interesting —
-  // drop them so the customer's live-map and the fleet view stop
-  // showing this rider as "live on order".
-  clearOrderTracking(orderId).catch(() => {});
-  clearRiderPresence(deliveryId).catch(() => {});
-
-  emitOrderStatusUpdate(
+  return completeOutForDeliveryOrder({
     orderId,
-    { 
-      workflowStatus: WORKFLOW_STATUS.DELIVERED,
-      checkoutGroupId: updated.checkoutGroupId 
-    },
-    updated.customer,
-  );
-
-  // Frontend-compat: customers + observers listen for "delivery:otp:validated"
-  // to flip their UI to "Delivered". Emit to both the customer room and the
-  // order room so any open client picks it up.
-  const validatedPayload = {
-    orderId,
-    checkoutGroupId: updated.checkoutGroupId,
-    status: "delivered",
-    deliveredAt: now.toISOString(),
-  };
-  emitToCustomer(updated.customer?._id || updated.customer, {
-    event: "delivery:otp:validated",
-    payload: validatedPayload,
+    deliveryId,
+    isV2Out,
+    images,
+    validationLocation,
+    now,
   });
-  emitToOrder(orderId, {
-    event: "delivery:otp:validated",
-    payload: validatedPayload,
-  });
-
-  emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_DELIVERED, {
-    orderId: updated.orderId,
-    customerId: updated.customer,
-    userId: updated.customer,
-    deliveryId: updated.deliveryBoy,
-    sellerId: updated.seller,
-  });
-
-  return {
-    order: updated,
-    orderId: updated.orderId,
-    deliveredAt: now.toISOString(),
-    warning: settlementWarning,
-  };
 }

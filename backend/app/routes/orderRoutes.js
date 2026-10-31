@@ -37,6 +37,10 @@ import {
   advanceDeliveryRiderUi,
   requestDeliveryOtp,
   verifyDeliveryOtp,
+  getCodPayment,
+  createCodPaymentQr,
+  verifyCodPaymentStatus,
+  confirmCodCashPayment,
   requestReturnPickupOtp,
   verifyReturnPickupOtp,
   requestReturnDropOtp,
@@ -235,6 +239,32 @@ router.post(
   verifyToken,
   allowRoles("delivery", "admin"),
   verifyDeliveryOtp,
+);
+
+// COD payment step (after OTP): Razorpay Dynamic QR or cash
+router.get(
+  "/workflow/:orderId/cod-payment",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  getCodPayment,
+);
+router.post(
+  "/workflow/:orderId/cod-payment/qr",
+  verifyToken,
+  allowRoles("delivery"),
+  createCodPaymentQr,
+);
+router.post(
+  "/workflow/:orderId/cod-payment/verify",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  verifyCodPaymentStatus,
+);
+router.post(
+  "/workflow/:orderId/cod-payment/cash",
+  verifyToken,
+  allowRoles("delivery"),
+  confirmCodCashPayment,
 );
 
 // Workflow routes — seller pickup OTP (forward)

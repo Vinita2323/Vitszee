@@ -56,6 +56,7 @@ import {
 } from "./app/jobs/delhiveryReconciliationJob.js";
 import logger from "./app/services/logger.js";
 import { stopScheduledJobs } from "./app/services/distributedScheduler.js";
+import { getCashSettlementJobHandler, getCashSettlementJobInterval } from "./app/jobs/cashSettlementJob.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -320,6 +321,13 @@ async function startScheduler() {
     'orderAutoCancelJob',
     getOrderAutoCancelJobInterval(),
     getOrderAutoCancelJobHandler()
+  );
+
+  // Captain cash settlement reminders / overdue notices
+  registerScheduledJob(
+    'cashSettlementJob',
+    getCashSettlementJobInterval(),
+    getCashSettlementJobHandler()
   );
 
   // Register return window release job (seller payout hold release)

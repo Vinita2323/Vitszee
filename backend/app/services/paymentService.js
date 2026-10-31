@@ -666,6 +666,22 @@ export async function processWebhook({
 
   const decoded = await provider.decodeWebhookPayload({ rawBody });
 
+  // Razorpay Dynamic QR events (COD payment at the doorstep). The signature
+  // is already verified above. QR processing is idempotent per payment id, so
+  // it deliberately skips the one-shot PaymentWebhookEvent guard: a failed
+  // attempt must stay retryable when Razorpay redelivers the event.
+  const rawEventName = String(decoded.raw?.event || "");
+  if (rawEventName.startsWith("qr_code.")) {
+    const qrEventId = String(webhookEventId || decoded.eventId || "").trim() || null;
+    const { processQrWebhookEvent } = await import("./codQrPaymentService.js");
+    const qrResult = await processQrWebhookEvent({
+      event: rawEventName,
+      payload: decoded.raw?.payload,
+      eventId: qrEventId,
+    });
+    return { accepted: true, qr: true, ...qrResult };
+  }
+
   const eventId = String(webhookEventId || decoded.eventId || "").trim();
   if (!eventId) {
     const err = new Error("Webhook event id is missing");

@@ -28,6 +28,7 @@ import customerMilestoneRoute from "./customerMilestoneRoutes.js";
 import headerCategoryMappingRoute from "./headerCategoryMappingRoutes.js";
 import lowestPriceRoute from "./lowestPriceRoutes.js";
 import delhiveryRoute from "./delhiveryRoutes.js";
+import cashSettlementRoute from "./cashSettlementRoutes.js";
 
 import express from "express";
 
@@ -60,6 +61,7 @@ const setupRoutes = (app) => {
     router.use("/maps", mapsRoute);
     router.use("/media", mediaRoute);
     router.use("/delhivery", delhiveryRoute);
+    router.use("/cash-settlement", cashSettlementRoute);
     // experienceRoute, offerRoute, couponRoute are mounted at "/" intentionally:
     // each of these routers declares ABSOLUTE paths internally (e.g.
     //   router.get("/experience", ...), router.get("/offers", ...),

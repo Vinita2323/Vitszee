@@ -50,6 +50,14 @@ export const deliveryApi = {
     axiosInstance.post(`/orders/workflow/${orderId}/otp/request`, body),
   verifyDeliveryOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/otp/verify`, body),
+  getCodPayment: (orderId) =>
+    axiosInstance.get(`/orders/workflow/${encodeURIComponent(String(orderId))}/cod-payment`),
+  createCodQr: (orderId, body = {}) =>
+    axiosInstance.post(`/orders/workflow/${encodeURIComponent(String(orderId))}/cod-payment/qr`, body),
+  verifyCodPayment: (orderId) =>
+    axiosInstance.post(`/orders/workflow/${encodeURIComponent(String(orderId))}/cod-payment/verify`, {}),
+  confirmCodCash: (orderId, body = {}) =>
+    axiosInstance.post(`/orders/workflow/${encodeURIComponent(String(orderId))}/cod-payment/cash`, body),
   requestSellerPickupOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/seller-pickup-otp/request`, body),
   verifySellerPickupOtp: (orderId, body) =>

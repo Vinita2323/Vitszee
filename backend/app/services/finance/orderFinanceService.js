@@ -619,11 +619,15 @@ export async function reconcileCodCash(
   orderOrId,
   amount,
   deliveryPartnerId,
-  { actorId = null, metadata = {} } = {},
+  { actorId = null, metadata = {}, session: externalSession = null } = {},
 ) {
-  const session = await mongoose.startSession();
+  // When a caller passes its own session (e.g. cash-settlement deposit
+  // approval allocating one deposit across several orders) we join that
+  // transaction; the caller owns commit/abort.
+  const ownsSession = !externalSession;
+  const session = externalSession || (await mongoose.startSession());
   try {
-    session.startTransaction();
+    if (ownsSession) session.startTransaction();
     const order = await findOrderForUpdate(orderOrId, session);
     const partnerId = deliveryPartnerId || order.deliveryBoy;
     if (!partnerId) {
@@ -744,13 +748,13 @@ export async function reconcileCodCash(
     );
 
     await order.save({ session });
-    await session.commitTransaction();
+    if (ownsSession) await session.commitTransaction();
     return order;
   } catch (error) {
-    await session.abortTransaction();
+    if (ownsSession) await session.abortTransaction();
     throw error;
   } finally {
-    session.endSession();
+    if (ownsSession) session.endSession();
   }
 }
 

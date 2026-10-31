@@ -121,6 +121,40 @@ const orderSchema = new mongoose.Schema(
       default: "CREATED",
       index: true,
     },
+    /**
+     * Detailed settlement method, set when delivery completes:
+     * "CASH" (rider collected cash) or "RAZORPAY_QR" (customer paid the
+     * dynamic QR). `paymentMode` / `payment.method` stay as the coarse
+     * COD / ONLINE flags used by finance.
+     */
+    paymentMethod: {
+      type: String,
+      enum: [null, "CASH", "RAZORPAY_QR"],
+      default: null,
+    },
+    /**
+     * COD hand-over state. After the customer's delivery OTP is verified on
+     * a COD order the order stays OUT_FOR_DELIVERY with awaitingPayment=true
+     * until payment is verified (QR) or cash is recorded.
+     */
+    codHandoff: {
+      awaitingPayment: { type: Boolean, default: false },
+      otpVerifiedAt: { type: Date, default: null },
+      proofImages: { type: [String], default: [] },
+      validationLocation: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+      outstandingAmount: { type: Number, default: 0 },
+      /** First verified settlement path wins; blocks the other (anti double-pay). */
+      paymentChoice: {
+        type: String,
+        enum: [null, "CASH", "RAZORPAY_QR"],
+        default: null,
+      },
+      cashReceived: { type: Number, default: null },
+      completedAt: { type: Date, default: null },
+    },
     stockReservation: {
       status: {
         type: String,

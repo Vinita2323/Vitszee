@@ -19,7 +19,7 @@ function buildRazorpayClient() {
   });
 }
 
-function getRazorpayClient() {
+export function getRazorpayClient() {
   if (_razorpayClient) return _razorpayClient;
   _razorpayClient = buildRazorpayClient();
   return _razorpayClient;

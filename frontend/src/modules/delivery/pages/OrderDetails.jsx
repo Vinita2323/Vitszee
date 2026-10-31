@@ -24,6 +24,7 @@ import { Loader2 } from "lucide-react";
 import DeliveryTrackingMap from "../components/DeliveryTrackingMap";
 import DeliverySlideButton from "../components/DeliverySlideButton";
 import OtpInput from "../components/OtpInput";
+import CodPaymentPanel from "../components/CodPaymentPanel";
 import ReturnPickupProofUpload from "../components/ReturnPickupProofUpload";
 import {
   getCachedDeliveryPartnerLocation,
@@ -183,6 +184,8 @@ const OrderDetails = () => {
   const [clockTick, setClockTick] = useState(Date.now());
 
   const isReturn = viewType === "FORWARD" ? false : !!(order?.returnStatus && order.returnStatus !== "none");
+  const awaitingCodPayment =
+    !isReturn && !!order?.codHandoff?.awaitingPayment && step !== 4;
 
   const fetchOrderDetails = useCallback(async () => {
     if (!orderId) return;
@@ -538,6 +541,21 @@ const OrderDetails = () => {
   const handleOtpValidationSuccess = async (data) => {
     const responsePayload = data?.result || data?.data?.result;
     const updatedOrder = responsePayload?.order || responsePayload;
+
+    // COD order: OTP only proves hand-over. The order is NOT delivered yet —
+    // show the payment step (Razorpay QR / cash) instead of the success state.
+    if (!isReturn && responsePayload?.paymentRequired) {
+      setShowOtpInput(false);
+      setOrder((prev) =>
+        prev
+          ? { ...prev, codHandoff: { ...(prev.codHandoff || {}), awaitingPayment: true } }
+          : prev,
+      );
+      await fetchOrderDetails();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast.success("OTP verified. Collect the payment to complete delivery.");
+      return;
+    }
 
     setShowOtpInput(false);
     setPickupProofSubmitted(false);
@@ -1162,7 +1180,7 @@ const OrderDetails = () => {
         )}
 
         {/* Normal delivery Step 3: generate OTP for customer */}
-        {!isReturn && step === 3 && !showOtpInput && (
+        {!isReturn && step === 3 && !showOtpInput && !awaitingCodPayment && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="p-6 rounded-3xl shadow-sm border border-slate-100">
               <div className="flex items-center mb-4 text-gray-800">
@@ -1179,6 +1197,21 @@ const OrderDetails = () => {
                 isReturn={false}
               />
             </Card>
+          </motion.div>
+        )}
+
+        {/* COD payment step: after OTP, collect via Razorpay QR or cash */}
+        {awaitingCodPayment && !showOtpInput && isAssignedRider && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <CodPaymentPanel
+              orderId={orderId}
+              onCompleted={async () => {
+                setStep(4);
+                await fetchOrderDetails();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                toast.success("✅ Payment received. Order delivered!");
+              }}
+            />
           </motion.div>
         )}
 

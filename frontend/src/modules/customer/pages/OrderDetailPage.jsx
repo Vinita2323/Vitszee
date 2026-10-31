@@ -994,6 +994,23 @@ const OrderDetailPage = () => {
           initialOtpData={order?.activeDeliveryOtp || null}
         />
 
+        {/* COD payment at the doorstep (after OTP): pending / failed / expired */}
+        {order?.codPayment?.awaitingPayment && order.status !== "delivered" && (() => {
+          const st = order.codPayment.attempt?.displayStatus;
+          const amt = order.codPayment.outstandingAmount;
+          const copy = {
+            PAYMENT_FAILED: ["Payment failed", "Your last payment attempt failed. Please try again — your delivery partner can show a new QR, or you can pay in cash."],
+            QR_EXPIRED: ["QR expired", "The payment QR has expired. Ask your delivery partner to generate a new one."],
+          }[st] || ["Payment pending", `Pay ₹${amt} by scanning the QR on your delivery partner's phone with any UPI app, or pay in cash. Your order completes once the payment is confirmed.`];
+          const tone = st === "PAYMENT_FAILED" ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800";
+          return (
+            <div className={`rounded-2xl border p-4 ${tone}`}>
+              <p className="text-sm font-bold">{copy[0]} · ₹{amt}</p>
+              <p className="text-xs mt-1 leading-relaxed">{copy[1]}</p>
+            </div>
+          );
+        })()}
+
         {/* Delivery Partner Card - Redesigned */}
         {(status?.startsWith("return_") ? order.returnDeliveryBoy : order.deliveryBoy) && status !== "delivered" && status !== "cancelled" && (
           <motion.div

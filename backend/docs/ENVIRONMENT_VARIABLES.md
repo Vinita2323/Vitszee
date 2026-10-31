@@ -139,6 +139,8 @@ Redis is **mandatory in production** (`NODE_ENV=production`). Startup fails if n
 | `RAZORPAY_KEY_ID` | — | Yes for Razorpay | Razorpay key id |
 | `RAZORPAY_KEY_SECRET` | — | Yes for Razorpay | Razorpay key secret |
 | `RAZORPAY_WEBHOOK_SECRET` | — | Yes for Razorpay webhooks | Secret configured on `POST /api/payments/webhook/razorpay` in the Razorpay dashboard |
+| `COD_QR_PAYMENT_ENABLED` | `true` | No | When `true`, COD orders collect payment via Razorpay Dynamic QR (or cash) after the delivery OTP; `false` restores OTP-completes-delivery. Webhook must also subscribe to `qr_code.credited` / `qr_code.closed` |
+| `COD_QR_EXPIRY_MINUTES` | `15` | No | Validity of a generated COD payment QR (3-60 minutes) |
 
 ## Production Validation Rules
 

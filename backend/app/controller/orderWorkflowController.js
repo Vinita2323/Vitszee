@@ -26,6 +26,12 @@ import { creditWallet } from "../services/finance/walletService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
+import {
+  getCodPaymentState,
+  createOrReuseQr,
+  verifyCodPayment,
+  confirmCashCollection,
+} from "../services/codQrPaymentService.js";
 
 export const confirmPickup = async (req, res) => {
   try {
@@ -159,9 +165,11 @@ export const verifyDeliveryOtp = async (req, res) => {
     return handleResponse(
       res,
       200,
-      result.warning
-        ? "Order delivered successfully (finance pending)"
-        : "Order delivered successfully",
+      result.paymentRequired
+        ? "OTP verified. Collect the payment to complete the delivery."
+        : result.warning
+          ? "Order delivered successfully (finance pending)"
+          : "Order delivered successfully",
       result,
     );
   } catch (e) {
@@ -697,5 +705,67 @@ export const verifySellerPickupOtp = async (req, res) => {
     return handleResponse(res, 200, "Pickup confirmed", result);
   } catch (e) {
     return handleResponse(res, e.statusCode || 500, e.message);
+  }
+};
+
+/* ───────────── COD payment (Razorpay Dynamic QR / cash) ───────────── */
+
+const codPaymentError = (res, e) =>
+  handleResponse(res, e.statusCode || 500, e.message, {
+    error: { code: e.code || "COD_PAYMENT_FAILED", message: e.message },
+  });
+
+export const getCodPayment = async (req, res) => {
+  try {
+    const result = await getCodPaymentState({
+      orderId: req.params.orderId,
+      actor: { role: req.user.role, id: req.user.id },
+    });
+    return handleResponse(res, 200, "COD payment status", result);
+  } catch (e) {
+    return codPaymentError(res, e);
+  }
+};
+
+export const createCodPaymentQr = async (req, res) => {
+  try {
+    const result = await createOrReuseQr({
+      orderId: req.params.orderId,
+      deliveryId: req.user.id,
+      regenerate: req.body?.regenerate === true,
+    });
+    return handleResponse(
+      res,
+      result.reused ? 200 : 201,
+      result.completed ? "Payment already received" : result.reused ? "Existing QR returned" : "Payment QR created",
+      result,
+    );
+  } catch (e) {
+    return codPaymentError(res, e);
+  }
+};
+
+export const verifyCodPaymentStatus = async (req, res) => {
+  try {
+    const result = await verifyCodPayment({
+      orderId: req.params.orderId,
+      actor: { role: req.user.role, id: req.user.id },
+    });
+    return handleResponse(res, 200, "COD payment verified", result);
+  } catch (e) {
+    return codPaymentError(res, e);
+  }
+};
+
+export const confirmCodCashPayment = async (req, res) => {
+  try {
+    const result = await confirmCashCollection({
+      orderId: req.params.orderId,
+      deliveryId: req.user.id,
+      amountReceived: req.body?.amountReceived,
+    });
+    return handleResponse(res, 200, "Cash collected. Order delivered successfully", result);
+  } catch (e) {
+    return codPaymentError(res, e);
   }
 };
