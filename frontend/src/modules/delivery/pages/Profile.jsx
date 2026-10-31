@@ -16,6 +16,7 @@ import {
   ChevronUp,
   Star,
   Loader2,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
@@ -114,6 +115,13 @@ const Profile = () => {
       sub: "Bike, License, Insurance",
       color: "text-orange-600 bg-orange-50",
       path: "/delivery/profile/vehicle-info",
+    },
+    {
+      icon: Clock,
+      label: "My Shifts & Cash Settlement",
+      sub: "Start/End shift, Cash deposits, Limits",
+      color: "text-emerald-600 bg-emerald-50",
+      path: "/delivery/profile/shifts",
     },
     {
       icon: Star,

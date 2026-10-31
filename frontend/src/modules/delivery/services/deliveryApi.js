@@ -93,4 +93,11 @@ export const deliveryApi = {
     axiosInstance.post(`/orders/workflow/${orderId}/return-drop-otp/request`, body),
   verifyReturnDropOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/return-drop-otp/verify`, body),
+  // Cash Settlement & Shifts
+  startShift: () => axiosInstance.post("/cash-settlement/shifts/start"),
+  endShift: () => axiosInstance.post("/cash-settlement/shifts/end"),
+  getCurrentShift: () => axiosInstance.get("/cash-settlement/shifts/current"),
+  getCashSettlementOverview: () => axiosInstance.get("/cash-settlement/overview"),
+  submitCashDeposit: (data, config = {}) =>
+    axiosInstance.post("/cash-settlement/deposits", data, config),
 };
