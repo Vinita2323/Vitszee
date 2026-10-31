@@ -17,6 +17,7 @@ import VehicleInfo from "../pages/profile/VehicleInfo";
 import BankAccount from "../pages/profile/BankAccount";
 import Documents from "../pages/profile/Documents";
 import Settings from "../pages/profile/Settings";
+import ShiftsAndSettlement from "../pages/profile/ShiftsAndSettlement";
 // import Withdrawals from "../pages/profile/Withdrawals"; // wallet temporarily disabled
 import Notifications from "../pages/Notifications";
 import ReviewsPage from "../pages/ReviewsPage";
@@ -44,6 +45,8 @@ const DeliveryRoutes = () => {
         <Route path="profile/vehicle-info" element={<VehicleInfo />} />
         <Route path="profile/bank-account" element={<BankAccount />} />
         <Route path="profile/documents" element={<Documents />} />
+        <Route path="profile/shifts" element={<ShiftsAndSettlement />} />
+        <Route path="shifts" element={<Navigate to="/delivery/profile/shifts" replace />} />
         <Route path="profile/safety-privacy" element={<Navigate to="/delivery/profile" replace />} />
         <Route path="profile/settings" element={<Settings />} />
         <Route path="profile/help-support" element={<Navigate to="/delivery/support" replace />} />

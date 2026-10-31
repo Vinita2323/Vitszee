@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, CheckCircle, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import { deliveryApi } from "../services/deliveryApi";
@@ -34,12 +35,14 @@ const formatTime = (seconds) => {
 };
 
 const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, isSellerPickup = false, initialExpiresAt = null, onSuccess, onError, onCancel }) => {
+  const navigate = useNavigate();
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [lastErrorCode, setLastErrorCode] = useState(null);
   const [attemptsRemaining, setAttemptsRemaining] = useState(3);
+  const [isStartingShift, setIsStartingShift] = useState(false);
   
   // Timer state
   const [expiresAtStr, setExpiresAtStr] = useState(initialExpiresAt);
@@ -378,6 +381,24 @@ const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, isSellerPic
     }
   };
 
+  const handleStartShiftQuick = async () => {
+    try {
+      setIsStartingShift(true);
+      const res = await deliveryApi.startShift();
+      toast.success(res.data?.message || "Shift started! Validating delivery OTP...");
+      setError(null);
+      setLastErrorCode(null);
+      // Immediately retry OTP validation
+      await handleSubmit();
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || "Failed to start shift";
+      toast.error(msg);
+      setError(msg);
+    } finally {
+      setIsStartingShift(false);
+    }
+  };
+
   // Check if all 4 digits are entered
   const isComplete = otp.every((digit) => digit !== "");
 
@@ -477,6 +498,46 @@ const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, isSellerPic
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-800 font-medium">{error}</p>
+        </div>
+      )}
+
+      {/* Quick Shift Starter if blocked by SHIFT_REQUIRED */}
+      {(lastErrorCode === "SHIFT_REQUIRED" || (typeof error === "string" && error.includes("Start your shift"))) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                Active Shift Required for COD
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                You must have an active shift to collect cash on delivery. Start your shift right now with 1 tap to proceed!
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              disabled={isStartingShift}
+              onClick={handleStartShiftQuick}
+              className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex-1 shadow-sm flex items-center justify-center gap-1.5 transition"
+            >
+              {isStartingShift ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Starting Shift & Retrying...
+                </>
+              ) : (
+                "⚡ Start Shift Now & Confirm"
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/delivery/profile/shifts")}
+              className="bg-white border border-gray-200 hover:bg-gray-50 active:scale-95 text-gray-700 font-bold text-xs py-2.5 px-3 rounded-xl transition"
+            >
+              Shifts & Limits
+            </button>
+          </div>
         </div>
       )}
 

@@ -10,6 +10,8 @@ import {
   IndianRupee,
   AlertCircle,
   LocateFixed,
+  Clock,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -276,6 +278,30 @@ const Dashboard = () => {
       {/* Main Content Area overlapping with rounded corners */}
       <div className="bg-white rounded-t-[32px] -mt-5 pt-4 px-4 space-y-3 relative z-10">
         
+        {/* Duty & Cash Shift Banner */}
+        <div
+          onClick={() => navigate("/delivery/profile/shifts")}
+          className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-100/80 rounded-2xl p-3 flex items-center justify-between shadow-xs cursor-pointer active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#0057B7] text-white flex items-center justify-center shadow-xs">
+              <Clock size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-900">Duty & Cash Shift</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-[#0057B7]">
+                  COD Enabled
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-500 font-medium">
+                Tap to manage duty shift, cash in hand & deposits
+              </p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-gray-400 shrink-0" />
+        </div>
+
         {/* Today's Overview Section */}
         <div>
           <h3 className="text-[13px] font-bold text-gray-800 mb-2">Today's Overview</h3>
