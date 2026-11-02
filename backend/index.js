@@ -13,7 +13,7 @@ import { initSocket, getIO } from "./app/socket/socketManager.js";
 import { registerOrderSocketGetter } from "./app/services/orderSocketEmitter.js";
 import { registerTicketSocketGetter } from "./app/services/ticketSocketEmitter.js";
 import {
-  globalApiRateLimiter,
+  apiRateLimiter,
 } from "./app/middleware/securityMiddlewares.js";
 import { structuredRequestLogger, correlationIdMiddleware } from "./app/middleware/requestLogger.js";
 import { trackInFlightRequests } from "./app/middleware/metricsMiddleware.js";
@@ -174,7 +174,7 @@ function createApp() {
   }));
   app.use(helmet());
   app.use(cors(corsOptions));
-  app.use(globalApiRateLimiter);
+  app.use(apiRateLimiter);
 
   // Payment webhooks need the original request bytes for signature checks.
   // This must run before express.json(), which would replace the body with an object.

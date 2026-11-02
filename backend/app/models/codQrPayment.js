@@ -26,6 +26,25 @@ const duplicatePaymentSchema = new mongoose.Schema(
  * A new row is created per attempt (retry / regenerate after expiry) so the
  * full payment history of an order is preserved.
  */
+const qrRefundSchema = new mongoose.Schema(
+  {
+    refundId: { type: String, required: true },
+    gatewayPaymentId: { type: String, default: null },
+    amount: { type: Number, required: true, min: 0 }, // paise
+    currency: { type: String, default: "INR" },
+    status: { type: String, enum: ["pending", "processed", "failed"], required: true },
+    speed: { type: String, default: null },
+    notes: { type: mongoose.Schema.Types.Mixed, default: null },
+    createdAtGateway: { type: Date, default: null },
+    processedAt: { type: Date, default: null },
+    failedAt: { type: Date, default: null },
+    failureAlertedAt: { type: Date, default: null },
+    lastEvent: { type: String, default: null },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const codQrPaymentSchema = new mongoose.Schema(
   {
     order: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true, index: true },
@@ -66,6 +85,10 @@ const codQrPaymentSchema = new mongoose.Schema(
     /** Money received that must be reviewed / refunded by finance. */
     reviewRequired: { type: Boolean, default: false },
     duplicatePayments: { type: [duplicatePaymentSchema], default: [] },
+
+    refundState: { type: String, enum: ["NONE", "PARTIAL", "FULL"], default: "NONE" },
+    refundedAmount: { type: Number, default: 0 }, // paise
+    refunds: { type: [qrRefundSchema], default: [] },
 
     webhookEventIds: { type: [String], default: [] },
     auditLog: { type: [auditEntrySchema], default: [] },

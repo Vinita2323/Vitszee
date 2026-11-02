@@ -33,6 +33,32 @@ export const globalApiRateLimiter = createRateLimiter({
   message: "Too many requests from this IP. Please retry shortly.",
 });
 
+/**
+ * Payment-gateway webhooks come from a handful of gateway IPs and may arrive
+ * in bursts (every payment fires several events). They are protected by their
+ * HMAC signature, so they get their own, much higher per-IP ceiling instead of
+ * sharing the 240/min bucket meant for browsers. Still bounded, so an
+ * unauthenticated flood cannot burn CPU on signature checks.
+ */
+export const WEBHOOK_PATHS = [
+  "/api/payments/webhook/phonepe",
+  "/api/payments/webhook/razorpay",
+];
+
+export const webhookRateLimiter = createRateLimiter({
+  namespace: "webhook",
+  windowMs: parseInt(process.env.WEBHOOK_RATE_LIMIT_WINDOW_MS || "60000", 10),
+  max: parseInt(process.env.WEBHOOK_RATE_LIMIT_MAX || "1200", 10),
+  keyGenerator: byIp,
+  message: "Too many webhook requests.",
+});
+
+/** Global API limiter, except gateway webhooks which use webhookRateLimiter. */
+export const apiRateLimiter = (req, res, next) =>
+  WEBHOOK_PATHS.includes(req.path)
+    ? webhookRateLimiter(req, res, next)
+    : globalApiRateLimiter(req, res, next);
+
 export const authRouteRateLimiter = createRateLimiter({
   namespace: "auth",
   windowMs: AUTH_RATE_LIMIT_WINDOW_MS(),

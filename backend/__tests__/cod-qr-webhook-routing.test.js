@@ -11,6 +11,7 @@ const sign = (body) => crypto.createHmac("sha256", SECRET).update(body).digest("
 
 const mockProcessQr = jest.fn(async () => ({ handled: true, completed: true }));
 const mockWebhookEventCreate = jest.fn(async () => ({}));
+const mockWebhookEventFindOneAndUpdate = jest.fn(async () => ({ attempts: 1, eventType: "qr_code.credited" }));
 const mockPaymentFindOne = jest.fn(async () => null);
 
 jest.unstable_mockModule("../app/services/codQrPaymentService.js", () => ({
@@ -22,7 +23,12 @@ jest.unstable_mockModule("../app/models/payment.js", () => ({
   default: { findOne: mockPaymentFindOne },
 }));
 jest.unstable_mockModule("../app/models/paymentWebhookEvent.js", () => ({
-  default: { create: mockWebhookEventCreate, updateOne: jest.fn() },
+  default: {
+    create: mockWebhookEventCreate,
+    updateOne: jest.fn(),
+    findOneAndUpdate: mockWebhookEventFindOneAndUpdate,
+    findOne: jest.fn(async () => null),
+  },
 }));
 jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () => ({
   handleOnlineOrderFinance: jest.fn(),
@@ -85,16 +91,23 @@ describe("Razorpay QR webhook entry point", () => {
       payload: expect.objectContaining({ qr_code: { entity: { id: "qr_1" } } }),
       eventId: "evt_123",
     });
-    // QR events must not consume the one-shot payment-link dedupe record,
-    // otherwise a failed attempt could never be retried by Razorpay.
-    expect(mockWebhookEventCreate).not.toHaveBeenCalled();
+    // QR events go through the reliable event ledger: claimed as PROCESSING,
+    // so a redelivery of a *failed* run is reprocessed (see the reliability suite).
+    expect(mockWebhookEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: "evt_123", status: "PROCESSING" }),
+    );
   });
 
-  it("propagates processing errors so Razorpay retries the delivery", async () => {
+  it("propagates processing errors so Razorpay retries, and marks the event FAILED so the retry is reprocessed", async () => {
     mockProcessQr.mockRejectedValueOnce(new Error("db down"));
     await expect(
       processWebhook({ rawBody: qrBody, authorization: sign(qrBody.toString("utf8")) }),
     ).rejects.toThrow("db down");
+    expect(mockWebhookEventFindOneAndUpdate).toHaveBeenCalledWith(
+      { eventId: expect.any(String) },
+      { $set: expect.objectContaining({ status: "FAILED" }) },
+      { new: true },
+    );
   });
 
   it("leaves existing payment-link events on the original path", async () => {

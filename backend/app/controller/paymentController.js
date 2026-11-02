@@ -189,35 +189,3 @@ export const getPaymentStatus = async (req, res) => {
         return handleResponse(res, error.statusCode || 500, error.message);
       }
 };
-export const handleRazorpayMockBypass = async (req, res) => {
-  try {
-    const { merchantOrderId, redirect } = req.query;
-    if (!merchantOrderId) return res.status(400).send('Missing merchantOrderId');
-
-    const mockPayload = {
-      event: 'payment_link.paid',
-      payload: {
-        payment_link: {
-          entity: {
-            reference_id: merchantOrderId,
-            status: 'paid',
-            id: 'plink_mock_' + Date.now(),
-          }
-        }
-      }
-    };
-
-    req.headers['x-razorpay-signature'] = 'MOCK_SIGNATURE';
-    req.body = Buffer.from(JSON.stringify(mockPayload));
-    
-    await processWebhook('razorpay', {
-      rawBody: req.body,
-      authorization: 'MOCK_SIGNATURE',
-    });
-
-    return res.redirect(redirect);
-  } catch (error) {
-    logger.error('Razorpay mock bypass failed', { error: error.message });
-    return res.status(500).send('Mock bypass failed');
-  }
-};

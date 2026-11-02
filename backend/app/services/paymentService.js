@@ -4,12 +4,14 @@ import mongoose from "mongoose";
 import Order from "../models/order.js";
 import CheckoutGroup from "../models/checkoutGroup.js";
 import Payment from "../models/payment.js";
-import PaymentWebhookEvent from "../models/paymentWebhookEvent.js";
 import { ORDER_PAYMENT_STATUS } from "../constants/finance.js";
 import {
   PAYMENT_EVENT_SOURCE,
   PAYMENT_STATUS,
-  canTransitionPaymentStatus,
+  PAYMENT_GATEWAY,
+  RECONCILIATION_REASON,
+  WEBHOOK_KIND,
+  WEBHOOK_EVENT_STATUS,
 } from "../constants/payment.js";
 import { handleOnlineOrderFinance } from "./finance/orderFinanceService.js";
 import { DEFAULT_SELLER_TIMEOUT_MS, WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
@@ -19,20 +21,10 @@ import { emitNotificationEvent } from "../modules/notifications/notification.emi
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import logger from "./logger.js";
 import { getActivePaymentProvider } from "./payment/providerRegistry.js";
+import { alertAdmins } from "./paymentAlerts.js";
+import { claimWebhookEvent, completeWebhookEvent, failWebhookEvent } from "./paymentWebhookEvents.js";
 
 const MAX_MERCHANT_ORDER_ID_LENGTH = 63;
-
-function sanitizeGatewayPayload(payload = {}) {
-  return {
-    merchantOrderId: payload.merchantOrderId,
-    transactionId: payload.transactionId,
-    amount: payload.amount,
-    state: payload.state,
-    responseCode: payload.responseCode,
-    paymentMode: payload.paymentMode,
-    meta: payload.meta || {},
-  };
-}
 
 function sanitizeMerchantOrderIdPart(value) {
   return String(value || "")
@@ -214,59 +206,48 @@ function paymentStatusToOrderPaymentStatus(status) {
   return ORDER_PAYMENT_STATUS.CREATED;
 }
 
-async function transitionPaymentState(payment, {
-  nextStatus,
+/**
+ * Atomically moves a payment to `nextStatus` only if it is currently in one
+ * of `allowedFrom`. Returns the updated payment, or null when another worker
+ * (or an earlier event) already moved it — callers treat null as "nothing to do".
+ */
+export async function claimStatusTransition(payment, nextStatus, {
+  allowedFrom,
   source,
   reason = "",
   gatewayPaymentId = null,
-  rawGatewayResponse = null,
+  eventName = null,
 }) {
-  const currentStatus = payment.status || PAYMENT_STATUS.CREATED;
-  if (currentStatus === nextStatus) {
-    if (gatewayPaymentId && !payment.gatewayPaymentId) {
-      payment.gatewayPaymentId = gatewayPaymentId;
-    }
-    if (rawGatewayResponse) {
-      payment.rawGatewayResponse = {
-        ...(payment.rawGatewayResponse || {}),
-        ...sanitizeGatewayPayload(rawGatewayResponse),
-      };
-    }
-    await payment.save();
-    return payment;
+  const now = new Date();
+  const set = { status: nextStatus };
+  if (gatewayPaymentId) set.gatewayPaymentId = gatewayPaymentId;
+  if (eventName) {
+    set["rawGatewayResponse.lastEvent"] = eventName;
+    set["rawGatewayResponse.lastEventAt"] = now;
   }
+  if (nextStatus === PAYMENT_STATUS.CAPTURED) set.capturedAt = now;
+  if (nextStatus === PAYMENT_STATUS.FAILED) {
+    set.failedAt = now;
+    set.failureReason = reason || null;
+  }
+  if (nextStatus === PAYMENT_STATUS.REFUNDED) set.refundedAt = now;
 
-  if (!canTransitionPaymentStatus(currentStatus, nextStatus)) {
-    const err = new Error(`Invalid payment transition ${currentStatus} -> ${nextStatus}`);
-    err.statusCode = 409;
-    throw err;
-  }
-
-  payment.status = nextStatus;
-  if (gatewayPaymentId) payment.gatewayPaymentId = gatewayPaymentId;
-  if (rawGatewayResponse) {
-    payment.rawGatewayResponse = {
-      ...(payment.rawGatewayResponse || {}),
-      ...sanitizeGatewayPayload(rawGatewayResponse),
-    };
-  }
-  payment.statusHistory.push({
-    fromStatus: currentStatus,
-    toStatus: nextStatus,
-    source,
-    reason,
-    changedAt: new Date(),
-  });
-  if (nextStatus === PAYMENT_STATUS.CAPTURED) {
-    payment.capturedAt = new Date();
-  } else if (nextStatus === PAYMENT_STATUS.FAILED) {
-    payment.failedAt = new Date();
-    payment.failureReason = reason || payment.failureReason;
-  } else if (nextStatus === PAYMENT_STATUS.REFUNDED) {
-    payment.refundedAt = new Date();
-  }
-  await payment.save();
-  return payment;
+  return Payment.findOneAndUpdate(
+    { _id: payment._id, status: { $in: allowedFrom } },
+    {
+      $set: set,
+      $push: {
+        statusHistory: {
+          fromStatus: payment.status || PAYMENT_STATUS.CREATED,
+          toStatus: nextStatus,
+          source,
+          reason,
+          changedAt: now,
+        },
+      },
+    },
+    { new: true },
+  );
 }
 
 async function moveOrderToSellerPendingAfterPayment(orderId) {
@@ -321,7 +302,7 @@ async function moveOrderToDeliverySearchAfterPayment(orderId) {
   }
 }
 
-async function getRelatedOrdersForPayment(payment) {
+export async function getRelatedOrdersForPayment(payment) {
   if (Array.isArray(payment.orderIds) && payment.orderIds.length > 0) {
     return Order.find({ _id: { $in: payment.orderIds } })
       .sort({ checkoutGroupIndex: 1, createdAt: 1 });
@@ -379,11 +360,91 @@ async function updateCheckoutGroupPaymentStatus(checkoutGroupId, nextStatus) {
   }
 }
 
-async function handleOrderSideEffectsFromPaymentStatus(payment, nextStatus, reason) {
-  const orders = await getRelatedOrdersForPayment(payment);
-  if (!orders.length) return;
+const isOrderCancelled = (order) =>
+  order.status === "cancelled" ||
+  order.orderStatus === "cancelled" ||
+  order.workflowStatus === WORKFLOW_STATUS.CANCELLED;
 
-  if (nextStatus === PAYMENT_STATUS.CAPTURED) {
+const CAPTURE_FROM = [
+  PAYMENT_STATUS.CREATED,
+  PAYMENT_STATUS.PENDING,
+  PAYMENT_STATUS.AUTHORIZED,
+  PAYMENT_STATUS.FAILED,
+  PAYMENT_STATUS.CANCELLED,
+];
+const CANCEL_FROM = [
+  PAYMENT_STATUS.CREATED,
+  PAYMENT_STATUS.PENDING,
+  PAYMENT_STATUS.AUTHORIZED,
+  PAYMENT_STATUS.FAILED,
+];
+const CAPTURE_LOCK_MS = 2 * 60 * 1000;
+
+/**
+ * Records that this payment needs a human (late capture after cancel,
+ * duplicate payment, amount mismatch...). Each (reason, key) is stored and
+ * alerted exactly once, however many times the triggering event is redelivered.
+ */
+export async function flagReconciliation(payment, reason, details = {}, keyPart = "") {
+  const key = `${reason}:${keyPart || details.gatewayPaymentId || ""}`;
+  const flagged = await Payment.findOneAndUpdate(
+    { _id: payment._id, reconciliationKeys: { $ne: key } },
+    {
+      $set: { "reconciliation.required": true },
+      $push: {
+        reconciliationKeys: key,
+        "reconciliation.items": { reason, details, flaggedAt: new Date() },
+      },
+    },
+    { new: true },
+  );
+  if (!flagged) return false; // already flagged and alerted
+  logger.error("payment_needs_reconciliation", {
+    scope: "paymentService.reconciliation",
+    reason,
+    publicOrderId: payment.publicOrderId,
+    paymentId: String(payment._id),
+    ...details,
+  });
+  alertAdmins({
+    title: "Payment needs reconciliation",
+    message: `${reason} for ${payment.publicOrderId}. ${describeReconciliation(reason, payment, details)}`,
+    token: `payment-recon:${payment._id}:${key}`,
+  });
+  return true;
+}
+
+function describeReconciliation(reason, payment, d) {
+  const amount = d.amountPaise != null ? `₹${(d.amountPaise / 100).toFixed(2)}` : `₹${(payment.amount / 100).toFixed(2)}`;
+  switch (reason) {
+    case RECONCILIATION_REASON.LATE_CAPTURE_AFTER_CANCEL:
+      return `${amount} was captured after the order was cancelled. Refund or reinstate it.`;
+    case RECONCILIATION_REASON.DUPLICATE_PAYMENT:
+      return `A second payment (${d.gatewayPaymentId || "unknown"}) of ${amount} was captured. Refund the duplicate.`;
+    case RECONCILIATION_REASON.AMOUNT_MISMATCH:
+      return `Expected ₹${(payment.amount / 100).toFixed(2)} but the gateway reported ${amount}.`;
+    default:
+      return JSON.stringify(d).slice(0, 180);
+  }
+}
+
+/** Stops a payment from being applied twice: one worker at a time, exactly once. */
+async function acquireCaptureLock(paymentId) {
+  return Payment.findOneAndUpdate(
+    {
+      _id: paymentId,
+      captureProcessedAt: null,
+      $or: [{ captureLockedAt: null }, { captureLockedAt: { $lt: new Date(Date.now() - CAPTURE_LOCK_MS) } }],
+    },
+    { $set: { captureLockedAt: new Date() } },
+    { new: true },
+  );
+}
+
+async function runCaptureSideEffects(payment, orders) {
+  const locked = await acquireCaptureLock(payment._id);
+  if (!locked) return { ran: false };
+  try {
     for (const order of orders) {
       await handleOnlineOrderFinance(order._id, {
         actorId: null,
@@ -402,93 +463,230 @@ async function handleOrderSideEffectsFromPaymentStatus(payment, nextStatus, reas
         userId: order.customer,
         sellerId: order.seller,
       });
-
       emitNotificationEvent(NOTIFICATION_EVENTS.NEW_ORDER, {
         orderId: order.orderId,
         sellerId: order.seller,
       });
     }
-    await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, nextStatus);
-    return;
-  }
-
-  if (nextStatus === PAYMENT_STATUS.FAILED || nextStatus === PAYMENT_STATUS.CANCELLED) {
-    const session = await mongoose.startSession();
-    try {
-      session.startTransaction();
-      for (const order of orders) {
-        const orderForUpdate = await Order.findById(order._id, null, { session });
-        if (
-          orderForUpdate &&
-          orderForUpdate.workflowStatus === WORKFLOW_STATUS.CREATED &&
-          orderForUpdate.status !== "cancelled"
-        ) {
-          await releaseReservedStockForOrder(orderForUpdate, {
-            session,
-            reason: reason || "Payment failed",
-          });
-          orderForUpdate.status = "cancelled";
-          orderForUpdate.orderStatus = "cancelled";
-          orderForUpdate.workflowStatus = WORKFLOW_STATUS.CANCELLED;
-          orderForUpdate.cancelledBy = "system";
-          orderForUpdate.cancelReason = reason || "Payment failed";
-          orderForUpdate.paymentStatus = ORDER_PAYMENT_STATUS.FAILED;
-          await orderForUpdate.save({ session });
-        }
-      }
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    if (orders.length === (await getRelatedOrdersForPayment(payment)).length) {
+      await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, PAYMENT_STATUS.CAPTURED);
     }
-    await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, nextStatus);
-    for (const order of orders) {
-      emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
-        orderId: order.orderId,
-        checkoutGroupId: payment.checkoutGroupId,
-        customerId: order.customer,
-        userId: order.customer,
-        sellerId: order.seller,
-        customerMessage: "Order was cancelled because payment failed.",
-        sellerMessage: `Order #${order.orderId} was cancelled because payment failed.`,
-      });
-    }
-    return;
-  }
-
-  if (nextStatus === PAYMENT_STATUS.REFUNDED) {
-    await Order.updateMany(
-      { _id: { $in: orders.map((order) => order._id) } },
-      {
-        $set: {
-          paymentStatus: ORDER_PAYMENT_STATUS.REFUNDED,
-          "payment.status": "refunded",
-        },
-      },
+    await Payment.updateOne(
+      { _id: payment._id },
+      { $set: { captureProcessedAt: new Date(), captureLockedAt: null } },
     );
-    await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, nextStatus);
-    for (const order of orders) {
-      emitNotificationEvent(NOTIFICATION_EVENTS.REFUND_COMPLETED, {
-        orderId: order.orderId,
-        checkoutGroupId: payment.checkoutGroupId,
-        customerId: order.customer,
-        userId: order.customer,
-        sellerId: order.seller,
+    return { ran: true };
+  } catch (error) {
+    await Payment.updateOne({ _id: payment._id }, { $set: { captureLockedAt: null } });
+    throw error;
+  }
+}
+
+/**
+ * Money was captured for this payment. Safe to call any number of times and
+ * from any signal (payment.captured, order.paid, payment_link.paid, client
+ * verify): the first caller moves the state, exactly one worker applies the
+ * order side effects, everyone else is a no-op.
+ */
+async function handleCaptured(payment, ev) {
+  // 1. Verify what was actually paid (webhook amount/currency vs what we asked for).
+  if (ev.amountPaise != null && ev.amountPaise !== payment.amount) {
+    await flagReconciliation(payment, RECONCILIATION_REASON.AMOUNT_MISMATCH, {
+      gatewayPaymentId: ev.gatewayPaymentId, amountPaise: ev.amountPaise, expectedPaise: payment.amount,
+    });
+    return { outcome: "AMOUNT_MISMATCH", payment };
+  }
+  if (ev.currency && payment.currency && ev.currency.toUpperCase() !== payment.currency.toUpperCase()) {
+    await flagReconciliation(payment, RECONCILIATION_REASON.AMOUNT_MISMATCH, {
+      gatewayPaymentId: ev.gatewayPaymentId, currency: ev.currency, expectedCurrency: payment.currency,
+    }, `currency:${ev.currency}`);
+    return { outcome: "CURRENCY_MISMATCH", payment };
+  }
+  if (payment.status === PAYMENT_STATUS.REFUNDED) return { outcome: "ALREADY_REFUNDED", payment };
+
+  // Only a real Razorpay payment id (pay_...) identifies the payment; older rows
+  // may hold the payment-link id here, which must not be mistaken for a payment.
+  const realPaymentId = ev.gatewayPaymentId && /^pay_/.test(ev.gatewayPaymentId) ? ev.gatewayPaymentId : null;
+  const knownPaymentId = payment.gatewayPaymentId && /^pay_/.test(payment.gatewayPaymentId) ? payment.gatewayPaymentId : null;
+
+  // 2. Already captured: either the same payment signalled again, or a second payment.
+  if (payment.status === PAYMENT_STATUS.CAPTURED) {
+    if (knownPaymentId && realPaymentId && knownPaymentId !== realPaymentId) {
+      await flagReconciliation(payment, RECONCILIATION_REASON.DUPLICATE_PAYMENT, {
+        gatewayPaymentId: realPaymentId, firstPaymentId: knownPaymentId, amountPaise: ev.amountPaise ?? payment.amount,
       });
+      return { outcome: "DUPLICATE_PAYMENT", payment };
     }
-    return;
+    if (!knownPaymentId && realPaymentId) {
+      await Payment.updateOne({ _id: payment._id, gatewayPaymentId: payment.gatewayPaymentId }, { $set: { gatewayPaymentId: realPaymentId } });
+    }
+    return finishCapture(await Payment.findById(payment._id), ev, { alreadyCaptured: true });
   }
 
+  // 3. First capture: claim the state change atomically.
+  const claimed = await claimStatusTransition(payment, PAYMENT_STATUS.CAPTURED, {
+    allowedFrom: CAPTURE_FROM,
+    source: ev.source,
+    reason: ev.reason || "Payment captured",
+    gatewayPaymentId: realPaymentId || (ev.gatewayPaymentId && !payment.gatewayPaymentId ? ev.gatewayPaymentId : null),
+    eventName: ev.eventName,
+  });
+  if (!claimed) {
+    // Lost the race — another event captured it first. Re-evaluate as "already captured".
+    return handleCaptured(await Payment.findById(payment._id), ev);
+  }
+  return finishCapture(claimed, ev, { alreadyCaptured: false });
+}
+
+async function finishCapture(payment, ev, { alreadyCaptured }) {
+  if (payment.captureProcessedAt) return { outcome: "ALREADY_PROCESSED", payment };
+  const orders = await getRelatedOrdersForPayment(payment);
+  const live = orders.filter((o) => !isOrderCancelled(o));
+  const dead = orders.filter(isOrderCancelled);
+
+  if (dead.length) {
+    // Never silently ignore a successful payment: the order is gone but the money is here.
+    await flagReconciliation(payment, RECONCILIATION_REASON.LATE_CAPTURE_AFTER_CANCEL, {
+      gatewayPaymentId: ev.gatewayPaymentId || payment.gatewayPaymentId,
+      amountPaise: payment.amount,
+      cancelledOrderIds: dead.map((o) => o.orderId),
+      allCancelled: live.length === 0,
+    }, payment.gatewayPaymentId || ev.gatewayPaymentId || "");
+  }
+  if (!live.length) {
+    await Payment.updateOne({ _id: payment._id }, { $set: { captureProcessedAt: new Date() } });
+    return { outcome: "CAPTURED_ORDER_CANCELLED", payment: await Payment.findById(payment._id) };
+  }
+  const result = await runCaptureSideEffects(payment, live);
+  return {
+    outcome: result.ran ? (alreadyCaptured ? "RECOVERED_SIDE_EFFECTS" : "CAPTURED") : "IN_PROGRESS",
+    payment: await Payment.findById(payment._id),
+  };
+}
+
+/**
+ * One failed attempt on a payment link. The link stays valid and the customer
+ * may retry, so the payment stays PENDING and the order is NOT cancelled.
+ */
+async function handleAttemptFailed(payment, ev) {
+  if ([PAYMENT_STATUS.CAPTURED, PAYMENT_STATUS.REFUNDED].includes(payment.status)) {
+    return { outcome: "IGNORED_AFTER_CAPTURE", payment };
+  }
+  const attemptId = ev.gatewayPaymentId || `attempt:${ev.eventId}`;
+  const recorded = await Payment.findOneAndUpdate(
+    { _id: payment._id, "failedAttempts.paymentId": { $ne: attemptId } },
+    {
+      $push: { failedAttempts: { paymentId: attemptId, reason: ev.failureReason || null, at: new Date() } },
+      $set: { failureReason: ev.failureReason || payment.failureReason || null, "rawGatewayResponse.lastEvent": ev.eventName },
+    },
+    { new: true },
+  );
+  if (recorded) {
+    const orders = await getRelatedOrdersForPayment(payment);
+    for (const order of orders) {
+      emitNotificationEvent(NOTIFICATION_EVENTS.CUSTOMER_PAYMENT_FAILED, {
+        orderId: order.orderId,
+        customerId: order.customer,
+        userId: order.customer,
+        customerMessage: "Your payment attempt failed. You can retry using the same payment link.",
+      });
+    }
+  }
+  return { outcome: recorded ? "ATTEMPT_RECORDED" : "ATTEMPT_ALREADY_RECORDED", payment: recorded || payment };
+}
+
+/**
+ * The payment link expired or was cancelled with no successful payment.
+ * Only now are unpaid orders cancelled and their stock released — and only
+ * orders that are still waiting for payment (state-checked).
+ */
+async function handleLinkClosed(payment, ev) {
+  if ([PAYMENT_STATUS.CAPTURED, PAYMENT_STATUS.REFUNDED].includes(payment.status)) {
+    return { outcome: "IGNORED_AFTER_CAPTURE", payment }; // out-of-order event
+  }
+  const reason = ev.reason || "Payment link closed";
+  let current = payment;
+  if (payment.status !== PAYMENT_STATUS.CANCELLED) {
+    const claimed = await claimStatusTransition(payment, PAYMENT_STATUS.CANCELLED, {
+      allowedFrom: CANCEL_FROM,
+      source: ev.source,
+      reason,
+      eventName: ev.eventName,
+    });
+    if (!claimed) return { outcome: "IGNORED_RACE", payment: await Payment.findById(payment._id) };
+    current = claimed;
+  }
+  // Idempotent: orders already cancelled are skipped, so retries are safe.
+  const cancelled = await cancelUnpaidOrders(current, reason);
+  return { outcome: cancelled ? "CANCELLED" : "CANCELLED_NO_ORDER_CHANGE", payment: current };
+}
+
+async function cancelUnpaidOrders(payment, reason) {
+  const orders = await getRelatedOrdersForPayment(payment);
+  if (!orders.length) return 0;
+  const cancelledNow = [];
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    for (const order of orders) {
+      const orderForUpdate = await Order.findById(order._id, null, { session });
+      if (
+        orderForUpdate &&
+        orderForUpdate.workflowStatus === WORKFLOW_STATUS.CREATED &&
+        orderForUpdate.status !== "cancelled" &&
+        orderForUpdate.paymentStatus !== ORDER_PAYMENT_STATUS.PAID
+      ) {
+        await releaseReservedStockForOrder(orderForUpdate, { session, reason });
+        orderForUpdate.status = "cancelled";
+        orderForUpdate.orderStatus = "cancelled";
+        orderForUpdate.workflowStatus = WORKFLOW_STATUS.CANCELLED;
+        orderForUpdate.cancelledBy = "system";
+        orderForUpdate.cancelReason = reason;
+        orderForUpdate.paymentStatus = ORDER_PAYMENT_STATUS.FAILED;
+        await orderForUpdate.save({ session });
+        cancelledNow.push(orderForUpdate);
+      }
+    }
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+  await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, PAYMENT_STATUS.CANCELLED);
+  for (const order of cancelledNow) {
+    emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
+      orderId: order.orderId,
+      checkoutGroupId: payment.checkoutGroupId,
+      customerId: order.customer,
+      userId: order.customer,
+      sellerId: order.seller,
+      customerMessage: "Order was cancelled because payment was not completed.",
+      sellerMessage: `Order #${order.orderId} was cancelled because payment was not completed.`,
+    });
+  }
+  return cancelledNow.length;
+}
+
+/** Full refund of the payment: mirror it on the related orders and checkout group. */
+export async function applyFullRefundEffects(payment) {
+  const orders = await getRelatedOrdersForPayment(payment);
+  if (!orders.length) return;
   await Order.updateMany(
     { _id: { $in: orders.map((order) => order._id) } },
-    {
-      $set: {
-        paymentStatus: paymentStatusToOrderPaymentStatus(nextStatus),
-      },
-    },
+    { $set: { paymentStatus: ORDER_PAYMENT_STATUS.REFUNDED, "payment.status": "refunded" } },
   );
+  await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, PAYMENT_STATUS.REFUNDED);
+  for (const order of orders) {
+    emitNotificationEvent(NOTIFICATION_EVENTS.REFUND_COMPLETED, {
+      orderId: order.orderId,
+      checkoutGroupId: payment.checkoutGroupId,
+      customerId: order.customer,
+      userId: order.customer,
+      sellerId: order.seller,
+    });
+  }
 }
 
 export async function createPaymentOrderForOrderRef({
@@ -560,6 +758,7 @@ export async function createPaymentOrderForOrderRef({
     customer: primaryOrder.customer,
     gatewayName: provider.providerName,
     gatewayOrderId: merchantOrderId,
+    gatewayLinkId: initResult.gatewayResponse?.id || null,
     amount: amountPaise,
     currency,
     status: PAYMENT_STATUS.PENDING,
@@ -569,6 +768,7 @@ export async function createPaymentOrderForOrderRef({
     rawGatewayResponse: {
       redirectUrl: initResult.redirectUrl,
       merchantOrderId: merchantOrderId,
+      linkId: initResult.gatewayResponse?.id || null,
       amount: amountPaise,
     },
     statusHistory: [
@@ -618,35 +818,164 @@ export async function verifyPaymentStatus({
   const provider = getActivePaymentProvider();
   const statusResp = await provider.getPaymentStatus({ merchantOrderId });
   const nextStatus = provider.mapStatusToInternal(statusResp.state);
+  const reason = `${provider.providerName} status check: ${statusResp.state}`;
 
-  await transitionPaymentState(payment, {
-    nextStatus,
+  if (statusResp.linkId && !payment.gatewayLinkId) {
+    await Payment.updateOne({ _id: payment._id, gatewayLinkId: null }, { $set: { gatewayLinkId: statusResp.linkId } });
+  }
+
+  const ev = {
     source: PAYMENT_EVENT_SOURCE.CLIENT_VERIFY,
-    reason: `${provider.providerName} status check: ${statusResp.state}`,
-    gatewayPaymentId: statusResp.transactionId,
-    rawGatewayResponse: statusResp.gatewayResponse,
-  });
+    reason,
+    eventName: "client_verify",
+    gatewayPaymentId: statusResp.paymentId || null,
+    amountPaise: statusResp.amountPaidPaise ?? null,
+    currency: statusResp.currency || null,
+  };
+  if (nextStatus === PAYMENT_STATUS.CAPTURED) {
+    // A payment link only reports "paid" once it is fully paid, so it is safe to capture.
+    await handleCaptured(payment, {
+      ...ev,
+      gatewayPaymentId: statusResp.paymentId || (statusResp.transactionId && /^pay_/.test(statusResp.transactionId) ? statusResp.transactionId : null),
+    });
+  } else if (nextStatus === PAYMENT_STATUS.CANCELLED || nextStatus === PAYMENT_STATUS.FAILED) {
+    await handleLinkClosed(payment, ev);
+  }
 
-  await handleOrderSideEffectsFromPaymentStatus(
-    payment,
-    nextStatus,
-    statusResp.responseCode || statusResp.state,
-  );
-
-  payment.correlationId = correlationId || payment.correlationId;
-  await payment.save();
-
+  const fresh = (await Payment.findById(payment._id)) || payment;
+  if (correlationId && !fresh.correlationId) {
+    await Payment.updateOne({ _id: fresh._id }, { $set: { correlationId } });
+  }
   logger.info("payment_status_verified", {
     correlationId,
     merchantOrderId,
-    status: nextStatus,
+    status: fresh.status,
     provider: provider.providerName,
   });
 
-  return {
-    payment,
-    status: nextStatus,
+  return { payment: fresh, status: fresh.status === PAYMENT_STATUS.PENDING ? nextStatus : fresh.status };
+}
+
+/* ───────────────────────── webhook processing ───────────────────────── */
+
+/** Find our Payment for a gateway event using every reference we store. */
+async function findPaymentForEvent(decoded) {
+  const tries = [
+    decoded.merchantOrderId && { gatewayOrderId: decoded.merchantOrderId },
+    decoded.linkId && { gatewayLinkId: decoded.linkId },
+    decoded.razorpayOrderId && { gatewayRazorpayOrderId: decoded.razorpayOrderId },
+    decoded.paymentId && { gatewayPaymentId: decoded.paymentId },
+  ].filter(Boolean);
+  for (const query of tries) {
+    const payment = await Payment.findOne(query);
+    if (payment) return payment;
+  }
+  return null;
+}
+
+/** Remember gateway ids so later events that carry only one of them still match. */
+async function backfillGatewayIds(payment, decoded) {
+  const set = {};
+  if (decoded.linkId && !payment.gatewayLinkId) set.gatewayLinkId = decoded.linkId;
+  if (decoded.razorpayOrderId && !payment.gatewayRazorpayOrderId) set.gatewayRazorpayOrderId = decoded.razorpayOrderId;
+  if (Object.keys(set).length) await Payment.updateOne({ _id: payment._id }, { $set: set });
+}
+
+async function dispatchWebhookEvent({ provider, decoded, eventId, correlationId }) {
+  const isRazorpay = provider.providerName === PAYMENT_GATEWAY.RAZORPAY;
+  const kind = decoded.kind || legacyKind(provider.mapStatusToInternal(decoded.state));
+
+  if (kind === WEBHOOK_KIND.QR) {
+    // Razorpay Dynamic QR (COD at the doorstep) — idempotent per payment id.
+    const { processQrWebhookEvent } = await import("./codQrPaymentService.js");
+    const qr = await processQrWebhookEvent({
+      event: decoded.eventName,
+      payload: decoded.raw?.payload,
+      eventId,
+    });
+    return { eventStatus: qr.handled ? WEBHOOK_EVENT_STATUS.PROCESSED : WEBHOOK_EVENT_STATUS.IGNORED, summary: { qr: true, ...qr } };
+  }
+  if (kind === WEBHOOK_KIND.IGNORED) {
+    return { eventStatus: WEBHOOK_EVENT_STATUS.IGNORED, summary: { ignored: true, reason: `Event ${decoded.eventName || decoded.state} not handled` } };
+  }
+  if (kind === WEBHOOK_KIND.REFUND) {
+    const { processRefundEvent } = await import("./paymentRefundService.js");
+    const refund = await processRefundEvent({ decoded, findPayment: findPaymentForEvent });
+    return {
+      eventStatus: refund.matched ? WEBHOOK_EVENT_STATUS.PROCESSED : WEBHOOK_EVENT_STATUS.UNMATCHED,
+      summary: { refund: true, ...refund },
+      paymentId: refund.paymentDocId,
+      publicOrderId: refund.publicOrderId,
+    };
+  }
+
+  const payment = await findPaymentForEvent(decoded);
+  if (!payment) {
+    // Not ours (e.g. a COD cash-deposit order), unless it carries our references:
+    // then a customer's money arrived with nothing to attach it to — alert, never drop silently.
+    if (kind === WEBHOOK_KIND.CAPTURED && (decoded.hasOurReference || decoded.eventName === "payment_link.paid")) {
+      logger.error("payment_captured_unmatched", {
+        scope: "paymentService.webhook",
+        eventName: decoded.eventName,
+        gatewayPaymentId: decoded.paymentId,
+        linkId: decoded.linkId,
+        merchantOrderId: decoded.merchantOrderId,
+        amountPaise: decoded.amountPaise,
+      });
+      alertAdmins({
+        title: "Payment received but not matched",
+        message: `Razorpay payment ${decoded.paymentId || "?"} (${decoded.amountPaise != null ? `₹${(decoded.amountPaise / 100).toFixed(2)}` : "amount unknown"}) matches no checkout. Reference: ${decoded.merchantOrderId || decoded.linkId || "none"}.`,
+        token: `payment-unmatched:${decoded.paymentId || decoded.linkId || eventId}`,
+      });
+      return {
+        eventStatus: WEBHOOK_EVENT_STATUS.UNMATCHED,
+        summary: { accepted: true, ignored: true, reason: "Payment attempt not found" },
+      };
+    }
+    return {
+      eventStatus: WEBHOOK_EVENT_STATUS.IGNORED,
+      summary: { accepted: true, ignored: true, reason: "Payment attempt not found" },
+    };
+  }
+
+  await backfillGatewayIds(payment, decoded);
+  const ev = {
+    source: PAYMENT_EVENT_SOURCE.WEBHOOK,
+    reason: `${provider.providerName} webhook: ${decoded.eventName || decoded.state}`,
+    eventName: decoded.eventName || decoded.state,
+    eventId,
+    gatewayPaymentId: decoded.paymentId || (isRazorpay ? null : decoded.transactionId) || null,
+    amountPaise: decoded.amountPaise ?? null,
+    currency: decoded.currency || null,
+    failureReason: decoded.failureReason || null,
   };
+
+  let result;
+  if (kind === WEBHOOK_KIND.CAPTURED) result = await handleCaptured(payment, ev);
+  else if (kind === WEBHOOK_KIND.ATTEMPT_FAILED) result = await handleAttemptFailed(payment, ev);
+  else result = await handleLinkClosed(payment, ev); // LINK_CLOSED
+
+  if (correlationId) {
+    await Payment.updateOne({ _id: payment._id, correlationId: null }, { $set: { correlationId } });
+  }
+  return {
+    eventStatus: WEBHOOK_EVENT_STATUS.PROCESSED,
+    paymentId: payment._id,
+    publicOrderId: payment.publicOrderId,
+    summary: {
+      duplicate: false,
+      outcome: result.outcome,
+      paymentStatus: (result.payment || payment).status,
+      publicOrderId: payment.publicOrderId,
+    },
+  };
+}
+
+// Providers without the richer decode (PhonePe) report only a state.
+function legacyKind(internalStatus) {
+  if (internalStatus === PAYMENT_STATUS.CAPTURED) return WEBHOOK_KIND.CAPTURED;
+  if (internalStatus === PAYMENT_STATUS.FAILED || internalStatus === PAYMENT_STATUS.CANCELLED) return WEBHOOK_KIND.LINK_CLOSED;
+  return WEBHOOK_KIND.IGNORED;
 }
 
 export async function processWebhook({
@@ -666,22 +995,6 @@ export async function processWebhook({
 
   const decoded = await provider.decodeWebhookPayload({ rawBody });
 
-  // Razorpay Dynamic QR events (COD payment at the doorstep). The signature
-  // is already verified above. QR processing is idempotent per payment id, so
-  // it deliberately skips the one-shot PaymentWebhookEvent guard: a failed
-  // attempt must stay retryable when Razorpay redelivers the event.
-  const rawEventName = String(decoded.raw?.event || "");
-  if (rawEventName.startsWith("qr_code.")) {
-    const qrEventId = String(webhookEventId || decoded.eventId || "").trim() || null;
-    const { processQrWebhookEvent } = await import("./codQrPaymentService.js");
-    const qrResult = await processQrWebhookEvent({
-      event: rawEventName,
-      payload: decoded.raw?.payload,
-      eventId: qrEventId,
-    });
-    return { accepted: true, qr: true, ...qrResult };
-  }
-
   const eventId = String(webhookEventId || decoded.eventId || "").trim();
   if (!eventId) {
     const err = new Error("Webhook event id is missing");
@@ -692,62 +1005,38 @@ export async function processWebhook({
     .createHash("sha256")
     .update(JSON.stringify(decoded.raw))
     .digest("hex");
-  const eventType = decoded.state || "unknown";
+
+  // Exactly-once processing with retryable failures: an event is only
+  // "done" once it has been fully applied. A failed attempt stays FAILED, so
+  // the gateway's redelivery re-runs it instead of being swallowed.
+  const claim = await claimWebhookEvent({
+    eventId,
+    gatewayName: provider.providerName,
+    eventType: decoded.eventName || decoded.state || "unknown",
+    payloadHash,
+  });
+  if (!claim.claimed) {
+    if (claim.reason === "IN_PROGRESS") {
+      const err = new Error("Webhook event is being processed; retry shortly");
+      err.statusCode = 503;
+      throw err;
+    }
+    return { duplicate: true, accepted: true };
+  }
 
   try {
-    await PaymentWebhookEvent.create({
-      eventId,
-      gatewayName: provider.providerName,
-      eventType,
-      payloadHash,
+    const result = await dispatchWebhookEvent({ provider, decoded, eventId, correlationId });
+    await completeWebhookEvent(eventId, {
+      status: result.eventStatus,
+      payment: result.paymentId || null,
+      publicOrderId: result.publicOrderId || null,
+      note: result.summary?.reason || result.summary?.outcome || null,
     });
+    return { accepted: true, duplicate: false, ...result.summary };
   } catch (error) {
-    if (error?.code === 11000) {
-      return { duplicate: true, accepted: true };
-    }
+    await failWebhookEvent(eventId, error);
     throw error;
   }
-
-  const merchantOrderId = decoded.merchantOrderId;
-  const payment = await Payment.findOne({ gatewayOrderId: merchantOrderId });
-  if (!payment) {
-    return { accepted: true, ignored: true, reason: "Payment attempt not found" };
-  }
-
-  const nextStatus = provider.mapStatusToInternal(decoded.state);
-  await transitionPaymentState(payment, {
-    nextStatus,
-    source: PAYMENT_EVENT_SOURCE.WEBHOOK,
-    reason: `${provider.providerName} webhook: ${decoded.state}`,
-    gatewayPaymentId: decoded.transactionId,
-    rawGatewayResponse: decoded.raw,
-  });
-
-  payment.correlationId = correlationId || payment.correlationId;
-  await payment.save();
-
-  await PaymentWebhookEvent.updateOne(
-    { eventId },
-    {
-      $set: {
-        payment: payment._id,
-        publicOrderId: payment.publicOrderId,
-      },
-    },
-  );
-
-  await handleOrderSideEffectsFromPaymentStatus(
-    payment,
-    nextStatus,
-    decoded.responseCode || decoded.state,
-  );
-
-  return {
-    accepted: true,
-    duplicate: false,
-    paymentStatus: nextStatus,
-    publicOrderId: payment.publicOrderId,
-  };
 }
 
 // Placeholder for generic verifyClientPaymentCallback
