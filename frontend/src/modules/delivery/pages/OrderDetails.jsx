@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/core/context/AuthContext";
 import {
@@ -20,7 +20,7 @@ import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { toast } from "sonner";
 import { deliveryApi } from "../services/deliveryApi";
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import DeliveryTrackingMap from "../components/DeliveryTrackingMap";
 import DeliverySlideButton from "../components/DeliverySlideButton";
 import OtpInput from "../components/OtpInput";
@@ -180,6 +180,7 @@ const OrderDetails = () => {
   const [showSellerOtpInput, setShowSellerOtpInput] = useState(false);
   const [showDropOtpInput, setShowDropOtpInput] = useState(false);
   const [pickupProofSubmitted, setPickupProofSubmitted] = useState(false);
+  const [markingArrival, setMarkingArrival] = useState(false);
   const [routeStats, setRouteStats] = useState(null);
   const [clockTick, setClockTick] = useState(Date.now());
 
@@ -517,6 +518,19 @@ const OrderDetails = () => {
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
   };
 
+  // Reload-safe: if an unexpired delivery OTP is already active, resume OTP entry
+  // instead of asking the rider to generate a new one.
+  const resumedOtpFor = useRef(null);
+  useEffect(() => {
+    if (!order || isReturn || step !== 3 || awaitingCodPayment) return;
+    if (resumedOtpFor.current === order.orderId) return;
+    const exp = order.activeDeliveryOtpExpiresAt ? new Date(order.activeDeliveryOtpExpiresAt).getTime() : 0;
+    if (exp > Date.now()) {
+      resumedOtpFor.current = order.orderId;
+      setShowOtpInput(true);
+    }
+  }, [order, isReturn, step, awaitingCodPayment]);
+
   const handleOtpGenerated = (data) => {
     console.log("OTP generated successfully:", data);
     
@@ -532,6 +546,50 @@ const OrderDetails = () => {
     
     setShowOtpInput(true);
     toast.success("OTP sent to customer!");
+  };
+
+  /**
+   * "Arrived at location": records the arrival (server time + GPS) and tells the
+   * customer, then generates the delivery OTP and sends it to them (app + SMS).
+   * The rider then enters the OTP the customer reads out.
+   */
+  const handleArrivedAtCustomer = async () => {
+    if (markingArrival) return;
+    setMarkingArrival(true);
+    try {
+      let location;
+      try {
+        location = await new Promise((resolve, reject) => {
+          getCurrentPositionWithCache(resolve, reject, { maxCacheAgeMs: 2 * 60 * 1000 });
+        });
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn("GPS failed, using customer location for testing");
+          const c = order?.address?.location;
+          location = c && typeof c.lat === "number" ? { lat: c.lat, lng: c.lng } : { lat: 22.7196, lng: 75.8577 };
+        } else {
+          throw new Error("Location unavailable. Please enable GPS and try again.");
+        }
+      }
+      const payload = { lat: location.lat, lng: location.lng };
+      await deliveryApi.markArrivedAtCustomer(order.orderId, payload); // idempotent
+      const response = await deliveryApi.requestDeliveryOtp(order.orderId, payload);
+      handleOtpGenerated(response.data);
+    } catch (error) {
+      const respData = error?.response?.data || {};
+      const structured =
+        (respData.result && respData.result.error) ||
+        (typeof respData.error === "object" ? respData.error : null) ||
+        {};
+      if (structured.code === "PROXIMITY_OUT_OF_RANGE") {
+        const d = structured.details || {};
+        toast.error(`You are ${d.currentDistance ?? "too far"} m away. Get within ${d.requiredRange || "the delivery radius"} and try again.`, { duration: 5000 });
+      } else {
+        toast.error(structured.message || respData.message || error?.message || "Could not mark arrival");
+      }
+    } finally {
+      setMarkingArrival(false);
+    }
   };
 
   const handleOtpGenerationError = (error) => {
@@ -1179,23 +1237,25 @@ const OrderDetails = () => {
           </motion.div>
         )}
 
-        {/* Normal delivery Step 3: generate OTP for customer */}
-        {!isReturn && step === 3 && !showOtpInput && !awaitingCodPayment && (
+        {/* Normal delivery Step 3: arrived → OTP goes to the customer */}
+        {!isReturn && step === 3 && !showOtpInput && !awaitingCodPayment && isAssignedRider && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="p-6 rounded-3xl shadow-sm border border-slate-100">
-              <div className="flex items-center mb-4 text-gray-800">
-                <ShieldCheck className="mr-2 text-primary" size={24} />
-                <h3 className="font-bold text-lg">Generate Delivery OTP</h3>
+              <div className="flex items-center mb-3 text-gray-800">
+                <MapPin className="mr-2 text-[#0057B7]" size={24} />
+                <h3 className="font-bold text-lg">At the delivery location?</h3>
               </div>
               <p className="text-gray-500 text-sm mb-4">
-                Slide to generate OTP for the customer.
+                Tap when you reach the customer. They get a delivery OTP on their app and SMS — ask them for it to complete the delivery.
               </p>
-              <DeliverySlideButton
-                orderId={orderId}
-                onSuccess={handleOtpGenerated}
-                onError={handleOtpGenerationError}
-                isReturn={false}
-              />
+              <Button
+                className="w-full h-12 text-sm font-bold"
+                onClick={handleArrivedAtCustomer}
+                disabled={markingArrival}
+              >
+                {markingArrival ? <Loader2 size={16} className="animate-spin mr-2" /> : <MapPin size={16} className="mr-2" />}
+                {markingArrival ? "Sending OTP…" : "Arrived at location"}
+              </Button>
             </Card>
           </motion.div>
         )}

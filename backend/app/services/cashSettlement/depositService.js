@@ -7,6 +7,7 @@ import Transaction from "../../models/transaction.js";
 import {
   AUDIT_ACTOR,
   DEPOSIT_METHOD,
+  DEPOSIT_PAYMENT_STATUS,
   DEPOSIT_STATUS,
   DISCREPANCY_TYPE,
 } from "../../constants/cashSettlement.js";
@@ -167,10 +168,19 @@ export async function submitDeposit({
  * than the claim, or smaller than the pending cash, leaves the remainder
  * outstanding — nothing is cleared without verified money.
  */
-export async function approveDeposit({ depositId, adminId, verifiedAmount = null, note = null }) {
+export async function approveDeposit({ depositId, adminId, verifiedAmount = null, note = null, gatewayVerified = false }) {
+  // gatewayVerified: a Razorpay deposit whose payment the BACKEND has already
+  // verified (signature + Razorpay API / signed webhook). No admin involved.
+  const claimFilter = gatewayVerified
+    ? {
+        _id: depositId,
+        status: { $in: [DEPOSIT_STATUS.PAYMENT_PENDING, DEPOSIT_STATUS.PAYMENT_FAILED] },
+        paymentStatus: DEPOSIT_PAYMENT_STATUS.PAID,
+      }
+    : { _id: depositId, status: DEPOSIT_STATUS.SUBMITTED };
   const claimedDeposit = await CashDeposit.findOneAndUpdate(
-    { _id: depositId, status: DEPOSIT_STATUS.SUBMITTED },
-    { $set: { status: DEPOSIT_STATUS.APPROVING, verifiedBy: adminId } },
+    claimFilter,
+    { $set: { status: DEPOSIT_STATUS.APPROVING, verifiedBy: adminId || null } },
     { new: true },
   );
   if (!claimedDeposit) {
@@ -182,7 +192,12 @@ export async function approveDeposit({ depositId, adminId, verifiedAmount = null
   const revert = () =>
     CashDeposit.updateOne(
       { _id: claimedDeposit._id, status: DEPOSIT_STATUS.APPROVING },
-      { $set: { status: DEPOSIT_STATUS.SUBMITTED, verifiedBy: null } },
+      {
+        $set: {
+          status: gatewayVerified ? DEPOSIT_STATUS.PAYMENT_PENDING : DEPOSIT_STATUS.SUBMITTED,
+          verifiedBy: null,
+        },
+      },
     );
 
   const claimed = claimedDeposit.amount;
@@ -235,7 +250,7 @@ export async function approveDeposit({ depositId, adminId, verifiedAmount = null
             allocations,
             pendingBefore: before.pendingCash,
             pendingAfter,
-            verifiedBy: adminId,
+            verifiedBy: adminId || null,
             verifiedAt: new Date(),
             adminNote: note || null,
           },
@@ -293,14 +308,21 @@ export async function approveDeposit({ depositId, adminId, verifiedAmount = null
       }
       await writeAudit(
         {
-          actorType: AUDIT_ACTOR.ADMIN,
-          actorId: adminId,
-          action: status === DEPOSIT_STATUS.APPROVED ? "DEPOSIT_APPROVED" : "DEPOSIT_PARTIALLY_APPROVED",
+          actorType: gatewayVerified ? AUDIT_ACTOR.SYSTEM : AUDIT_ACTOR.ADMIN,
+          actorId: adminId || null,
+          action: gatewayVerified
+            ? "DEPOSIT_PAID_VERIFIED"
+            : status === DEPOSIT_STATUS.APPROVED
+              ? "DEPOSIT_APPROVED"
+              : "DEPOSIT_PARTIALLY_APPROVED",
           entityType: "CashDeposit",
           entityId: claimedDeposit._id,
           captain: claimedDeposit.captain,
           reason: note || null,
-          before: { status: DEPOSIT_STATUS.SUBMITTED, pendingCash: before.pendingCash },
+          before: {
+            status: gatewayVerified ? DEPOSIT_STATUS.PAYMENT_PENDING : DEPOSIT_STATUS.SUBMITTED,
+            pendingCash: before.pendingCash,
+          },
           after: { status, claimed, verified, allocated, excess, pendingAfter, allocations: allocations.length },
         },
         { session },
@@ -315,11 +337,11 @@ export async function approveDeposit({ depositId, adminId, verifiedAmount = null
   }
 
   notifyCaptain(claimedDeposit.captain, {
-    title: "Settlement approved",
+    title: gatewayVerified ? "Payment received" : "Settlement approved",
     message:
       outcome.pendingAfter > 0
-        ? `₹${outcome.allocated} verified. ₹${outcome.pendingAfter} is still pending — please deposit the remainder.`
-        : `₹${outcome.allocated} verified. Your cash is fully settled.`,
+        ? `₹${outcome.allocated} ${gatewayVerified ? "received" : "verified"}. ₹${outcome.pendingAfter} is still pending — please deposit the remainder.`
+        : `₹${outcome.allocated} ${gatewayVerified ? "received" : "verified"}. Your cash is fully settled.`,
     token: `deposit-approved:${claimedDeposit._id}`,
   });
   if (outcome.pendingAfter > 0 || outcome.excess > 0 || verified < claimed) {

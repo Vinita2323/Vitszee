@@ -1610,6 +1610,19 @@ export async function requestHandoffOtpAtomic(deliveryId, orderId, lat, lng) {
     */
   }
 
+  // Asking for the delivery OTP implies the rider is at the customer: record the
+  // arrival if the explicit "I've reached the customer" step was not used.
+  await Order.updateOne(
+    { _id: order._id, reachedCustomerAt: null },
+    {
+      $set: {
+        reachedCustomerAt: new Date(),
+        reachedCustomerLocation: { lat: rider.lat, lng: rider.lng },
+        reachedCustomerDistanceM: Math.round(d),
+      },
+    },
+  );
+
   const redis = getRedisClient();
   if (redis) {
     try {
