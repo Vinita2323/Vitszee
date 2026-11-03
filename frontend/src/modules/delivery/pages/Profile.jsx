@@ -17,6 +17,7 @@ import {
   Star,
   Loader2,
   Clock,
+  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
@@ -115,6 +116,13 @@ const Profile = () => {
       sub: "Bike, License, Insurance",
       color: "text-orange-600 bg-orange-50",
       path: "/delivery/profile/vehicle-info",
+    },
+    {
+      icon: Wallet,
+      label: "Wallet",
+      sub: "Cash collected, deposits, pending",
+      color: "text-orange-600 bg-orange-50",
+      path: "/delivery/profile/wallet",
     },
     {
       icon: Clock,

@@ -622,6 +622,13 @@ const orderSchema = new mongoose.Schema(
     otpValidatedAt: {
       type: Date,
     },
+    /** Rider tapped "I've reached the customer" (server time + where + distance to the drop point). */
+    reachedCustomerAt: { type: Date, default: null },
+    reachedCustomerLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    reachedCustomerDistanceM: { type: Number, default: null },
     otpValidationLocation: {
       lat: Number,
       lng: Number,

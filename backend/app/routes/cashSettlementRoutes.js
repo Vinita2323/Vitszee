@@ -1,10 +1,13 @@
 import express from "express";
 import multer from "multer";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
+import { paymentRouteRateLimiter } from "../middleware/securityMiddlewares.js";
 import {
   captainStartShift,
   captainEndShift,
   captainOverview,
+  captainCreateRazorpayDeposit,
+  captainVerifyRazorpayDeposit,
   captainCurrentSummary,
   captainSubmitDeposit,
   adminDashboard,
@@ -67,6 +70,22 @@ router.post(
   allowRoles("delivery"),
   upload.single("proof"),
   captainSubmitDeposit,
+);
+
+// Online deposit through Razorpay Checkout (order creation + backend verification)
+router.post(
+  "/deposits/razorpay",
+  verifyToken,
+  allowRoles("delivery"),
+  paymentRouteRateLimiter,
+  captainCreateRazorpayDeposit,
+);
+router.post(
+  "/deposits/razorpay/verify",
+  verifyToken,
+  allowRoles("delivery"),
+  paymentRouteRateLimiter,
+  captainVerifyRazorpayDeposit,
 );
 
 /* ──────────────────────── Admin Operations Routes ──────────────────────── */

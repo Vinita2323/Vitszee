@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { DEPOSIT_METHOD, DEPOSIT_STATUS } from "../constants/cashSettlement.js";
+import { DEPOSIT_METHOD, DEPOSIT_PAYMENT_STATUS, DEPOSIT_STATUS } from "../constants/cashSettlement.js";
 
 const allocationSchema = new mongoose.Schema(
   {
@@ -51,6 +51,17 @@ const cashDepositSchema = new mongoose.Schema(
     rejectionReason: { type: String, default: null },
     adminNote: { type: String, default: null },
     adjustmentReason: { type: String, default: null },
+
+    // RAZORPAY: online payment details (set by the backend only)
+    razorpayOrderId: { type: String, default: undefined },
+    razorpayPaymentId: { type: String, default: undefined },
+    paymentStatus: { type: String, enum: [null, ...Object.values(DEPOSIT_PAYMENT_STATUS)], default: null, index: true },
+    paidAt: { type: Date, default: null }, // server time when the payment was verified
+    failureReason: { type: String, default: null },
+    failedAttempts: {
+      type: [{ paymentId: String, reason: String, at: { type: Date, default: Date.now }, _id: false }],
+      default: [],
+    },
   },
   { timestamps: true },
 );
@@ -61,6 +72,15 @@ cashDepositSchema.index(
 );
 cashDepositSchema.index({ utrKey: 1 }, { unique: true, partialFilterExpression: { utrKey: { $type: "string" } } });
 cashDepositSchema.index({ receiptKey: 1 }, { unique: true, partialFilterExpression: { receiptKey: { $type: "string" } } });
+// One deposit per Razorpay order and per Razorpay payment (no duplicate deposit records).
+cashDepositSchema.index(
+  { razorpayOrderId: 1 },
+  { unique: true, partialFilterExpression: { razorpayOrderId: { $type: "string" } } },
+);
+cashDepositSchema.index(
+  { razorpayPaymentId: 1 },
+  { unique: true, partialFilterExpression: { razorpayPaymentId: { $type: "string" } } },
+);
 cashDepositSchema.index({ status: 1, submittedAt: -1 });
 
 export default mongoose.model("CashDeposit", cashDepositSchema);

@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import Card from "@/shared/components/ui/Card";
 import Button from "@/shared/components/ui/Button";
 import { deliveryApi } from "../../services/deliveryApi";
+import { loadRazorpayCheckout } from "../../utils/razorpayCheckout";
+import { useAuth } from "@core/context/AuthContext";
 
 const formatTime = (isoString) => {
   if (!isoString) return "-";
@@ -58,7 +60,8 @@ const ShiftsAndSettlement = () => {
   const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Deposit Form State
-  const [depositMethod, setDepositMethod] = useState("BANK_UPI");
+  const { user } = useAuth();
+  const [depositMethod, setDepositMethod] = useState("RAZORPAY");
   const [depositAmount, setDepositAmount] = useState("");
   const [utr, setUtr] = useState("");
   const [receiptNumber, setReceiptNumber] = useState("");
@@ -184,6 +187,113 @@ const ShiftsAndSettlement = () => {
       toast.error(error?.response?.data?.message || "Failed to submit deposit");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const verifyOnline = async (payload) => {
+    const res = await deliveryApi.verifyRazorpayDeposit(payload);
+    return res.data?.result;
+  };
+
+  /**
+   * Pay the deposit online. The backend creates the Razorpay order; after
+   * Checkout the backend verifies the signature AND the payment with Razorpay
+   * before anything is settled — this page never decides success itself.
+   */
+  const handlePayViaRazorpay = async () => {
+    const numAmount = Number(depositAmount);
+    if (!Number.isFinite(numAmount) || numAmount < 1) {
+      toast.error("Please enter a valid deposit amount");
+      return;
+    }
+    if (pendingCash > 0 && numAmount > pendingCash) {
+      toast.error(`You can pay up to ₹${pendingCash} (your pending cash)`);
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const Razorpay = await loadRazorpayCheckout();
+      const created = await deliveryApi.createRazorpayDeposit({ amount: numAmount });
+      const { checkout } = created.data.result;
+
+      await new Promise((resolve) => {
+        const instance = new Razorpay({
+          key: checkout.keyId,
+          order_id: checkout.orderId,
+          amount: checkout.amount,
+          currency: checkout.currency,
+          name: checkout.name,
+          description: checkout.description,
+          prefill: { name: user?.name || "", contact: user?.phone || "" },
+          theme: { color: "#0057B7" },
+          handler: async (response) => {
+            try {
+              const result = await verifyOnline({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              if (result?.settled) {
+                toast.success(`Payment verified. ₹${numAmount} deposited.`);
+                setShowDepositModal(false);
+                setDepositAmount("");
+              } else {
+                toast.info("Payment received. Confirming with Razorpay…");
+              }
+            } catch (err) {
+              toast.info(
+                err?.response?.data?.message ||
+                  "Payment received. Confirmation is pending and will update automatically.",
+              );
+            } finally {
+              await fetchOverview(true);
+              resolve();
+            }
+          },
+          modal: {
+            ondismiss: async () => {
+              // Closed without paying (or the handler did not run): ask the backend what really happened.
+              try {
+                const result = await verifyOnline({ razorpay_order_id: checkout.orderId });
+                if (result?.settled) {
+                  toast.success(`Payment verified. ₹${numAmount} deposited.`);
+                  setShowDepositModal(false);
+                  setDepositAmount("");
+                } else if (result?.deposit?.paymentStatus === "FAILED") {
+                  toast.error("Payment failed. You can try again.");
+                } else {
+                  toast.info("Payment not completed. You can pay again any time.");
+                }
+              } catch {
+                /* the deposit stays pending; the webhook will settle it if money arrived */
+              }
+              await fetchOverview(true);
+              resolve();
+            },
+          },
+        });
+        instance.on("payment.failed", (resp) => {
+          toast.error(resp?.error?.description || "Payment failed. You can try again.");
+        });
+        instance.open();
+      });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error?.message || "Could not start the payment");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  /** Re-check an online deposit that is still pending (e.g. the webhook was delayed). */
+  const handleCheckOnlineDeposit = async (dep) => {
+    try {
+      const result = await verifyOnline({ razorpay_order_id: dep.razorpayOrderId });
+      toast[result?.settled ? "success" : "info"](
+        result?.settled ? "Payment verified. Deposit settled." : "Payment not confirmed yet.",
+      );
+      await fetchOverview(true);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Could not check the payment");
     }
   };
 
@@ -426,9 +536,10 @@ const ShiftsAndSettlement = () => {
           ) : (
             <div className="space-y-2">
               {deposits.slice(0, 5).map((dep) => {
-                const isApproved = dep.status === "APPROVED";
-                const isRejected = dep.status === "REJECTED";
-                const isPending = dep.status === "SUBMITTED" || dep.status === "APPROVING";
+                const isOnline = dep.method === "RAZORPAY";
+                const isApproved = dep.status === "APPROVED" || dep.status === "PARTIALLY_APPROVED";
+                const isRejected = dep.status === "REJECTED" || dep.status === "PAYMENT_FAILED";
+                const isPending = dep.status === "SUBMITTED" || dep.status === "APPROVING" || dep.status === "PAYMENT_PENDING";
 
                 return (
                   <Card
@@ -441,7 +552,7 @@ const ShiftsAndSettlement = () => {
                           {dep.depositId}
                         </span>
                         <span className="text-[10px] text-gray-400">
-                          {dep.method === "BANK_UPI" ? "Bank/UPI" : "Cash at Hub"}
+                          {isOnline ? "Razorpay" : dep.method === "BANK_UPI" ? "Bank/UPI" : "Cash at Hub"}
                         </span>
                       </div>
                       <span
@@ -453,7 +564,13 @@ const ShiftsAndSettlement = () => {
                             : "bg-amber-50 text-amber-700 border border-amber-200"
                         }`}
                       >
-                        {isApproved
+                        {isOnline
+                          ? isApproved
+                            ? "PAID & VERIFIED"
+                            : isRejected
+                            ? "PAYMENT FAILED"
+                            : "PAYMENT PENDING"
+                          : isApproved
                           ? "APPROVED"
                           : isRejected
                           ? "REJECTED"
@@ -463,7 +580,9 @@ const ShiftsAndSettlement = () => {
 
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500">
-                        {dep.method === "BANK_UPI"
+                        {isOnline
+                          ? `Payment ID: ${dep.razorpayPaymentId || "-"}`
+                          : dep.method === "BANK_UPI"
                           ? `UTR: ${dep.utr || "-"}`
                           : `Receipt: ${dep.receiptNumber || "-"}`}
                       </span>
@@ -473,7 +592,18 @@ const ShiftsAndSettlement = () => {
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] text-gray-400 pt-1 border-t border-gray-50">
-                      <span>Submitted: {formatDate(dep.submittedAt)}</span>
+                      <span>
+                        {isOnline && dep.paidAt ? `Paid: ${formatDate(dep.paidAt)}` : `Submitted: ${formatDate(dep.submittedAt)}`}
+                      </span>
+                      {isOnline && dep.status === "PAYMENT_PENDING" && dep.razorpayOrderId && (
+                        <button
+                          type="button"
+                          onClick={() => handleCheckOnlineDeposit(dep)}
+                          className="text-[#0057B7] hover:underline font-bold"
+                        >
+                          Check payment
+                        </button>
+                      )}
                       {dep.proofUrl && (
                         <a
                           href={dep.proofUrl}
@@ -485,6 +615,12 @@ const ShiftsAndSettlement = () => {
                         </a>
                       )}
                     </div>
+
+                    {isOnline && dep.status === "PAYMENT_FAILED" && dep.failureReason && (
+                      <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg mt-1">
+                        {dep.failureReason}
+                      </p>
+                    )}
 
                     {isRejected && dep.rejectionReason && (
                       <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg mt-1">
@@ -567,29 +703,25 @@ const ShiftsAndSettlement = () => {
               </div>
 
               {/* Method Toggle */}
-              <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  className={`py-2 text-xs font-bold rounded-lg transition ${
-                    depositMethod === "BANK_UPI"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                  onClick={() => setDepositMethod("BANK_UPI")}
-                >
-                  Bank / UPI Transfer
-                </button>
-                <button
-                  type="button"
-                  className={`py-2 text-xs font-bold rounded-lg transition ${
-                    depositMethod === "PHYSICAL_CASH"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                  onClick={() => setDepositMethod("PHYSICAL_CASH")}
-                >
-                  Cash at Hub / Office
-                </button>
+              <div className="grid grid-cols-3 gap-1.5 bg-gray-100 p-1 rounded-xl">
+                {[
+                  ["RAZORPAY", "Pay Online"],
+                  ["BANK_UPI", "Bank / UPI"],
+                  ["PHYSICAL_CASH", "Cash at Hub / Office"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`py-2 px-1 text-[11px] leading-tight font-bold rounded-lg transition ${
+                      depositMethod === value
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setDepositMethod(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               <form onSubmit={handleSubmitDeposit} className="space-y-3">
@@ -619,7 +751,12 @@ const ShiftsAndSettlement = () => {
                   )}
                 </div>
 
-                {depositMethod === "BANK_UPI" ? (
+                {depositMethod === "RAZORPAY" ? (
+                  <p className="text-[11px] text-gray-500 bg-blue-50 border border-blue-100 rounded-xl p-3 leading-relaxed">
+                    Pay with <b>UPI, debit card, credit card or net banking</b>. Your deposit is verified automatically
+                    by Razorpay — no screenshot or reference number needed.
+                  </p>
+                ) : depositMethod === "BANK_UPI" ? (
                   <>
                     <div>
                       <label className="text-xs font-bold text-gray-700 block mb-1">
@@ -718,19 +855,36 @@ const ShiftsAndSettlement = () => {
                 )}
 
                 <div className="pt-2">
-                  <Button
-                    type="submit"
-                    disabled={actionLoading}
-                    className="w-full bg-[#0057B7] hover:bg-[#004494] text-white font-bold text-xs py-3 rounded-xl shadow-md"
-                  >
-                    {actionLoading ? (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <Loader2 size={16} className="animate-spin" /> Submitting Deposit...
-                      </span>
-                    ) : (
-                      "Submit Deposit for Verification"
-                    )}
-                  </Button>
+                  {depositMethod === "RAZORPAY" ? (
+                    <Button
+                      type="button"
+                      onClick={handlePayViaRazorpay}
+                      disabled={actionLoading}
+                      className="w-full bg-[#0057B7] hover:bg-[#004494] text-white font-bold text-xs py-3 rounded-xl shadow-md"
+                    >
+                      {actionLoading ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <Loader2 size={16} className="animate-spin" /> Opening Razorpay...
+                        </span>
+                      ) : (
+                        `Pay ${depositAmount ? `₹${depositAmount} ` : ""}via Razorpay`
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={actionLoading}
+                      className="w-full bg-[#0057B7] hover:bg-[#004494] text-white font-bold text-xs py-3 rounded-xl shadow-md"
+                    >
+                      {actionLoading ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <Loader2 size={16} className="animate-spin" /> Submitting Deposit...
+                        </span>
+                      ) : (
+                        "Submit Deposit for Verification"
+                      )}
+                    </Button>
+                  )}
                 </div>
               </form>
             </motion.div>

@@ -26,6 +26,7 @@ import { creditWallet } from "../services/finance/walletService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import OrderReturnService from "../services/order/orderReturnService.js";
+import { markArrivedAtCustomer } from "../services/customerArrivalService.js";
 import {
   getCodPaymentState,
   createOrReuseQr,
@@ -67,6 +68,30 @@ export const advanceDeliveryRiderUi = async (req, res) => {
     return handleResponse(res, 200, "Delivery progress updated", result);
   } catch (e) {
     return handleResponse(res, e.statusCode || 500, e.message);
+  }
+};
+
+export const arrivedAtCustomer = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { location, lat: bodyLat, lng: bodyLng } = req.body || {};
+    const lat = typeof bodyLat === "number" ? bodyLat : location?.lat;
+    const lng = typeof bodyLng === "number" ? bodyLng : location?.lng;
+    const result = await markArrivedAtCustomer(req.user.id, orderId, lat, lng);
+    return handleResponse(
+      res,
+      200,
+      result.alreadyArrived ? "Already marked as arrived" : "Marked as arrived at customer",
+      result,
+    );
+  } catch (e) {
+    return handleResponse(res, e.statusCode || 500, e.message, {
+      error: {
+        code: e.code || "ARRIVAL_FAILED",
+        message: e.message,
+        ...(e.details ? { details: e.details } : {}),
+      },
+    });
   }
 };
 
