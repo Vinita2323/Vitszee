@@ -8,6 +8,7 @@ import {
 import { getShiftTotals } from "../services/cashSettlement/position.js";
 import { writeAudit } from "../services/cashSettlement/audit.js";
 import { notifyAdmins, notifyCaptain } from "../services/cashSettlement/notifier.js";
+import { sweepAbandonedRazorpayDeposits } from "../services/cashSettlement/razorpayDepositService.js";
 import logger from "../services/logger.js";
 
 /**
@@ -20,7 +21,8 @@ import logger from "../services/logger.js";
  * running the job repeatedly (or on several instances) never double-sends.
  */
 export async function runCashSettlementJob(now = new Date()) {
-  const result = { shiftReminders: 0, pendingReminders: 0, overdue: 0 };
+  const result = { shiftReminders: 0, pendingReminders: 0, overdue: 0, abandonedDeposits: 0 };
+  result.abandonedDeposits = await sweepAbandonedRazorpayDeposits();
 
   // 1. Long-running shifts
   const longAgo = new Date(now.getTime() - shiftReminderHours() * 3600 * 1000);

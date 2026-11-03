@@ -51,6 +51,14 @@ export const adminFinanceApi = {
     settleRiderCash: (data) => axiosInstance.post('/admin/settle-cash', data),
     getCashSettlementHistory: (params) =>
         axiosInstance.get('/admin/cash-history', { params }),
+
+    // Captain cash deposits (Razorpay / bank-UPI / hub cash)
+    getCaptainDeposits: (params) =>
+        axiosInstance.get('/cash-settlement/admin/deposits', { params }),
+    approveCaptainDeposit: (id, data = {}) =>
+        axiosInstance.post(`/cash-settlement/admin/deposits/${id}/approve`, data),
+    rejectCaptainDeposit: (id, data) =>
+        axiosInstance.post(`/cash-settlement/admin/deposits/${id}/reject`, data),
 };
 
 export default adminFinanceApi;

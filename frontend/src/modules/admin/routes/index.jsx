@@ -23,6 +23,7 @@ import {
   User,
   Store,
   Gift,
+  Landmark,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -63,6 +64,7 @@ const SellerTransactions = React.lazy(
   () => import("../pages/SellerTransactions"),
 );
 const CashCollection = React.lazy(() => import("../pages/CashCollection"));
+const CaptainDeposits = React.lazy(() => import("../pages/CaptainDeposits"));
 const CustomerManagement = React.lazy(
   () => import("../pages/CustomerManagement"),
 );
@@ -184,6 +186,12 @@ const navItems = [
     color: "green",
   },
   {
+    label: "Captain Deposits",
+    path: "/admin/captain-deposits",
+    icon: Landmark,
+    color: "blue",
+  },
+  {
     label: "Customers",
     icon: Users,
     color: "sky",
@@ -285,6 +293,7 @@ const AdminRoutes = () => {
         <Route path="/withdrawals" element={<WithdrawalRequests />} />
         <Route path="/seller-transactions" element={<SellerTransactions />} />
         <Route path="/cash-collection" element={<CashCollection />} />
+        <Route path="/captain-deposits" element={<CaptainDeposits />} />
         <Route path="/customers" element={<CustomerManagement />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/birthdays" element={<BirthdayCenter />} />

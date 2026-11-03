@@ -176,19 +176,37 @@ export async function getSettlementDetail(idOrShiftId) {
   };
 }
 
-export async function listDeposits({ status = null, page = 1, limit = 20 } = {}) {
-  const query = status ? { status } : {};
+export async function listDeposits({ status = null, method = null, paymentStatus = null, page = 1, limit = 20 } = {}) {
+  const query = {};
+  if (status) query.status = status;
+  if (method) query.method = method;
+  if (paymentStatus) query.paymentStatus = paymentStatus;
   const p = Math.max(1, Number(page) || 1);
   const l = Math.min(100, Math.max(1, Number(limit) || 20));
   const [items, total] = await Promise.all([
-    CashDeposit.find(query).populate("captain", "name phone").sort({ submittedAt: -1 }).skip((p - 1) * l).limit(l).lean(),
+    CashDeposit.find(query)
+      .populate("captain", "name phone")
+      .populate("shift", "shiftId startedAt endedAt status")
+      .sort({ submittedAt: -1 })
+      .skip((p - 1) * l)
+      .limit(l)
+      .lean(),
     CashDeposit.countDocuments(query),
   ]);
   return {
     total,
     page: p,
     limit: l,
-    items: items.map((d) => ({ ...serializeDeposit(d), captain: d.captain, adminNote: d.adminNote, adjustmentReason: d.adjustmentReason, receivedBy: d.receivedBy })),
+    items: items.map((d) => ({
+      ...serializeDeposit(d),
+      captain: d.captain,
+      shift: d.shift
+        ? { id: String(d.shift._id), shiftId: d.shift.shiftId, startedAt: d.shift.startedAt, endedAt: d.shift.endedAt, status: d.shift.status }
+        : null,
+      adminNote: d.adminNote,
+      adjustmentReason: d.adjustmentReason,
+      receivedBy: d.receivedBy,
+    })),
   };
 }
 
