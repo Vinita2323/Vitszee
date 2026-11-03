@@ -16,6 +16,7 @@ const mockPaymentFindOne = jest.fn(async () => null);
 
 jest.unstable_mockModule("../app/services/codQrPaymentService.js", () => ({
   processQrWebhookEvent: mockProcessQr,
+  processCollectLinkWebhookEvent: jest.fn(async () => ({ handled: false })),
 }));
 jest.unstable_mockModule("../app/models/order.js", () => ({ default: {} }));
 jest.unstable_mockModule("../app/models/checkoutGroup.js", () => ({ default: {} }));

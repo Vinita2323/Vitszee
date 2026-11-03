@@ -9,7 +9,7 @@ const settingSchema = new mongoose.Schema(
         // General
         appName: {
             type: String,
-            default: "Vitszee Market",
+            default: "Vitszee",
         },
         supportEmail: {
             type: String,

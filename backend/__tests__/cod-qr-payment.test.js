@@ -32,6 +32,9 @@ const mockCreateDynamicQr = jest.fn(async () => {
 const mockFetchQr = jest.fn();
 const mockFetchQrPayments = jest.fn();
 const mockCloseQr = jest.fn(async () => ({}));
+const mockCreateCollectLink = jest.fn();
+const mockFetchCollectLink = jest.fn();
+const mockCancelCollectLink = jest.fn(async () => ({}));
 
 const mockHandleOnlineOrderFinance = jest.fn(async (orderId) => {
   const row = Order.rows.find((r) => String(r._id) === String(orderId));
@@ -74,6 +77,10 @@ jest.unstable_mockModule("../app/services/payment/razorpayQrGateway.js", () => (
   fetchQr: mockFetchQr,
   fetchQrPayments: mockFetchQrPayments,
   closeQr: mockCloseQr,
+  createCollectLink: mockCreateCollectLink,
+  fetchCollectLink: mockFetchCollectLink,
+  cancelCollectLink: mockCancelCollectLink,
+  isQrApiUnavailable: (e) => /requested url was not found/i.test(String(e?.error?.description || e?.message || "")),
 }));
 jest.unstable_mockModule("../app/services/orderSocketEmitter.js", () => ({
   emitOrderStatusUpdate: jest.fn(),
@@ -402,14 +409,81 @@ describe("delayed webhook → backend verification via Razorpay API", () => {
     expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("surfaces a gateway outage without touching the order", async () => {
+  it("reports a gateway outage as 'cannot check right now' without failing or touching the order", async () => {
     const order = seedOrder();
     await startQr();
     mockFetchQr.mockRejectedValue(new Error("network"));
-    await expect(svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider })).rejects.toMatchObject({
-      code: "GATEWAY_UNAVAILABLE",
-    });
+    const state = await svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider });
+    expect(state.gatewayCheck.ok).toBe(false);
+    expect(state.gatewayCheck.message).toMatch(/can't be checked/i);
+    expect(state.payment.displayStatus).toBe("PAYMENT_PENDING"); // QR is still usable
+    expect(state.completed).toBe(false);
     expect(order.workflowStatus).toBe("OUT_FOR_DELIVERY");
+  });
+});
+
+describe("Razorpay status API unavailable (e.g. QR read endpoints rejected for the account)", () => {
+  const unavailable = () => {
+    const err = new Error("The requested URL was not found on the server.");
+    err.error = { description: "The requested URL was not found on the server." };
+    mockFetchQr.mockRejectedValue(err);
+    mockFetchQrPayments.mockRejectedValue(err);
+  };
+
+  it("still returns the existing valid QR instead of failing", async () => {
+    seedOrder();
+    await startQr();
+    unavailable();
+    const again = await startQr();
+    expect(again.reused).toBe(true);
+    expect(again.verification).toBe("UNAVAILABLE");
+    expect(again.payment.qrImageUrl).toBe("https://rzp.test/qr_1.png");
+    expect(mockCreateDynamicQr).toHaveBeenCalledTimes(1);
+  });
+
+  it("still lets the rider generate a new QR (retry / expired) and closes the old one best-effort", async () => {
+    seedOrder();
+    await startQr();
+    unavailable();
+    const fresh = await startQr(true);
+    expect(fresh.reused).toBe(false);
+    expect(fresh.payment.razorpayQrId).toBe("qr_2");
+    expect(CodQr.rows.filter((r) => r.isActive)).toHaveLength(1);
+    expect(mockCloseQr).toHaveBeenCalledWith("qr_1");
+  });
+
+  it("a payment on the replaced QR that the webhook reports later is not lost", async () => {
+    const order = seedOrder();
+    await startQr();
+    unavailable();
+    await startQr(true); // qr_1 closed, qr_2 live
+    const result = await svc.processQrWebhookEvent(credited("qr_1"));
+    expect(result.completed).toBe(true);
+    expect(order.workflowStatus).toBe("DELIVERED");
+  });
+
+  it("cash can still be recorded", async () => {
+    const order = seedOrder();
+    await startQr();
+    unavailable();
+    await svc.confirmCashCollection({ orderId: ORDER_ID, deliveryId: RIDER });
+    expect(order.paymentMethod).toBe("CASH");
+  });
+});
+
+describe("orders delivered outside the payment step", () => {
+  it("a delivered order whose payment step flag was left open cannot generate a QR", async () => {
+    // e.g. an admin/seller marked it delivered through the legacy status endpoint
+    seedOrder({ status: "delivered", orderStatus: "delivered" });
+    await expect(startQr()).rejects.toMatchObject({ code: "ALREADY_COMPLETED" });
+    expect(mockCreateDynamicQr).not.toHaveBeenCalled();
+  });
+
+  it("nor can cash be recorded again", async () => {
+    seedOrder({ status: "delivered", orderStatus: "delivered" });
+    await expect(
+      svc.confirmCashCollection({ orderId: ORDER_ID, deliveryId: RIDER }),
+    ).rejects.toMatchObject({ code: "ALREADY_COMPLETED" });
   });
 });
 
@@ -487,5 +561,185 @@ describe("OTP → payment hand-off", () => {
     expect(updated.codHandoff.awaitingPayment).toBe(true);
     expect(updated.codHandoff.outstandingAmount).toBe(AMOUNT);
     expect(updated.codHandoff.proofImages).toEqual(["https://img/a.jpg"]);
+  });
+});
+
+describe("Payment Link fallback (Razorpay QR Codes API unavailable for the account)", () => {
+  const notFound = () => {
+    const err = new Error("The requested URL was not found on the server.");
+    err.statusCode = 400;
+    err.error = { code: "BAD_REQUEST_ERROR", description: "The requested URL was not found on the server." };
+    return err;
+  };
+  const useLinkFallback = (id = "plink_1") => {
+    mockCreateDynamicQr.mockRejectedValueOnce(notFound());
+    mockCreateCollectLink.mockResolvedValueOnce({ id, short_url: `https://rzp.io/i/${id}` });
+  };
+  const paidLink = (id = "plink_1", amount = PAISE) => ({
+    id, status: "paid", amount_paid: amount, currency: "INR", payments: [{ payment_id: "pay_link1" }],
+  });
+
+  it("creates a fixed-amount payment link instead of failing, and shows it as the QR", async () => {
+    seedOrder();
+    useLinkFallback();
+    const res = await startQr();
+
+    expect(mockCreateCollectLink).toHaveBeenCalledTimes(1);
+    const args = mockCreateCollectLink.mock.calls[0][0];
+    expect(args.amountPaise).toBe(PAISE);
+    expect(args.expireByUnix).toBeGreaterThan(Math.floor(Date.now() / 1000) + 15 * 60); // Razorpay minimum
+    expect(res.payment).toMatchObject({
+      gatewayKind: "PAYMENT_LINK",
+      paymentLinkUrl: "https://rzp.io/i/plink_1",
+      amountPaise: PAISE,
+      displayStatus: "PAYMENT_PENDING",
+    });
+    const row = CodQr.rows[0];
+    expect(row.paymentLinkId).toBe("plink_1");
+    expect(row.status).toBe("PENDING");
+    expect(row.razorpayQrId).toBeNull();
+  });
+
+  it("does NOT fall back on other QR errors", async () => {
+    seedOrder();
+    const err = new Error("boom");
+    err.error = { description: "Internal server error" };
+    mockCreateDynamicQr.mockRejectedValueOnce(err);
+    await expect(startQr()).rejects.toMatchObject({ code: "QR_CREATE_FAILED" });
+    expect(mockCreateCollectLink).not.toHaveBeenCalled();
+    expect(CodQr.rows[0].isActive).toBe(false);
+  });
+
+  it("a failure creating the link too is reported and leaves nothing active", async () => {
+    seedOrder();
+    mockCreateDynamicQr.mockRejectedValueOnce(notFound());
+    mockCreateCollectLink.mockRejectedValueOnce(Object.assign(new Error("x"), { error: { description: "link failed" } }));
+    await expect(startQr()).rejects.toMatchObject({ code: "QR_CREATE_FAILED" });
+    expect(CodQr.rows.filter((r) => r.isActive)).toHaveLength(0);
+  });
+
+  it("the status check completes the order when the link is paid (exact amount)", async () => {
+    const order = seedOrder();
+    useLinkFallback();
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue(paidLink());
+
+    const state = await svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider });
+    expect(state.completed).toBe(true);
+    expect(order.workflowStatus).toBe("DELIVERED");
+    expect(order.paymentMethod).toBe("RAZORPAY_QR");
+    expect(CodQr.rows[0].razorpayPaymentId).toBe("pay_link1");
+    expect(mockHandleOnlineOrderFinance).toHaveBeenCalledTimes(1);
+  });
+
+  it("an under-paid link does not complete the order and is flagged", async () => {
+    const order = seedOrder();
+    useLinkFallback();
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue(paidLink("plink_1", PAISE - 500));
+    const state = await svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider });
+    expect(state.completed).toBe(false);
+    expect(order.workflowStatus).toBe("OUT_FOR_DELIVERY");
+    expect(CodQr.rows[0].reviewRequired).toBe(true);
+  });
+
+  it("an unpaid link stays pending", async () => {
+    seedOrder();
+    useLinkFallback();
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue({ id: "plink_1", status: "created", amount_paid: 0, currency: "INR" });
+    const state = await svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider });
+    expect(state.payment.displayStatus).toBe("PAYMENT_PENDING");
+    expect(state.completed).toBe(false);
+  });
+
+  it("an expired link shows 'QR expired' and a new link can be generated", async () => {
+    seedOrder();
+    useLinkFallback("plink_1");
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue({ id: "plink_1", status: "expired", amount_paid: 0, currency: "INR" });
+    const state = await svc.verifyCodPayment({ orderId: ORDER_ID, actor: rider });
+    expect(state.payment.displayStatus).toBe("QR_EXPIRED");
+
+    useLinkFallback("plink_2");
+    const fresh = await startQr();
+    expect(fresh.payment.paymentLinkUrl).toBe("https://rzp.io/i/plink_2");
+  });
+
+  it("regenerating cancels the previous link so it cannot be paid", async () => {
+    seedOrder();
+    useLinkFallback("plink_1");
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue({ id: "plink_1", status: "created", amount_paid: 0, currency: "INR" });
+    useLinkFallback("plink_2");
+    const fresh = await startQr(true);
+    expect(mockCancelCollectLink).toHaveBeenCalledWith("plink_1");
+    expect(fresh.payment.paymentLinkUrl).toBe("https://rzp.io/i/plink_2");
+    expect(CodQr.rows.filter((r) => r.isActive)).toHaveLength(1);
+  });
+
+  it("payment_link.paid webhook completes the order exactly once, even when redelivered", async () => {
+    const order = seedOrder();
+    useLinkFallback();
+    await startQr();
+    const event = {
+      event: "payment_link.paid",
+      payload: {
+        payment_link: { entity: { id: "plink_1", status: "paid", amount_paid: PAISE, currency: "INR" } },
+        payment: { entity: payment({ id: "pay_wh1" }) },
+      },
+    };
+    const first = await svc.processCollectLinkWebhookEvent({ ...event, eventId: "evt_l1" });
+    const again = await svc.processCollectLinkWebhookEvent({ ...event, eventId: "evt_l1" });
+    expect(first).toMatchObject({ handled: true, completed: true });
+    expect(again.completed).toBe(true);
+    expect(order.workflowStatus).toBe("DELIVERED");
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+    expect(mockHandleOnlineOrderFinance).toHaveBeenCalledTimes(1);
+  });
+
+  it("payment_link.paid with the wrong amount is flagged, not completed", async () => {
+    const order = seedOrder();
+    useLinkFallback();
+    await startQr();
+    await svc.processCollectLinkWebhookEvent({
+      event: "payment_link.paid",
+      payload: {
+        payment_link: { entity: { id: "plink_1", status: "paid", amount_paid: 1000, currency: "INR" } },
+        payment: { entity: payment({ id: "pay_wh2", amount: 1000 }) },
+      },
+    });
+    expect(order.workflowStatus).toBe("OUT_FOR_DELIVERY");
+    expect(CodQr.rows[0].reviewRequired).toBe(true);
+  });
+
+  it("links that are not COD collect links are left to the normal payment flow", async () => {
+    const r = await svc.processCollectLinkWebhookEvent({
+      event: "payment_link.paid",
+      payload: { payment_link: { entity: { id: "plink_other", status: "paid" } } },
+    });
+    expect(r).toMatchObject({ handled: false });
+  });
+
+  it("payment_link.expired marks the attempt expired", async () => {
+    seedOrder();
+    useLinkFallback();
+    await startQr();
+    await svc.processCollectLinkWebhookEvent({
+      event: "payment_link.expired",
+      payload: { payment_link: { entity: { id: "plink_1", status: "expired" } } },
+    });
+    expect(CodQr.rows[0].status).toBe("EXPIRED");
+    expect(CodQr.rows[0].isActive).toBe(false);
+  });
+
+  it("cash switch cancels the open link", async () => {
+    const order = seedOrder();
+    useLinkFallback();
+    await startQr();
+    mockFetchCollectLink.mockResolvedValue({ id: "plink_1", status: "created", amount_paid: 0, currency: "INR" });
+    await svc.confirmCashCollection({ orderId: ORDER_ID, deliveryId: RIDER });
+    expect(mockCancelCollectLink).toHaveBeenCalledWith("plink_1");
+    expect(order.paymentMethod).toBe("CASH");
   });
 });

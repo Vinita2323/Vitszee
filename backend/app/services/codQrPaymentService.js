@@ -17,6 +17,10 @@ import {
   fetchQr,
   fetchQrPayments,
   closeQr,
+  createCollectLink,
+  fetchCollectLink,
+  cancelCollectLink,
+  isQrApiUnavailable,
 } from "./payment/razorpayQrGateway.js";
 import {
   emitOrderStatusUpdate,
@@ -137,6 +141,8 @@ export function summarizeAttempt(doc, { includeQr = true } = {}) {
     amountPaise: doc.amountPaise,
     currency: doc.currency,
     qrImageUrl: includeQr ? doc.qrImageUrl : undefined,
+    gatewayKind: doc.gatewayKind || "QR_CODE",
+    paymentLinkUrl: includeQr ? doc.paymentLinkUrl || undefined : undefined,
     razorpayQrId: doc.razorpayQrId,
     razorpayPaymentId: doc.razorpayPaymentId,
     expiresAt: doc.expiresAt,
@@ -185,10 +191,10 @@ async function loadOrderForActor(orderIdParam, actor, { write = false } = {}) {
 }
 
 function assertAwaitingPayment(order) {
-  if (order.codHandoff?.awaitingPayment) return;
   if (isOrderDelivered(order)) {
     throw svcError("Order is already delivered and paid", 409, "ALREADY_COMPLETED");
   }
+  if (order.codHandoff?.awaitingPayment) return;
   throw svcError(
     "Verify the customer's delivery OTP before collecting payment",
     409,
@@ -254,7 +260,14 @@ async function pushAudit(docId, entry, extraSet = {}) {
 }
 
 async function closeAttempt(doc, nextStatus, reason) {
-  if (doc.razorpayQrId) {
+  if (doc.gatewayKind === "PAYMENT_LINK" && doc.paymentLinkId) {
+    try {
+      await cancelCollectLink(doc.paymentLinkId);
+    } catch (e) {
+      // already paid/expired/cancelled at Razorpay — fine.
+      logger.warn("cod payment link cancel failed (ignored)", { linkId: doc.paymentLinkId, error: e?.error?.description || e.message });
+    }
+  } else if (doc.razorpayQrId) {
     try {
       await closeQr(doc.razorpayQrId);
     } catch (e) {
@@ -549,10 +562,71 @@ async function settlePaidAttempt(doc, payment, { source, webhookEventId = null }
  * Ask Razorpay what really happened to this QR and apply it. Used by the
  * status endpoint (delayed/missed webhooks) and before closing/replacing a QR.
  */
+/** Status check for attempts collected through a Payment Link (QR API unavailable). */
+async function reconcileLinkAttempt(doc, { source }) {
+  if (!doc.paymentLinkId) return { doc, completed: false };
+  let link;
+  try {
+    link = await fetchCollectLink(doc.paymentLinkId);
+  } catch (error) {
+    logger.error("cod link reconcile: razorpay unreachable", {
+      scope: "codQrPaymentService",
+      linkId: doc.paymentLinkId,
+      error: error?.error?.description || error.message,
+    });
+    throw svcError(
+      "Could not reach Razorpay to verify the payment. Try again.",
+      502,
+      "GATEWAY_UNAVAILABLE",
+      { gatewayDetail: error?.error?.description || error.message },
+    );
+  }
+
+  if (link.status === "paid") {
+    const payment = {
+      id: link.payments?.[0]?.payment_id || `${link.id}:paid`,
+      status: "captured",
+      amount: Number(link.amount_paid),
+      currency: link.currency || "INR",
+      method: "upi",
+    };
+    return settlePaidAttempt(doc, payment, { source });
+  }
+
+  let current = doc;
+  if (link.status === "expired" || (doc.expiresAt && new Date(doc.expiresAt) <= new Date())) {
+    try {
+      await cancelCollectLink(doc.paymentLinkId); // stop any further payment, then re-check once
+      const again = await fetchCollectLink(doc.paymentLinkId);
+      if (again.status === "paid") {
+        return settlePaidAttempt(
+          doc,
+          {
+            id: again.payments?.[0]?.payment_id || `${again.id}:paid`,
+            status: "captured",
+            amount: Number(again.amount_paid),
+            currency: again.currency || "INR",
+            method: "upi",
+          },
+          { source },
+        );
+      }
+    } catch (e) {
+      logger.warn("cod payment link expiry cancel failed (ignored)", { error: e?.error?.description || e.message });
+    }
+    current = await markExpired(current, source);
+  } else if (link.status === "cancelled") {
+    current = await closeAttempt(current, COD_QR_STATUS.CLOSED, "Cancelled at Razorpay");
+  }
+  await pushAudit(current._id, auditEntry(COD_QR_AUDIT_EVENT.STATUS_CHECKED, source, { linkStatus: link.status }));
+  return { doc: (await CodQrPayment.findById(current._id)) || current, completed: false };
+}
+
 async function reconcileAttempt(doc, { source = "STATUS_CHECK" } = {}) {
   if (doc.status === COD_QR_STATUS.PAID) {
     return doc.finalizedAt ? { doc, completed: true } : ensureOrderCompleted(doc);
   }
+  if (doc.gatewayKind === "PAYMENT_LINK") return reconcileLinkAttempt(doc, { source });
   if (!doc.razorpayQrId) return { doc, completed: false };
 
   let qr;
@@ -570,7 +644,12 @@ async function reconcileAttempt(doc, { source = "STATUS_CHECK" } = {}) {
       qrId: doc.razorpayQrId,
       error: error?.error?.description || error.message,
     });
-    throw svcError("Could not reach Razorpay to verify the payment. Try again.", 502, "GATEWAY_UNAVAILABLE");
+    throw svcError(
+      "Could not reach Razorpay to verify the payment. Try again.",
+      502,
+      "GATEWAY_UNAVAILABLE",
+      { gatewayDetail: error?.error?.description || error.message },
+    );
   }
 
   const exact = items.find((p) => isExactPayment(doc, p));
@@ -656,8 +735,25 @@ export async function createOrReuseQr({ orderId, deliveryId, regenerate = false 
 
   const active = await CodQrPayment.findOne({ order: order._id, isActive: true });
   if (active) {
-    // A payment may have landed on the old QR — settle that first.
-    const rec = await reconcileAttempt(active, { source: "STATUS_CHECK" });
+    // A payment may have landed on the old QR — settle that first. If Razorpay's
+    // status API cannot be reached (outage, or the account's QR read API is
+    // unavailable) we must still let the rider reuse a valid QR or issue a new
+    // one: payments are then confirmed by the qr_code.credited webhook, and a
+    // payment landing on a replaced QR is handled (late-payment / duplicate rules).
+    let rec;
+    let verification = "OK";
+    try {
+      rec = await reconcileAttempt(active, { source: "STATUS_CHECK" });
+    } catch (error) {
+      if (error.code !== "GATEWAY_UNAVAILABLE") throw error;
+      verification = "UNAVAILABLE";
+      logger.warn("cod qr: status check unavailable, continuing without it", {
+        scope: "codQrPaymentService",
+        orderId: order.orderId,
+        detail: error.gatewayDetail,
+      });
+      rec = { doc: active, completed: false };
+    }
     if (rec.completed) {
       return { completed: true, payment: summarizeAttempt(rec.doc), reused: false };
     }
@@ -669,7 +765,7 @@ export async function createOrReuseQr({ orderId, deliveryId, regenerate = false 
       current.amountPaise === amountPaise &&
       new Date(current.expiresAt) > new Date();
     if (reusable && !regenerate) {
-      return { completed: false, payment: summarizeAttempt(current), reused: true };
+      return { completed: false, payment: summarizeAttempt(current), reused: true, verification };
     }
     if (current.isActive) {
       await closeAttempt(
@@ -707,14 +803,57 @@ export async function createOrReuseQr({ orderId, deliveryId, regenerate = false 
   }
 
   try {
-    const qr = await createDynamicQr({
-      amountPaise,
-      closeByUnix: Math.floor(expiresAt.getTime() / 1000),
-      name: `Order ${order.orderId}`.slice(0, 40),
-      description: `COD payment for order ${order.orderId}`.slice(0, 255),
-      notes: { orderId: order.orderId, codQrPaymentId: String(doc._id), attempt: String(attempt) },
-    });
-    doc = await CodQrPayment.findOneAndUpdate(
+    const notes = { orderId: order.orderId, codQrPaymentId: String(doc._id), attempt: String(attempt) };
+    let qr;
+    try {
+      qr = await createDynamicQr({
+        amountPaise,
+        closeByUnix: Math.floor(expiresAt.getTime() / 1000),
+        name: `Order ${order.orderId}`.slice(0, 40),
+        description: `COD payment for order ${order.orderId}`.slice(0, 255),
+        notes,
+      });
+    } catch (qrError) {
+      if (!isQrApiUnavailable(qrError)) throw qrError;
+      // The account has no QR Codes API: collect through a fixed-amount Payment Link instead.
+      logger.warn("cod qr: QR Codes API unavailable, using a fixed-amount payment link", {
+        scope: "codQrPaymentService",
+        orderId: order.orderId,
+      });
+      const linkExpiresAt = new Date(Date.now() + Math.max(codQrExpiryMinutes(), 16) * 60 * 1000); // Razorpay needs >= 15 min
+      const link = await createCollectLink({
+        amountPaise,
+        referenceId: String(doc._id),
+        expireByUnix: Math.floor(linkExpiresAt.getTime() / 1000),
+        description: `COD payment for order ${order.orderId}`.slice(0, 250),
+        notes,
+      });
+      doc = await CodQrPayment.findOneAndUpdate(
+        { _id: doc._id },
+        {
+          $set: {
+            gatewayKind: "PAYMENT_LINK",
+            paymentLinkId: link.id,
+            paymentLinkUrl: link.short_url,
+            expiresAt: linkExpiresAt,
+            status: COD_QR_STATUS.PENDING,
+          },
+          $push: {
+            auditLog: auditEntry(COD_QR_AUDIT_EVENT.QR_CREATED, "RIDER", {
+              kind: "PAYMENT_LINK",
+              linkId: link.id,
+              amountPaise,
+              expiresAt: linkExpiresAt,
+            }),
+          },
+        },
+        { new: true },
+      );
+      qr = null;
+    }
+    if (!qr) {
+      // payment-link path already stored on `doc`
+    } else doc = await CodQrPayment.findOneAndUpdate(
       { _id: doc._id },
       {
         $set: {
@@ -757,6 +896,7 @@ export async function createOrReuseQr({ orderId, deliveryId, regenerate = false 
 export async function verifyCodPayment({ orderId, actor }) {
   const order = await loadOrderForActor(orderId, actor);
   let completed = isOrderDelivered(order);
+  let gatewayCheck = null;
 
   // Recover an attempt that was paid but whose order completion failed earlier.
   const stuck = await CodQrPayment.findOne({
@@ -770,12 +910,22 @@ export async function verifyCodPayment({ orderId, actor }) {
   } else if (!completed) {
     const active = await CodQrPayment.findOne({ order: order._id, isActive: true });
     if (active) {
-      const r = await reconcileAttempt(active, { source: "STATUS_CHECK" });
-      completed = completed || !!r.completed;
+      try {
+        const r = await reconcileAttempt(active, { source: "STATUS_CHECK" });
+        completed = completed || !!r.completed;
+      } catch (error) {
+        if (error.code !== "GATEWAY_UNAVAILABLE") throw error;
+        gatewayCheck = {
+          ok: false,
+          message:
+            "Razorpay payment status can't be checked right now. The payment will be confirmed automatically when Razorpay notifies us, or you can collect cash.",
+        };
+      }
     }
   }
 
-  return getCodPaymentState({ orderId: order.orderId, actor });
+  const state = await getCodPaymentState({ orderId: order.orderId, actor });
+  return gatewayCheck ? { ...state, gatewayCheck } : state;
 }
 
 /** Rider records cash instead of QR. */
@@ -901,6 +1051,45 @@ export async function processQrWebhookEvent({ event, payload, eventId = null }) 
     duplicate: !!result.duplicate,
     mismatch: !!result.mismatch,
   };
+}
+
+/**
+ * payment_link.paid / expired / cancelled for a COD collect link (the fallback
+ * used when the QR Codes API is unavailable). Idempotent per payment id.
+ *
+ * @returns {{ handled: boolean }} handled=false when the link is not a COD one.
+ */
+export async function processCollectLinkWebhookEvent({ event, payload, eventId = null }) {
+  const link = payload?.payment_link?.entity;
+  if (!link?.id) return { handled: false, reason: "missing_link" };
+  const doc = await CodQrPayment.findOne({ paymentLinkId: link.id });
+  if (!doc) return { handled: false, reason: "unknown_link" };
+
+  await pushAudit(
+    doc._id,
+    auditEntry(COD_QR_AUDIT_EVENT.WEBHOOK_RECEIVED, "WEBHOOK", { event, eventId, linkId: link.id }),
+  );
+
+  if (event === "payment_link.paid") {
+    const entity = payload?.payment?.entity;
+    const payment =
+      entity?.id
+        ? entity
+        : {
+            id: link.payments?.[0]?.payment_id || `${link.id}:paid`,
+            status: "captured",
+            amount: Number(link.amount_paid),
+            currency: link.currency || "INR",
+          };
+    const result = await settlePaidAttempt(doc, payment, { source: "WEBHOOK", webhookEventId: eventId });
+    return { handled: true, completed: !!result.completed, duplicate: !!result.duplicate, mismatch: !!result.mismatch };
+  }
+  if (event === "payment_link.expired") {
+    await markExpired(doc, "WEBHOOK");
+  } else if (event === "payment_link.cancelled") {
+    await closeAttempt(doc, COD_QR_STATUS.CLOSED, "Cancelled at Razorpay");
+  }
+  return { handled: true, completed: false };
 }
 
 /** Payment summary attached to order-details responses. */

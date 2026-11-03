@@ -909,6 +909,31 @@ async function dispatchWebhookEvent({ provider, decoded, eventId, correlationId 
     };
   }
 
+  // Captain cash-deposit orders (Razorpay Checkout) are settled by the cash-settlement module.
+  if (
+    decoded.razorpayOrderId &&
+    (kind === WEBHOOK_KIND.CAPTURED || kind === WEBHOOK_KIND.ATTEMPT_FAILED)
+  ) {
+    const dep = await import("./cashSettlement/razorpayDepositService.js");
+    const handledDeposit = await dep.processDepositPaymentEvent({ decoded, eventId });
+    if (handledDeposit.handled) {
+      return { eventStatus: WEBHOOK_EVENT_STATUS.PROCESSED, summary: { deposit: true, ...handledDeposit } };
+    }
+  }
+
+  // A Payment Link created by the COD "scan to pay" fallback belongs to the COD QR service.
+  if (decoded.eventName?.startsWith("payment_link.") && decoded.linkId) {
+    const cod = await import("./codQrPaymentService.js");
+    const handledByCod = await cod.processCollectLinkWebhookEvent({
+      event: decoded.eventName,
+      payload: decoded.raw?.payload,
+      eventId,
+    });
+    if (handledByCod.handled) {
+      return { eventStatus: WEBHOOK_EVENT_STATUS.PROCESSED, summary: { codLink: true, ...handledByCod } };
+    }
+  }
+
   const payment = await findPaymentForEvent(decoded);
   if (!payment) {
     // Not ours (e.g. a COD cash-deposit order), unless it carries our references:
