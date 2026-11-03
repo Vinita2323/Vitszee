@@ -57,6 +57,10 @@ const codQrPaymentSchema = new mongoose.Schema(
     currency: { type: String, default: "INR" },
 
     razorpayQrId: { type: String, default: null },
+    /** QR_CODE (Razorpay QR API) or PAYMENT_LINK (fixed-amount link shown as a QR, used when the QR API is unavailable). */
+    gatewayKind: { type: String, enum: ["QR_CODE", "PAYMENT_LINK"], default: "QR_CODE" },
+    paymentLinkId: { type: String, default: null },
+    paymentLinkUrl: { type: String, default: null },
     qrImageUrl: { type: String, default: null },
     status: {
       type: String,
@@ -106,6 +110,10 @@ codQrPaymentSchema.index(
   { unique: true, partialFilterExpression: { razorpayQrId: { $type: "string" } } },
 );
 // A Razorpay payment id can complete at most one attempt (idempotency).
+codQrPaymentSchema.index(
+  { paymentLinkId: 1 },
+  { unique: true, partialFilterExpression: { paymentLinkId: { $type: "string" } } },
+);
 codQrPaymentSchema.index(
   { razorpayPaymentId: 1 },
   { unique: true, partialFilterExpression: { razorpayPaymentId: { $type: "string" } } },

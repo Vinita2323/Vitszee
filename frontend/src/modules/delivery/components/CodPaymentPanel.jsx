@@ -8,7 +8,10 @@ import {
   AlertTriangle,
   Clock,
   Banknote,
+  Smartphone,
+  X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
@@ -19,22 +22,22 @@ const VERIFY_EVERY_N_POLLS = 3; // hit Razorpay via backend every ~9s as a webho
 
 const STATUS_UI = {
   PAYMENT_PENDING: {
-    label: "Payment Pending",
+    label: "Waiting for payment",
     cls: "bg-amber-50 text-amber-700 border-amber-200",
     Icon: Clock,
   },
   PAYMENT_FAILED: {
-    label: "Payment Failed",
+    label: "Payment failed",
     cls: "bg-red-50 text-red-700 border-red-200",
     Icon: AlertTriangle,
   },
   QR_EXPIRED: {
-    label: "QR Expired",
+    label: "QR expired",
     cls: "bg-gray-100 text-gray-600 border-gray-200",
     Icon: Clock,
   },
   PAID: {
-    label: "Payment Received",
+    label: "Payment received",
     cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
     Icon: CheckCircle2,
   },
@@ -51,29 +54,40 @@ const formatClock = (ms) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
+const rupees = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
 /**
- * Rider-side payment step for COD orders, shown after the customer's
- * delivery OTP is verified. Shows a Razorpay Dynamic QR for the exact amount
- * due; delivery completes only when the backend verifies the payment (or the
- * rider records cash). Success is never decided by this component.
+ * Payment step for COD orders, shown after the customer's delivery OTP is
+ * verified: the rider picks how the customer pays.
+ *
+ *  - UPI  → a popup shows the Razorpay QR for the exact amount due. The QR is
+ *           created as a fixed-amount code, so after scanning, the customer's
+ *           UPI app already shows the amount and cannot change it.
+ *  - Cash → the rider confirms the cash received.
+ *
+ * Delivery completes only when the backend verifies the payment (or records
+ * the cash). Success is never decided by this component.
  */
 const CodPaymentPanel = ({ orderId, onCompleted }) => {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState("qr"); // qr | cash
+  const [view, setView] = useState("choose"); // choose | cash
+  const [upiOpen, setUpiOpen] = useState(false);
   const [cash, setCash] = useState("");
   const [now, setNow] = useState(Date.now());
   const [loadError, setLoadError] = useState(null);
   const pollCount = useRef(0);
-  const autoCreated = useRef(false);
+  const resumed = useRef(false);
   const completedRef = useRef(false);
 
   const applyState = useCallback(
     (next) => {
       setState(next);
-      setLoadError(null);
+      // The backend could not reach Razorpay's status API: say so, keep the QR usable.
+      setLoadError(next?.gatewayCheck?.ok === false ? next.gatewayCheck.message : null);
       if (next?.completed && !completedRef.current) {
         completedRef.current = true;
+        setUpiOpen(false);
         onCompleted?.(next);
       }
     },
@@ -88,7 +102,7 @@ const CodPaymentPanel = ({ orderId, onCompleted }) => {
           : await deliveryApi.getCodPayment(orderId);
         applyState(res.data?.result);
       } catch (e) {
-        // A failed verify (e.g. Razorpay unreachable) must not wipe known state.
+        // A failed verify must not wipe known state.
         setLoadError(errMessage(e, "Could not refresh payment status"));
       }
     },
@@ -100,12 +114,8 @@ const CodPaymentPanel = ({ orderId, onCompleted }) => {
       setBusy(true);
       try {
         const res = await deliveryApi.createCodQr(orderId, { regenerate });
-        if (res.data?.result?.completed) {
-          await refresh();
-        } else {
-          await refresh();
-          if (!res.data?.result?.reused) toast.success("Payment QR ready");
-        }
+        await refresh();
+        if (!res.data?.result?.reused && !res.data?.result?.completed) toast.success("Payment QR ready");
       } catch (e) {
         toast.error(errMessage(e, "Could not create the payment QR"));
         await refresh();
@@ -116,30 +126,19 @@ const CodPaymentPanel = ({ orderId, onCompleted }) => {
     [orderId, refresh],
   );
 
-  // Initial load, then auto-create the first QR once.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await refresh();
-      if (cancelled) return;
-    })();
-    return () => {
-      cancelled = true;
-    };
+    refresh();
   }, [refresh]);
 
+  // Resume: if a QR is already live (rider reloaded the page), reopen its popup.
   useEffect(() => {
-    if (!state || autoCreated.current) return;
-    if (state.completed) return;
-    if (state.awaitingPayment && !state.payment && state.canGenerateQr) {
-      autoCreated.current = true;
-      createQr(false);
-    }
-  }, [state, createQr]);
+    if (!state || resumed.current || state.completed) return;
+    resumed.current = true;
+    if (state.payment?.displayStatus === "PAYMENT_PENDING") setUpiOpen(true);
+  }, [state]);
 
-  // Poll while a QR is live; verify against Razorpay every few polls.
   const attemptStatus = state?.payment?.displayStatus;
-  const polling = !state?.completed && state?.awaitingPayment && attemptStatus === "PAYMENT_PENDING" && mode === "qr";
+  const polling = !state?.completed && state?.awaitingPayment && attemptStatus === "PAYMENT_PENDING" && upiOpen;
   useEffect(() => {
     if (!polling) return undefined;
     const t = setInterval(() => {
@@ -153,6 +152,15 @@ const CodPaymentPanel = ({ orderId, onCompleted }) => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  const payWithUpi = () => {
+    setUpiOpen(true);
+    const live =
+      state?.payment?.displayStatus === "PAYMENT_PENDING" &&
+      state?.payment?.expiresAt &&
+      new Date(state.payment.expiresAt).getTime() > Date.now();
+    if (!live) createQr(false);
+  };
 
   const confirmCash = async () => {
     setBusy(true);
@@ -184,147 +192,204 @@ const CodPaymentPanel = ({ orderId, onCompleted }) => {
   const effective = attemptStatus === "PAYMENT_PENDING" && remaining <= 0 ? "QR_EXPIRED" : attemptStatus;
   const ui = STATUS_UI[effective] || null;
 
+  if (state.completed) {
+    return (
+      <Card className="p-5 rounded-3xl border border-emerald-100 flex items-center gap-2 text-emerald-700 font-semibold">
+        <CheckCircle2 size={18} /> Payment received — delivery complete.
+      </Card>
+    );
+  }
+
   return (
-    <Card className="p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
-      <div className="flex items-start justify-between">
+    <>
+      <Card className="p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
             OTP verified · Collect payment
           </p>
-          <h3 className="text-3xl font-extrabold text-orange-600 flex items-center">
-            <IndianRupee size={24} />
-            {amount}
-          </h3>
+          <h3 className="text-3xl font-extrabold text-orange-600">{rupees(amount)}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Choose how the customer is paying</p>
         </div>
-        {ui && (
-          <span
-            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${ui.cls}`}
-          >
-            <ui.Icon size={12} /> {ui.label}
-          </span>
-        )}
-      </div>
 
-      {state.completed ? (
-        <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-          <CheckCircle2 size={18} /> Payment received — delivery complete.
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl text-sm font-bold">
+        {view === "choose" && (
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              disabled={!state.canGenerateQr}
-              onClick={() => setMode("qr")}
-              className={`py-2 rounded-lg flex items-center justify-center gap-1.5 ${
-                mode === "qr" ? "bg-white shadow text-[#0057B7]" : "text-gray-500"
-              } disabled:opacity-40`}
+              disabled={!state.canGenerateQr || busy}
+              onClick={payWithUpi}
+              className="rounded-2xl border-2 border-[#0057B7] bg-[#0057B7]/5 p-4 flex flex-col items-center gap-2 text-[#0057B7] font-bold disabled:opacity-40 active:scale-95 transition"
             >
-              <QrCode size={15} /> Scan QR
+              <Smartphone size={28} />
+              UPI / QR
+              <span className="text-[10px] font-medium text-gray-500">Customer scans &amp; pays</span>
             </button>
             <button
               type="button"
-              disabled={!state.canCollectCash}
-              onClick={() => setMode("cash")}
-              className={`py-2 rounded-lg flex items-center justify-center gap-1.5 ${
-                mode === "cash" ? "bg-white shadow text-[#0057B7]" : "text-gray-500"
-              } disabled:opacity-40`}
+              disabled={!state.canCollectCash || busy}
+              onClick={() => setView("cash")}
+              className="rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 flex flex-col items-center gap-2 text-emerald-700 font-bold disabled:opacity-40 active:scale-95 transition"
             >
-              <Banknote size={15} /> Cash
+              <Banknote size={28} />
+              Cash
+              <span className="text-[10px] font-medium text-gray-500">Collect from customer</span>
             </button>
           </div>
+        )}
 
-          {mode === "qr" && (
-            <div className="space-y-3">
-              {payment && effective !== "QR_EXPIRED" && payment.qrImageUrl ? (
-                <div className="flex flex-col items-center">
-                  <div className={`p-3 bg-white rounded-2xl border ${isLive ? "border-slate-200" : "border-red-200 opacity-60"}`}>
-                    <img
-                      src={payment.qrImageUrl}
-                      alt={`Pay ₹${amount} via UPI`}
-                      className="w-56 h-56 object-contain"
-                    />
-                  </div>
-                  {isLive && (
-                    <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                      <Clock size={12} /> Expires in {formatClock(remaining)} · Ask the customer to scan with any UPI app
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center text-sm text-gray-500 py-6">
-                  {busy ? "Generating QR…" : effective === "QR_EXPIRED" ? "The QR has expired." : "No active QR."}
-                </div>
-              )}
-
-              {effective === "PAYMENT_FAILED" && (
-                <p className="text-xs text-red-600 text-center">
-                  {payment?.failureReason || "The payment attempt failed."} The customer can try again, or generate a new QR.
-                </p>
-              )}
-              {payment?.reviewRequired && (
-                <p className="text-xs text-amber-700 text-center">
-                  A payment needs review by support. Do not hand over cash for the same amount.
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                {isLive && (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    disabled={busy}
-                    onClick={() => refresh({ verify: true })}
-                  >
-                    <RefreshCw size={14} className="mr-1.5" /> Check payment
-                  </Button>
-                )}
-                {(!payment || effective !== "PAYMENT_PENDING" || !isLive) && state.canGenerateQr && (
-                  <Button className="flex-1" disabled={busy} onClick={() => createQr(true)}>
-                    {busy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <QrCode size={14} className="mr-1.5" />}
-                    {payment ? "Generate new QR" : "Generate QR"}
-                  </Button>
-                )}
-              </div>
+        {view === "cash" && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Cash received</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-3 flex items-center text-gray-500 font-bold">₹</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={amount}
+                value={cash}
+                placeholder={String(amount)}
+                onChange={(e) => setCash(e.target.value)}
+                className="block w-full rounded-lg border border-gray-300 pl-8 pr-4 py-3 text-lg font-bold bg-gray-50 focus:bg-white outline-none focus:border-emerald-500"
+              />
             </div>
-          )}
-
-          {mode === "cash" && (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">Cash received</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-gray-500 font-bold">₹</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={amount}
-                  value={cash}
-                  placeholder={String(amount)}
-                  onChange={(e) => setCash(e.target.value)}
-                  className="block w-full rounded-lg border border-gray-300 pl-8 pr-4 py-3 text-lg font-bold bg-gray-50 focus:bg-white outline-none focus:border-orange-500"
-                />
-              </div>
-              {Number(cash) > amount && (
-                <p className="text-sm text-emerald-700 font-medium">
-                  Return change: ₹{Math.round((Number(cash) - amount) * 100) / 100}
-                </p>
-              )}
-              <Button className="w-full" disabled={busy} onClick={confirmCash}>
+            {Number(cash) > amount && (
+              <p className="text-sm text-emerald-700 font-medium">
+                Return change: {rupees(Math.round((Number(cash) - amount) * 100) / 100)}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" disabled={busy} onClick={() => setView("choose")}>
+                Back
+              </Button>
+              <Button className="flex-[2]" disabled={busy} onClick={confirmCash}>
                 {busy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Banknote size={14} className="mr-1.5" />}
                 Confirm cash collected
               </Button>
-              <p className="text-[11px] text-gray-400">
-                Any open QR is closed. If the customer already paid by QR, the app will tell you and complete the order.
-              </p>
             </div>
-          )}
-        </>
-      )}
+            <p className="text-[11px] text-gray-400">
+              Any open QR is closed. If the customer already paid by QR, the app will tell you and complete the order.
+            </p>
+          </div>
+        )}
 
-      {loadError && (
-        <p className="text-[11px] text-amber-600 text-center">{loadError}</p>
+        {loadError && !upiOpen && <p className="text-[11px] text-amber-600 text-center">{loadError}</p>}
+      </Card>
+
+      {/* UPI popup: Razorpay QR for the exact amount */}
+      {upiOpen && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/60 flex items-end sm:items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pay with UPI"
+        >
+          <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 pb-6 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Scan to pay</p>
+                <h3 className="text-4xl font-extrabold text-[#0057B7] flex items-center leading-tight">
+                  <IndianRupee size={30} />
+                  {Number(amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                </h3>
+                <p className="text-xs text-gray-500">Order #{String(orderId).slice(-8)} · amount is fixed</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setUpiOpen(false)}
+                className="p-2 -mr-2 rounded-full hover:bg-gray-100"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {ui && (
+              <span className={`mt-3 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${ui.cls}`}>
+                <ui.Icon size={12} /> {ui.label}
+              </span>
+            )}
+
+            <div className="mt-4 flex flex-col items-center">
+              {payment && effective !== "QR_EXPIRED" && (payment.qrImageUrl || payment.paymentLinkUrl) ? (
+                <>
+                  <div className={`p-3 bg-white rounded-2xl border ${isLive ? "border-slate-200" : "border-red-200 opacity-60"}`}>
+                    {payment.paymentLinkUrl ? (
+                      <QRCodeSVG
+                        value={payment.paymentLinkUrl}
+                        size={256}
+                        level="M"
+                        marginSize={1}
+                        title={`Pay ${rupees(amount)}`}
+                      />
+                    ) : (
+                      <img
+                        src={payment.qrImageUrl}
+                        alt={`Pay ${rupees(amount)} via UPI`}
+                        className="w-64 h-64 object-contain"
+                      />
+                    )}
+                  </div>
+                  {isLive && (
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      <Clock size={12} className="inline mr-1" />
+                      Valid for {formatClock(remaining)} · {payment.paymentLinkUrl
+                        ? `Customer scans with the phone camera or any UPI app — the payment page opens with ${rupees(amount)} already filled in`
+                        : `Customer scans with any UPI app — ${rupees(amount)} is already filled in`}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="py-14 text-center text-sm text-gray-500">
+                  {busy ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" /> Creating QR for {rupees(amount)}…
+                    </span>
+                  ) : effective === "QR_EXPIRED" ? (
+                    "This QR has expired."
+                  ) : (
+                    "No active QR."
+                  )}
+                </div>
+              )}
+            </div>
+
+            {effective === "PAYMENT_FAILED" && (
+              <p className="mt-3 text-xs text-red-600 text-center">
+                {payment?.failureReason || "The payment attempt failed."} The customer can try again, or generate a new QR.
+              </p>
+            )}
+            {payment?.reviewRequired && (
+              <p className="mt-3 text-xs text-amber-700 text-center">
+                A payment needs review by support. Do not hand over cash for the same amount.
+              </p>
+            )}
+            {loadError && <p className="mt-3 text-[11px] text-amber-600 text-center">{loadError}</p>}
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {isLive ? (
+                <Button variant="outline" disabled={busy} onClick={() => refresh({ verify: true })}>
+                  <RefreshCw size={14} className="mr-1.5" /> Check payment
+                </Button>
+              ) : (
+                <Button disabled={busy || !state.canGenerateQr} onClick={() => createQr(true)}>
+                  {busy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <QrCode size={14} className="mr-1.5" />}
+                  {payment ? "New QR" : "Generate QR"}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                disabled={busy || !state.canCollectCash}
+                onClick={() => {
+                  setUpiOpen(false);
+                  setView("cash");
+                }}
+              >
+                <Banknote size={14} className="mr-1.5" /> Pay with cash
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
-    </Card>
+    </>
   );
 };
 

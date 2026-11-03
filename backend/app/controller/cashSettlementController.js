@@ -11,6 +11,10 @@ import {
 import { submitDeposit, approveDeposit, rejectDeposit, recordDiscrepancy, resolveDiscrepancy, createAdjustment } from "../services/cashSettlement/depositService.js";
 import { grantLimitOverride } from "../services/cashSettlement/limitService.js";
 import {
+  createRazorpayDeposit,
+  verifyRazorpayDeposit,
+} from "../services/cashSettlement/razorpayDepositService.js";
+import {
   getDashboard,
   listSettlements,
   getSettlementDetail,
@@ -83,6 +87,36 @@ export const captainSubmitDeposit = wrap(async (req, res) => {
       ? "Deposit already submitted"
       : "Deposit submitted. It will count only after an admin verifies it.",
     serializeDeposit(deposit),
+  );
+});
+
+/** Pay a cash deposit online: creates the Razorpay order (amount is validated against pending cash). */
+export const captainCreateRazorpayDeposit = wrap(async (req, res) => {
+  const { deposit, checkout, duplicate } = await createRazorpayDeposit({
+    captainId: req.user.id,
+    amount: req.body?.amount,
+    idempotencyKey: req.headers["idempotency-key"] || req.body?.idempotencyKey || null,
+  });
+  return handleResponse(res, duplicate ? 200 : 201, "Payment ready", {
+    deposit: serializeDeposit(deposit),
+    checkout,
+  });
+});
+
+/** After Checkout: the backend verifies the signature AND the payment with Razorpay before settling anything. */
+export const captainVerifyRazorpayDeposit = wrap(async (req, res) => {
+  const b = req.body || {};
+  const result = await verifyRazorpayDeposit({
+    captainId: req.user.id,
+    razorpayOrderId: b.razorpay_order_id || b.razorpayOrderId,
+    razorpayPaymentId: b.razorpay_payment_id || b.razorpayPaymentId || null,
+    razorpaySignature: b.razorpay_signature || b.razorpaySignature || null,
+  });
+  return handleResponse(
+    res,
+    200,
+    result.settled ? "Payment verified. Your deposit is settled." : "Payment not completed yet",
+    result,
   );
 });
 

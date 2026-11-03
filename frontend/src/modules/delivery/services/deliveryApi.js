@@ -50,6 +50,8 @@ export const deliveryApi = {
     axiosInstance.post(`/orders/workflow/${orderId}/otp/request`, body),
   verifyDeliveryOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/otp/verify`, body),
+  markArrivedAtCustomer: (orderId, body = {}) =>
+    axiosInstance.post(`/orders/workflow/${encodeURIComponent(String(orderId))}/arrived-customer`, body),
   getCodPayment: (orderId) =>
     axiosInstance.get(`/orders/workflow/${encodeURIComponent(String(orderId))}/cod-payment`),
   createCodQr: (orderId, body = {}) =>
@@ -98,6 +100,8 @@ export const deliveryApi = {
   endShift: () => axiosInstance.post("/cash-settlement/shifts/end"),
   getCurrentShift: () => axiosInstance.get("/cash-settlement/shifts/current"),
   getCashSettlementOverview: () => axiosInstance.get("/cash-settlement/overview"),
+  createRazorpayDeposit: (data) => axiosInstance.post("/cash-settlement/deposits/razorpay", data),
+  verifyRazorpayDeposit: (data) => axiosInstance.post("/cash-settlement/deposits/razorpay/verify", data),
   submitCashDeposit: (data, config = {}) =>
     axiosInstance.post("/cash-settlement/deposits", data, config),
 };

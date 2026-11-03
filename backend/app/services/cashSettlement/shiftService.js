@@ -229,7 +229,13 @@ export async function getCaptainOverview(captainId) {
     .sort({ submittedAt: -1 })
     .limit(30)
     .lean();
+  // The shifts screen reads `activeShift`, `currentSummary` and `limits`; the wallet reads
+  // `currentShift`, `cash` and `limit`. Both shapes are returned (additive, same data).
+  const currentSummary = active ? await buildSettlementSummary(active) : null;
   return {
+    activeShift: active ? serializeShift(active) : null,
+    currentSummary,
+    limits: limit,
     currentShift: active ? { ...serializeShift(active), totals: await getShiftTotals(active) } : null,
     cash: {
       totalCollected: position.collectedCash,
@@ -261,5 +267,10 @@ export function serializeDeposit(d) {
     verifiedAt: d.verifiedAt,
     rejectionReason: d.rejectionReason,
     pendingAfter: d.pendingAfter,
+    paymentStatus: d.paymentStatus || null,
+    razorpayOrderId: d.razorpayOrderId || null,
+    razorpayPaymentId: d.razorpayPaymentId || null,
+    paidAt: d.paidAt || null,
+    failureReason: d.failureReason || null,
   };
 }

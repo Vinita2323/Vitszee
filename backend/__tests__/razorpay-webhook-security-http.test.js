@@ -32,6 +32,7 @@ jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
 }));
 jest.unstable_mockModule("../app/services/codQrPaymentService.js", () => ({
   processQrWebhookEvent: jest.fn(async () => ({ handled: true })),
+  processCollectLinkWebhookEvent: jest.fn(async () => ({ handled: false })),
 }));
 
 await startMemoryMongo("webhook_http");

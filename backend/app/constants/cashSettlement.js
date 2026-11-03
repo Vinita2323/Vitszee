@@ -14,6 +14,7 @@ export const COLLECTION_METHOD = {
 };
 
 export const DEPOSIT_METHOD = {
+  RAZORPAY: "RAZORPAY", // paid online through Razorpay Checkout, verified by the gateway
   BANK_UPI: "BANK_UPI",
   PHYSICAL_CASH: "PHYSICAL_CASH",
   ADMIN_ADJUSTMENT: "ADMIN_ADJUSTMENT",
@@ -25,6 +26,16 @@ export const DEPOSIT_STATUS = {
   APPROVED: "APPROVED",
   PARTIALLY_APPROVED: "PARTIALLY_APPROVED", // verified < claimed
   REJECTED: "REJECTED",
+  // Razorpay deposits: waiting for / recovering from the online payment
+  PAYMENT_PENDING: "PAYMENT_PENDING",
+  PAYMENT_FAILED: "PAYMENT_FAILED",
+};
+
+/** Razorpay payment state shown to captains and admins. */
+export const DEPOSIT_PAYMENT_STATUS = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  FAILED: "FAILED",
 };
 
 export const SETTLEMENT_STATUS = {

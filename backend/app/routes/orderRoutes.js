@@ -38,6 +38,7 @@ import {
   requestDeliveryOtp,
   verifyDeliveryOtp,
   getCodPayment,
+  arrivedAtCustomer,
   createCodPaymentQr,
   verifyCodPaymentStatus,
   confirmCodCashPayment,
@@ -227,6 +228,12 @@ router.post(
   verifyToken,
   allowRoles("delivery", "admin"),
   advanceDeliveryRiderUi,
+);
+router.post(
+  "/workflow/:orderId/arrived-customer",
+  verifyToken,
+  allowRoles("delivery"),
+  arrivedAtCustomer,
 );
 router.post(
   "/workflow/:orderId/otp/request",
