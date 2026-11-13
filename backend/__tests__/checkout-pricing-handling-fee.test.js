@@ -27,6 +27,16 @@ jest.unstable_mockModule("../app/services/finance/financeSettingsService.js", ()
   getOrCreateFinanceSettings: mockGetOrCreateFinanceSettings,
 }));
 
+// This test covers handling fees on local (non-courier) pricing. Lane resolution needs a real
+// Seller/Delhivery config, so it is pinned to the local lane here; courier pricing has its own suite
+// (courier-pricing.test.js).
+jest.unstable_mockModule("../app/services/finance/courierPricingService.js", () => ({
+  DELIVERY_LANE: { INTERNAL: "internal", QUICK: "quick", COURIER: "courier" },
+  loadSellerForPricing: jest.fn().mockResolvedValue({}),
+  resolveDeliveryLane: jest.fn().mockResolvedValue({ lane: "internal" }),
+  getCourierQuoteForSeller: jest.fn(),
+}));
+
 const { buildCheckoutPricingSnapshot } = await import(
   "../app/services/checkoutPricingService.js"
 );

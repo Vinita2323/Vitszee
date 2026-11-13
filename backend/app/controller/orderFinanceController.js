@@ -101,6 +101,8 @@ export const previewCheckoutFinance = async (req, res) => {
       couponCode: payload.couponCode || null,
       couponId: payload.couponId || null,
       customerId: req.user?.id || null,
+      // Courier shipping is quoted per payment type (COD includes Delhivery COD charges).
+      paymentMode: payload.paymentMode,
     });
 
     const sellerBreakdowns = pricingSnapshot.sellerBreakdownEntries.map((entry) => ({

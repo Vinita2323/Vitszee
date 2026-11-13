@@ -14,6 +14,19 @@ import {
 } from "./finance/pricingService.js";
 import { computeOrderDiscount } from "./finance/couponService.js";
 import { resolveDeliveryEstimateForSellers } from "./deliveryEstimate.js";
+import {
+  DELIVERY_LANE,
+  getCourierQuoteForSeller,
+  loadSellerForPricing,
+  resolveDeliveryLane,
+} from "./finance/courierPricingService.js";
+
+// Cost the platform bears for delivery: the courier quote on courier shipments, else rider payout.
+function logisticsCostOf(breakdown = {}) {
+  const courierAmount = Number(breakdown?.snapshots?.courierQuote?.amount);
+  if (Number.isFinite(courierAmount) && courierAmount > 0) return courierAmount;
+  return Number(breakdown?.riderPayoutTotal || 0);
+}
 
 function normalizeLocation(location = null) {
   const lat = Number(location?.lat);
@@ -155,18 +168,25 @@ function allocateCheckoutTipToSellerBreakdowns(
     return;
   }
 
-  const totalBase = sellerBreakdownEntries.reduce(
+  // Rider tips only go to local (captain) deliveries. Courier shipments have no rider to pay,
+  // so they never absorb a tip.
+  const tipEntries = sellerBreakdownEntries.filter(
+    (entry) => entry?.lane !== DELIVERY_LANE.COURIER,
+  );
+  if (tipEntries.length === 0) return;
+
+  const totalBase = tipEntries.reduce(
     (sum, entry) => sum + Number(entry?.breakdown?.grandTotal || 0),
     0,
   );
 
   let allocatedSoFar = 0;
-  sellerBreakdownEntries.forEach((entry, index) => {
+  tipEntries.forEach((entry, index) => {
     const breakdown = entry?.breakdown;
     if (!breakdown) return;
 
     let allocatedTip = 0;
-    if (index === sellerBreakdownEntries.length - 1) {
+    if (index === tipEntries.length - 1) {
       allocatedTip = round2(normalizedTip - allocatedSoFar);
     } else if (totalBase > 0) {
       allocatedTip = round2(
@@ -274,7 +294,7 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
     breakdown.payableAmount = grossTotal;
     breakdown.walletAmount = 0;
     breakdown.platformLogisticsMargin = round2(
-      deliveryFeeCharged + handlingFeeCharged - riderPayoutTotal,
+      deliveryFeeCharged + handlingFeeCharged - logisticsCostOf(breakdown),
     );
     breakdown.platformTotalEarning = round2(
       adminProductCommissionTotal + breakdown.platformLogisticsMargin,
@@ -312,7 +332,7 @@ function applyFreeDeliveryToSellerBreakdowns(sellerBreakdownEntries = []) {
     // Platform now collects only the handling fee against the rider
     // payout — typically a loss, which is the campaign cost we want to
     // attribute to the free-delivery coupon for finance reconciliation.
-    breakdown.platformLogisticsMargin = round2(handlingFeeCharged - riderPayoutTotal);
+    breakdown.platformLogisticsMargin = round2(handlingFeeCharged - logisticsCostOf(breakdown));
     breakdown.platformTotalEarning = round2(
       adminProductCommissionTotal + breakdown.platformLogisticsMargin,
     );
@@ -395,6 +415,7 @@ export async function buildCheckoutPricingSnapshot({
   couponCode = null,
   couponId = null,
   customerId = null,
+  paymentMode = "COD",
   session = null,
 }) {
   const hydratedItems = await hydrateOrderItems(orderItems, {
@@ -463,16 +484,33 @@ export async function buildCheckoutPricingSnapshot({
     // `applyWalletAllocationToSellerBreakdowns` so it can clamp against
     // the post-tip grandTotal — matching the customer-facing clamp on the
     // frontend. We deliberately do NOT pass walletAmount through here.
+    // Decide the delivery lane BEFORE pricing (same rules as dispatch). Only the Express courier
+    // lane gets a real Delhivery quote; local lanes keep the distance formula untouched.
+    const seller = await loadSellerForPricing(sellerId, { session });
+    const { lane } = await resolveDeliveryLane({ seller, address, paymentMode });
+    let courierOverride = null;
+    if (lane === DELIVERY_LANE.COURIER) {
+      courierOverride = await getCourierQuoteForSeller({
+        sellerId,
+        seller,
+        address,
+        items: sellerItems,
+        paymentMode,
+        codBaseAmount: Math.max(0, (sellerSubtotals.get(sellerId) || 0) - sellerDiscount),
+      });
+    }
     const breakdown = await generateOrderPaymentBreakdown({
       preHydratedItems: sellerItems,
       distanceKm,
       distanceSource,
       discountTotal: sellerDiscount,
       taxTotal: 0,
+      courierOverride,
       session,
     });
     sellerBreakdownEntries.push({
       sellerId,
+      lane,
       distanceKm,
       distanceSource,
       durationSeconds,

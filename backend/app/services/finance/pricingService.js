@@ -321,7 +321,7 @@ export async function hydrateOrderItems(
     .filter(Boolean);
 
   const productQuery = Product.find({ _id: { $in: productIds } })
-    .select("_id name salePrice price mainImage headerId sellerId status approvalStatus variants")
+    .select("_id name salePrice price mainImage headerId sellerId status approvalStatus variants weight")
     .lean();
   if (session) productQuery.session(session);
   const products = await productQuery;
@@ -376,6 +376,8 @@ export async function hydrateOrderItems(
       sellerId: String(product.sellerId),
       variantSku: rawVariantSku || "",
       variantName: resolvedVariant ? String(resolvedVariant?.name || "").trim() : "",
+      // Raw product weight text (e.g. "500 g", "1.5 kg"); parsed to grams for courier pricing.
+      weightText: String(resolvedVariant?.weight || product.weight || "").trim(),
     };
   });
 }
@@ -399,6 +401,9 @@ export async function generateOrderPaymentBreakdown({
   walletAmount = 0,
   deliverySettings,
   handlingFeeStrategy,
+  // Courier (Delhivery Express) lane: { fee, quote }. When present the local distance formula
+  // and rider payout are NOT used; the customer pays the real courier quote (pass-through).
+  courierOverride = null,
   session = null,
 }) {
   const normalizedItems = Array.isArray(preHydratedItems) && preHydratedItems.length > 0
@@ -465,8 +470,22 @@ export async function generateOrderPaymentBreakdown({
     handlingFeeStrategy: effectiveHandlingStrategy,
     categoryById,
   });
-  const delivery = calculateCustomerDeliveryFee(distanceKm, effectiveSettings);
-  const rider = calculateRiderPayout(distanceKm, effectiveSettings);
+  const isCourier = Boolean(courierOverride && Number.isFinite(Number(courierOverride.fee)));
+  const delivery = isCourier
+    ? {
+        deliveryFeeCharged: roundCurrency(courierOverride.fee),
+        distanceKmActual: Math.max(Number(distanceKm) || 0, 0),
+        distanceKmRounded: roundCurrency(Math.max(Number(distanceKm) || 0, 0)),
+        roundedExtraKm: 0,
+        mode: "COURIER_QUOTE",
+        baseFee: roundCurrency(courierOverride.fee),
+        extraFee: 0,
+      }
+    : calculateCustomerDeliveryFee(distanceKm, effectiveSettings);
+  // No local rider exists for a courier shipment: zero payout, never a distance-based one.
+  const rider = isCourier
+    ? { riderPayoutBase: 0, riderPayoutDistance: 0, riderPayoutBonus: 0 }
+    : calculateRiderPayout(distanceKm, effectiveSettings);
 
   const normalizedDiscount = roundCurrency(discountTotal || 0);
   const normalizedTax = roundCurrency(taxTotal || 0);
@@ -500,10 +519,13 @@ export async function generateOrderPaymentBreakdown({
       riderTipAmount,
   );
 
+  // Courier: the customer fee equals the courier cost (pass-through), so the logistics margin is
+  // just the handling fee. Local: unchanged (fee + handling - rider payout).
+  const logisticsCost = isCourier
+    ? roundCurrency(courierOverride.fee)
+    : rider.riderPayoutBase + rider.riderPayoutDistance + rider.riderPayoutBonus;
   const platformLogisticsMargin = roundCurrency(
-    delivery.deliveryFeeCharged +
-      handling.handlingFeeCharged -
-      (rider.riderPayoutBase + rider.riderPayoutDistance + rider.riderPayoutBonus),
+    delivery.deliveryFeeCharged + handling.handlingFeeCharged - logisticsCost,
   );
   const platformTotalEarning = roundCurrency(
     adminProductCommissionTotal + platformLogisticsMargin,
@@ -528,6 +550,7 @@ export async function generateOrderPaymentBreakdown({
     })),
     handlingFeeStrategy: effectiveHandlingStrategy,
     handlingCategoryUsed: handling.handlingCategoryUsed,
+    ...(isCourier ? { courierQuote: courierOverride.quote || null } : {}),
   };
 
   return {

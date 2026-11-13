@@ -418,6 +418,7 @@ export async function placeOrderAtomic({
       couponCode: normalizedPayload.couponCode || null,
       couponId: normalizedPayload.couponId || null,
       customerId,
+      paymentMode,
       session,
     });
 

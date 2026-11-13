@@ -92,6 +92,56 @@ export async function checkForwardServiceability({ pickupPincode, deliveryPincod
 }
 
 /**
+ * Fetches the real Delhivery forward shipping quote (existing invoice-charges endpoint).
+ * Pass-through: returns Delhivery's total_amount untouched. Throws on any failure; callers must
+ * not invent a fallback fee.
+ */
+export async function getForwardRateQuote({
+  pickupPincode,
+  deliveryPincode,
+  weightGrams,
+  paymentType = "Pre-paid",
+  codAmount = 0,
+  shippingMode,
+}) {
+  const config = await getDelhiveryConfig();
+  const mode = String(shippingMode || config.shippingMode || "Surface").toLowerCase().startsWith("e") ? "E" : "S";
+  const isCod = String(paymentType).toUpperCase() === "COD";
+  const response = await sendDelhiveryRequest({
+    method: "GET",
+    path: "/api/kinko/v1/invoice/charges/.json",
+    params: {
+      md: mode,
+      ss: "Delivered",
+      d_pin: String(deliveryPincode).trim(),
+      o_pin: String(pickupPincode).trim(),
+      cgm: Math.max(1, Math.round(Number(weightGrams) || 0)),
+      pt: isCod ? "COD" : "Pre-paid",
+      cod: isCod ? Math.max(0, Math.round(Number(codAmount) || 0)) : 0,
+    },
+  });
+  const body = Array.isArray(response.data) ? response.data[0] : response.data;
+  const total = Number(body?.total_amount);
+  if (!body || !Number.isFinite(total) || total <= 0) {
+    throw new DelhiveryInvalidRequestError("Delhivery returned an invalid shipping rate.", { status: body?.status });
+  }
+  return {
+    provider: "delhivery",
+    amount: Math.round(total * 100) / 100,
+    shippingMode: mode === "E" ? "Express" : "Surface",
+    paymentType: isCod ? "COD" : "Pre-paid",
+    zone: body.zone || null,
+    chargedWeight: Number(body.charged_weight) || null,
+    breakdown: {
+      chargeDL: Number(body.charge_DL) || 0,
+      chargeCOD: Number(body.charge_COD) || 0,
+      grossAmount: Number(body.gross_amount) || 0,
+      totalAmount: total,
+    },
+  };
+}
+
+/**
  * Reads the customer delivery address off the order, validated the way Delhivery needs it.
  */
 function resolveDropDetails(order) {

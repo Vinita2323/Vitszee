@@ -285,6 +285,8 @@ const orderSchema = new mongoose.Schema(
         categoryCommissionSettings: { type: Array, default: [] },
         handlingFeeStrategy: { type: String, default: null },
         handlingCategoryUsed: { type: Object, default: {} },
+        // Delhivery Express courier quote snapshot (null for local deliveries).
+        courierQuote: { type: Object, default: null },
       },
       lineItems: {
         type: Array,

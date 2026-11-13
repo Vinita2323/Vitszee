@@ -38,7 +38,7 @@ function pointOf(location) {
 }
 
 /** Extracts a 6-digit pincode from the delivery address (field or embedded in text). */
-function dropPincode(order = {}) {
+export function dropPincode(order = {}) {
   const a = order.address || {};
   const pin = String(a.pincode || "").trim();
   if (/^\d{6}$/.test(pin)) return pin;
