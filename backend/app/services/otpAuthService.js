@@ -140,14 +140,13 @@ export async function issueCustomerOtp({
           "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
         );
       }
-    } else if (useRealSMS()) {
-      otpAuditLog("customer_otp_login_generic_response", {
+    } else if (!customer) {
+      // Product rule: a number with no account can still log in. Issue an OTP and create the
+      // (unverified) customer; verifying the OTP completes the account.
+      otpAuditLog("customer_otp_login_new_number", {
         phone: maskPhone(phone),
         ipAddress,
-        accountExists: !!customer,
       });
-      return { sent: true, phone };
-    } else if (!customer) {
       // In mock/dev mode, allow login OTP issuance so local testing works end-to-end.
       customer = await Customer.create({
         name: name || "Customer",
